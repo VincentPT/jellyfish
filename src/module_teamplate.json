@@ -1,0 +1,31 @@
+{
+	"module": "<module>.dll",
+	"tickerInterval": 6,
+    "notifyTimeDistance": 900,
+	"triggers": [
+        {
+			"startTime": 1800,
+            "endTime": 3600,
+			"changedPerMin": 0.2
+		},{
+			"startTime": 3600,
+            "endTime": 7200,
+			"changedPerMin": 0.1667
+		},{
+			"startTime": 7200,
+            "endTime": 14400,
+			"changedPerMin": 0.0833
+		},{
+			"startTime": 14400,
+            "endTime": 28800,
+			"changedPerMin": 0.0625
+		}
+	],
+	"users": [
+        {
+			"userKey": "<Pushover's userKey>",
+			"applicationKey": "<Pushover's applicationKey>",
+			"interest": "all"
+		}
+	]
+}
