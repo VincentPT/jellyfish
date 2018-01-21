@@ -8,6 +8,10 @@ inline bool IS_INVALID_VOL(const double& vol) {
 	return vol == 0;
 }
 
+inline double computeBuy(const VolumePeriod& vol) {
+	return vol.bought / (vol.bought + vol.sold);
+}
+
 inline int comparePrice(const double& price1, const double& price2) {
 	if (IS_INVALID_PRICE(price1) && IS_INVALID_PRICE(price2)) {
 		if (IS_INVALID_PRICE(price1)) {
@@ -68,10 +72,13 @@ bool WxCryptoBoardInfo::checkValidPricePeriod(int i, int iOffset) {
 	return !IS_INVALID_PRICE(*pValue);
 }
 bool WxCryptoBoardInfo::checkValidVolPeriod(int i, int iOffset) {
-	auto pValue = (double*)((char*)&_fixedItems->at(i) + _rawElmInfoOffsets[iOffset]);
-	return !IS_INVALID_VOL(*pValue);
+	auto pValue = (VolumePeriod*)((char*)&_fixedItems->at(i) + _rawElmInfoOffsets[iOffset]);
+	return !IS_INVALID_VOL(pValue->bought + pValue->sold);
 }
-
+bool WxCryptoBoardInfo::checkValidBPSh(int i, int iOffset) {
+	auto pValue = (VolumePeriod*)((char*)&_fixedItems->at(i) + _rawElmInfoOffsets[iOffset]);
+	return !IS_INVALID_VOL(pValue->bought + pValue->sold);
+}
 
 bool WxCryptoBoardInfo::compareSymbol(int i1, int i2) {
 
@@ -104,10 +111,17 @@ bool WxCryptoBoardInfo::comparePricePeriod(int i1, int i2, int iOffset) {
 }
 bool WxCryptoBoardInfo::compareVolPeriod(int i1, int i2, int iOffset) {
 
-	auto pValue1 = (double*)((char*)&_fixedItems->at(i1) + _rawElmInfoOffsets[iOffset]);
-	auto pValue2 = (double*)((char*)&_fixedItems->at(i2) + _rawElmInfoOffsets[iOffset]);
+	auto pValue1 = (VolumePeriod*)((char*)&_fixedItems->at(i1) + _rawElmInfoOffsets[iOffset]);
+	auto pValue2 = (VolumePeriod*)((char*)&_fixedItems->at(i2) + _rawElmInfoOffsets[iOffset]);
 
-	return (*pValue1) < (*pValue2);
+	return (pValue1->bought + pValue1->sold) < (pValue2->bought + pValue2->sold);
+}
+
+bool WxCryptoBoardInfo::compareVolBPSh(int i1, int i2, int iOffset) {
+	auto pValue1 = (VolumePeriod*)((char*)&_fixedItems->at(i1) + _rawElmInfoOffsets[iOffset]);
+	auto pValue2 = (VolumePeriod*)((char*)&_fixedItems->at(i2) + _rawElmInfoOffsets[iOffset]);
+
+	return computeBuy(*pValue1) < computeBuy(*pValue2);
 }
 
 std::string WxCryptoBoardInfo::convert2StringForSymbol(int i) {
@@ -146,13 +160,23 @@ std::string WxCryptoBoardInfo::convert2StringForVol(int i) {
 }
 std::string WxCryptoBoardInfo::convert2StringForVolPeriod(int i, int iOffset) {
 	char buffer[32];
-	auto pValue = (double*)((char*)&_fixedItems->at(_dataIndexcies[i]) + _rawElmInfoOffsets[iOffset]);
-	auto vol = *pValue;
+	auto pValue = (VolumePeriod*)((char*)&_fixedItems->at(_dataIndexcies[i]) + _rawElmInfoOffsets[iOffset]);
+	auto vol = pValue->bought + pValue->sold;
 	if ( IS_INVALID_VOL(vol)) {
 		return "N/A";
 	}
 
 	sprintf(buffer, "%.8f", vol);
+	return buffer;
+}
+std::string WxCryptoBoardInfo::convert2StringForBPSh(int i, int iOffset) {
+	char buffer[32];
+	auto pValue = (VolumePeriod*)((char*)&_fixedItems->at(_dataIndexcies[i]) + _rawElmInfoOffsets[iOffset]);
+	if (IS_INVALID_VOL(pValue->bought + pValue->sold)) {
+		return "N/A";
+	}
+
+	sprintf(buffer, "%0.2f %%", (computeBuy(*pValue) * 100));
 	return buffer;
 }
 
@@ -178,6 +202,11 @@ WxCryptoBoardInfo::WxCryptoBoardInfo() : _selected(-1), _fixedItems(nullptr)
 		{ "vol 2h", 70, 10 },
 		{ "vol 3h", 70, 11 },
 		{ "vol 4h", 70, 12 },
+		{ "BPV 30", 70, 13 },
+		{ "BPV 1h", 70, 14 },
+		{ "BPV 2h", 70, 15 },
+		{ "BPV 3h", 70, 16 },
+		{ "BPV 4h", 70, 17 },
 	};
 
 	_rawElmInfoOffsets = {
@@ -273,6 +302,36 @@ WxCryptoBoardInfo::WxCryptoBoardInfo() : _selected(-1), _fixedItems(nullptr)
 			bind(&WxCryptoBoardInfo::compareVolPeriod, this, _1, _2, 12),
 			bind(&WxCryptoBoardInfo::convert2StringForVolPeriod, this, _1, 12),
 			bind(&WxCryptoBoardInfo::checkValidVolPeriod, this, _1, 12),
+			SortType::NotSort,
+		},
+		{
+			bind(&WxCryptoBoardInfo::compareVolBPSh, this, _1, _2, 8),
+			bind(&WxCryptoBoardInfo::convert2StringForBPSh, this, _1, 8),
+			bind(&WxCryptoBoardInfo::checkValidBPSh, this, _1, 8),
+			SortType::NotSort,
+		},
+		{
+			bind(&WxCryptoBoardInfo::compareVolBPSh, this, _1, _2, 9),
+			bind(&WxCryptoBoardInfo::convert2StringForBPSh, this, _1, 9),
+			bind(&WxCryptoBoardInfo::checkValidBPSh, this, _1, 9),
+			SortType::NotSort,
+		},
+		{
+			bind(&WxCryptoBoardInfo::compareVolBPSh, this, _1, _2, 10),
+			bind(&WxCryptoBoardInfo::convert2StringForBPSh, this, _1, 10),
+			bind(&WxCryptoBoardInfo::checkValidBPSh, this, _1, 10),
+			SortType::NotSort,
+		},
+		{
+			bind(&WxCryptoBoardInfo::compareVolBPSh, this, _1, _2, 11),
+			bind(&WxCryptoBoardInfo::convert2StringForBPSh, this, _1, 11),
+			bind(&WxCryptoBoardInfo::checkValidBPSh, this, _1, 11),
+			SortType::NotSort,
+		},
+		{
+			bind(&WxCryptoBoardInfo::compareVolBPSh, this, _1, _2, 12),
+			bind(&WxCryptoBoardInfo::convert2StringForBPSh, this, _1, 12),
+			bind(&WxCryptoBoardInfo::checkValidBPSh, this, _1, 12),
 			SortType::NotSort,
 		},
 	};

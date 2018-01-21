@@ -46,18 +46,21 @@ private:
 	bool compareVol(int i1, int i2);
 	bool comparePricePeriod(int i1, int i2, int iOffset);
 	bool compareVolPeriod(int i1, int i2, int iOffset);
+	bool compareVolBPSh(int i1, int i2, int iOffset);
 
 	std::string convert2StringForSymbol(int i);
 	std::string convert2StringForPrice(int i);
 	std::string convert2StringForVol(int i);
 	std::string convert2StringForPricePeriod(int i, int iOffset);
 	std::string convert2StringForVolPeriod(int i, int iOffset);
+	std::string convert2StringForBPSh(int i, int iOffset);
 
 	bool checkValidSymbol(int i);
 	bool checkValidPrice(int i);
 	bool checkValidVol(int i);
 	bool checkValidPricePeriod(int i, int iOffset);
 	bool checkValidVolPeriod(int i, int iOffset);
+	bool checkValidBPSh(int i, int iOffset);
 
 	void onSort(int columnIdx);
 public:

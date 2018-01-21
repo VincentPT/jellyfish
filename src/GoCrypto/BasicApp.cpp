@@ -101,30 +101,24 @@ void BasicApp::setup()
 	int h = getWindow()->getHeight();
 	_spliter.setSize((float)w, (float)h);
 	_spliter.setPos(0, 0);
-	_spliter.setVertical(true);
 
 	auto cryptoBoard = std::make_shared<WxCryptoBoardInfo>();
-	auto leftSpilter = std::make_shared<Spliter>();
-	auto rightSpilter = std::make_shared<Spliter>();
+	auto bottomSpliter = std::make_shared<Spliter>();
 	_applog = std::make_shared<WxAppLog>();
 	auto graphLine = std::make_shared<WxLineGraphLive>();
 
 	_logAdapter = new LogAdapter(_applog.get());
 
-	_spliter.setFixedPanelSize(cryptoBoard->getWidth());
-	_spliter.setFixPanel(FixedPanel::Panel1);
+	bottomSpliter->setVertical(true);
+	bottomSpliter->setFixedPanelSize(800);
+	bottomSpliter->setFixPanel(FixedPanel::Panel1);
+	bottomSpliter->setChild1(graphLine);
+	bottomSpliter->setChild2(_applog);
 
-	leftSpilter->setFixedPanelSize(300);
-	leftSpilter->setFixPanel(FixedPanel::Panel2);
-	leftSpilter->setChild1(cryptoBoard);
-	leftSpilter->setChild2(graphLine);
-
-	rightSpilter->setFixedPanelSize(300);
-	rightSpilter->setFixPanel(FixedPanel::Panel2);
-	rightSpilter->setChild2(_applog);
-
-	_spliter.setChild1(leftSpilter);
-	_spliter.setChild2(rightSpilter);
+	_spliter.setFixedPanelSize(300);
+	_spliter.setFixPanel(FixedPanel::Panel2);
+	_spliter.setChild1(cryptoBoard);
+	_spliter.setChild2(bottomSpliter);
 
 	graphLine->setInitalGraphRegion(Area(20, 20, graphLine->getWidth() - 20, graphLine->getHeight() - 20));
 	graphLine->setGraphRegionColor(ColorA8u(0, 0, 0, 255));

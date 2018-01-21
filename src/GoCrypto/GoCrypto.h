@@ -1,5 +1,14 @@
 #pragma once
 
+struct VolumePeriod
+{
+	double bought;
+	double sold;
+
+	VolumePeriod() : bought(0), sold(0)
+	{}
+};
+
 struct CryptoBoardElmInfo {
 	std::string symbol;
 	double price;
@@ -9,11 +18,11 @@ struct CryptoBoardElmInfo {
 	double pricePeriod3;
 	double pricePeriod4;
 	double pricePeriod5;
-	double volPeriod1;
-	double volPeriod2;
-	double volPeriod3;
-	double volPeriod4;
-	double volPeriod5;
+	VolumePeriod volPeriod1;
+	VolumePeriod volPeriod2;
+	VolumePeriod volPeriod3;
+	VolumePeriod volPeriod4;
+	VolumePeriod volPeriod5;
 
 	CryptoBoardElmInfo() :
 		price(-1),
@@ -22,12 +31,7 @@ struct CryptoBoardElmInfo {
 		pricePeriod2(-1),
 		pricePeriod3(-1),
 		pricePeriod4(-1),
-		pricePeriod5(-1),
-		volPeriod1(0),
-		volPeriod2(0),
-		volPeriod3(0),
-		volPeriod4(0),
-		volPeriod5(0) {
+		pricePeriod5(-1) {
 
 	}
 };

@@ -251,12 +251,11 @@ void PlatformEngine::updateSymbolStatistic(CryptoBoardElmInfo* info, NAPMarketEv
 		pValue++;
 	}
 
-	pValue = &info->volPeriod1;
+	auto pVolumePeriod = &info->volPeriod1;
 
 	it = jt;
 	double sumVol;
 	for (auto& period : volPeriods) {
-		totalTime = 0;
 		sumVol = 0;
 		for (; it != tickers.end(); it++) {
 			if (it->lastPrice.price < 0 || (it->boughtVolume <= 0 && it->soldVolume <= 0)) {
@@ -267,19 +266,10 @@ void PlatformEngine::updateSymbolStatistic(CryptoBoardElmInfo* info, NAPMarketEv
 				break;
 			}
 
-			sumVol += it->boughtVolume + it->soldVolume;
-			duration = (it->lastPrice.at - it->firstPrice.at);
-			totalTime += duration;
-			if (duration < 0) {
-				pushLog("time synchronizing error %lld\n", duration);
-			}
+			pVolumePeriod->bought += it->boughtVolume;
+			pVolumePeriod->sold += it->soldVolume;
 		}
-
-		if (totalTime) {
-			// volume per minutes
-			*pValue = sumVol / totalTime * 60*1000;
-		}
-		pValue++;
+		pVolumePeriod++;
 	}
 }
 
