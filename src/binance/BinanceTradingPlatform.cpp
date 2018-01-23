@@ -7,8 +7,6 @@
 #include <codecvt>
 
 #include <iostream>
-
-#include <cpprest/http_client.h>
 using namespace std;
 using namespace web;
 using namespace web::websockets::client;
@@ -133,6 +131,9 @@ bool BinanceTradingPlatform::connectImpl() {
 
 bool BinanceTradingPlatform::disconnectImpl() {
 	_client->close().wait();
+
+	_stopPingTask.sendSignal(false);
+	_pingServerTask.wait();
 	return true;
 }
 
@@ -387,8 +388,95 @@ char* BinanceTradingPlatform::getAllPairs() {
 	throw std::runtime_error(erroreMsg);
 }
 
-void BinanceTradingPlatform::startServerTimeQuery(TIMESTAMP updateInterval) {
+void BinanceTradingPlatform::pingServerLoop() {
+	bool temp;
+	bool sent;
 
+	TIMESTAMP t1, t2;
+	TIMESTAMP processTime;
+	TIMESTAMP interval = getQueryTimeInterval();
+	unsigned int bonusTime, sleepTime = 0;
+
+	/*
+	Request: https://api.binance.com/api/v1/time
+	Response:
+	{
+	"serverTime": 1499827319559
+	}
+	*/
+
+	http_client_config config;
+	// 5 seconds timeout
+	std::chrono::duration<long long, std::milli> timeout((long long)5000);
+	config.set_timeout(timeout);
+
+	http_request httpRequest(methods::GET);
+	auto& headers = httpRequest.headers();
+	headers[U("Connection")] = U("keep-alive");
+
+	_restClient = make_shared<http_client>(U("https://api.binance.com/api/v1/time"), config);
+	
+	do
+	{
+		t1 = getCurrentTimeStamp();
+		bonusTime = 0;
+		sent = false;
+		try {
+			auto task = _restClient->request(httpRequest).then([&t1, &t2, &bonusTime, this](http_response response) {
+				t2 = getCurrentTimeStamp();
+
+				//asume that sending time from client to server equal to
+				//response time from server to client
+				// then we can calculate coressponding time of server and client
+				auto localTime = t1 + (t2 - t1) / 2;
+
+				if (response.status_code() == 200) {
+					auto js = response.extract_json().get();
+					if (js.has_field(U("serverTime")) && js[U("serverTime")].is_integer()) {
+
+						auto serverTime = js[U("serverTime")].as_number().to_int64();
+
+						_timeDiff = serverTime - localTime;
+						_serverTimeIsReady = true;
+					}
+					else {
+						pushLogV("unknow response format %s\n", CPPREST_FROM_STRING(js.as_string()).c_str());
+					}
+				}
+				else if (response.status_code() == 429) {
+					pushLog("The API has reach the limit, pause to the next minutes\n");
+					bonusTime = 60000;
+				}
+				else if (response.status_code() == 418) {
+					pushLog("The client's IP has been banned by Binance\n");
+				}
+				else {
+					pushLog("Ping server failed\n");
+				}
+			});
+
+			task.wait();
+		}
+		catch (const std::exception&e) {
+			pushLogV("ping server failed: %s\n", e.what());
+		}
+		catch (...) {
+			pushLog("ping server failed: unknown error\n");
+		}
+		
+		t2 = getCurrentTimeStamp();
+
+		sleepTime = 0;
+		processTime = t2 - t1;
+		if (processTime < interval) {
+			sleepTime = (unsigned int)(interval - processTime);
+		}
+	} while (_stopPingTask.waitSignal(temp, sleepTime + bonusTime) == false);
+}
+
+void BinanceTradingPlatform::startServerTimeQuery(TIMESTAMP updateInterval) {
+	setQueryTimeInterval(updateInterval);
+	_pingServerTask = std::async(std::launch::async, [this]() { pingServerLoop(); });
 }
 
 TIMESTAMP BinanceTradingPlatform::getSyncTime(TIMESTAMP localTime) {
@@ -396,7 +484,7 @@ TIMESTAMP BinanceTradingPlatform::getSyncTime(TIMESTAMP localTime) {
 }
 
 bool BinanceTradingPlatform::isServerTimeReady() {
-	return false;
+	return _serverTimeIsReady;
 }
 
 extern "C" {

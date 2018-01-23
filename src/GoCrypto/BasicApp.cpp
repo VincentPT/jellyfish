@@ -238,7 +238,7 @@ void BasicApp::setup()
 		}
 	});
 
-	_platformRunner = new PlatformEngine("bitfinex");
+	_platformRunner = new PlatformEngine("binance");
 	_platformRunner->getPlatform()->setLogger(_logAdapter);
 	_platformRunner->run();
 	auto& items = _platformRunner->getSymbolsStatistics();

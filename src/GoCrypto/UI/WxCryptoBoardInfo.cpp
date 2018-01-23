@@ -415,7 +415,6 @@ void WxCryptoBoardInfo::update() {
 		auto& column = _columns[i];
 		//ImGui::Text(column.label);
 		if (ImGui::Button(column.label, ImVec2(column.size, 0))) {
-			pushLog("push button %s\n", column.label);
 			onSort(column.additionalIdx);
 		}
 		ImGui::SetColumnOffset(-1, offset);
