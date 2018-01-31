@@ -24,6 +24,7 @@ public:
 	virtual void addPoint(const glm::vec2& point);
 	void import(std::list<glm::vec2>& points);
 	virtual void clearPoints();
+	const std::list<glm::vec2>& getPoints();
 	virtual size_t getPointCount() const;
 	virtual void setInitalGraphRegion(const ci::Area& area);
 	virtual const ci::Area& getGraphRegion() const;

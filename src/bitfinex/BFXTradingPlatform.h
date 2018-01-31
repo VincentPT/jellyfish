@@ -21,7 +21,7 @@ class BFXTradingPlatform : public CPPRESTBaseTradingPlatformThreadSafe
 private:
 	web::websockets::client::websocket_client _pingServerClient;
 	std::future<void> _pingServerTask;
-	Signal<bool> _stopPingTask;
+	Signal<bool> _stopLoopTask;
 
 	std::mutex _eventMutex;
 	std::map<int, EventHandlerInfo> _chanelEventHandlerInfoMap;
@@ -64,4 +64,5 @@ public:
 	virtual bool addEventHandler(MarketEventHandler* handler, bool allowDelete = false);
 	virtual void removeEventHandler(const char* pair);
 	virtual char* getAllPairs();
+	virtual void getTradeHistory(const char* pair, TIMESTAMP duration, TIMESTAMP endTime, TradingList& tradeItems);
 };

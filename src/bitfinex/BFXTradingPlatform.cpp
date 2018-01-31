@@ -218,7 +218,7 @@ bool BFXTradingPlatform::disconnectImpl() {
 	_restartEvents.sendSignal(false);
 	_maintenanceTask.wait();
 
-	_stopPingTask.sendSignal(false);
+	_stopLoopTask.sendSignal(false);
 	_pingServerTask.wait();
 
 	_client->close().wait();
@@ -709,7 +709,7 @@ void BFXTradingPlatform::pingServerLoop() {
 		if (processTime < interval) {
 			sleepTime = (unsigned int)(interval - processTime);
 		}
-	} while (_stopPingTask.waitSignal(temp, sleepTime) == false);
+	} while (_stopLoopTask.waitSignal(temp, sleepTime) == false);
 }
 
 void BFXTradingPlatform::startServerTimeQuery(TIMESTAMP updateInterval) {
@@ -725,6 +725,152 @@ TIMESTAMP BFXTradingPlatform::getSyncTime(TIMESTAMP localTime) {
 
 bool BFXTradingPlatform::isServerTimeReady() {
 	return _serverTimeIsReady;
+}
+
+inline bool isMaitenanceMode(const json::array& response) {
+	if (response.size() != 3) {
+		return false;
+	}
+
+	if (response.at(0).is_string() && response.at(1).is_integer() && response.at(2).is_string()) {
+		if (response.at(0).as_string() == U("error") && response.at(1).as_integer() == 20060) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+void BFXTradingPlatform::getTradeHistory(const char* pair, TIMESTAMP duration, TIMESTAMP endTime, TradingList& tradeItems) {
+	bool temp;
+
+	TIMESTAMP t1, t2, additionalTime;
+	TIMESTAMP processTime;
+	TIMESTAMP interval = 4*1000;
+	unsigned int sleepTime = 0;
+	bool shouldStop = false;
+
+	std::map<TRADE_ID, bool> existingTrades;
+
+	auto parseTrades = [this, &tradeItems, &duration, &existingTrades, &shouldStop, &additionalTime](http_response response) {
+		additionalTime = 0;
+		if (response.status_code() == 200) {
+			auto js = response.extract_json().get();
+			if (js.is_array()) {
+				auto& items = js.as_array();
+
+				if (!isMaitenanceMode(items)) {
+
+					TIMESTAMP lastTimeStamp = 0;
+					if (tradeItems.size()) {
+						lastTimeStamp = tradeItems.back().timestamp;
+					}
+					
+					for (auto it = items.begin(); it != items.end(); it++) {
+
+						auto& itemElm = it->as_array();
+
+						TradeItem tradeItem;
+						tradeItem.oderId = itemElm[0].as_number().to_uint64();
+						tradeItem.timestamp = itemElm[1].as_number().to_uint64();
+						// skip existing trade items
+						if (lastTimeStamp == tradeItem.timestamp && existingTrades.find(tradeItem.oderId) != existingTrades.end() ){
+							//pushLogV("skip trade item %lld\n", tradeItem.oderId);
+							if (items.size() == 1) {
+								//pushLog("there is only one item\n");
+								shouldStop = true;
+							}
+							continue;
+						}
+
+						tradeItem.amount = itemElm[2].as_double();
+						tradeItem.price = itemElm[3].as_double();
+
+						tradeItems.push_back(tradeItem);
+
+						if (tradeItems.size() > 1) {
+							if (tradeItems.front().timestamp - tradeItems.back().timestamp >= duration) {
+								return;
+							}
+						}
+					}
+				}
+			}
+			else {
+				pushLogV("unknow response format %s\n", CPPREST_FROM_STRING(js.as_string()).c_str());
+			}
+		}
+		else {
+			pushLog("query trade history failed, try again in one minute\n");
+			additionalTime = 60 * 1000;
+		}
+	};
+
+	TIMESTAMP tStart, tEnd, durationLeft = duration;
+	utility::string_t parameters;
+
+	if (endTime > 0) {
+		tEnd = endTime;
+		parameters = U("&end=");
+		parameters += TO_STRING_T(tEnd);
+	}
+
+	utility::string_t baseURL = U("https://api.bitfinex.com/v2/trades/t");
+	baseURL.append(CPPREST_TO_STRING(pair));
+	baseURL.append(U("/hist?limit=1000"));
+
+	while(durationLeft > 0)
+	{
+		t1 = getCurrentTimeStamp();
+		try {
+			http_client client(baseURL + parameters);
+			auto task = client.request(methods::GET).then(parseTrades);
+			task.wait();
+		}
+		catch (const std::exception&e) {
+			pushLogV("ping server failed: %s\n", e.what());
+		}
+		catch (...) {
+			pushLog("ping server failed: unknown error\n");
+		}
+		
+		if (tradeItems.size() == 0 || shouldStop) {
+			return;
+		}
+
+		tStart = tradeItems.back().timestamp;
+		tEnd = tradeItems.front().timestamp;
+		durationLeft = duration - (tEnd - tStart);
+
+		tEnd = tStart;
+		tStart = tEnd - durationLeft;
+
+		parameters = U("&start=");
+		parameters += TO_STRING_T(tStart);
+		parameters += U("&end=");
+		parameters += TO_STRING_T(tEnd);
+
+		//pushLogV("request trade from %s to %s\n", Utility::time2str(tStart).c_str(), Utility::time2str(tEnd).c_str());
+
+		t2 = getCurrentTimeStamp();
+
+		sleepTime = 0;
+		processTime = t2 - t1;
+		if (processTime < interval) {
+			sleepTime = (unsigned int)(interval - processTime);
+		}
+		if (_stopLoopTask.waitSignal(temp, sleepTime + (unsigned int)additionalTime)) {
+			break;
+		}
+
+		existingTrades.clear();
+		t2 = tradeItems.back().timestamp;
+		for (auto it = tradeItems.head(); it; it = it->nextNode) {
+			if (it->value.timestamp == t2) {
+				existingTrades[it->value.oderId] = true;
+			}
+		}
+	}
 }
 
 extern "C" {

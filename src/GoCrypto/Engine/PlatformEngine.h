@@ -29,6 +29,12 @@ class PlatformEngine
 		Notification message;
 		std::string pair;
 	};
+
+	struct RequestTradeHistoryMessage {
+		std::string pair;
+		TIMESTAMP endTime;
+		TIMESTAMP duration;
+	};
 	
 private:
 	bool _runFlag;
@@ -39,6 +45,7 @@ private:
 	AccessEventDataFunc _tickerAnalyzer;
 	std::vector<TriggerTimeBase> _triggers;
 	SyncMessageQueue<InternalNotificationData> _messageQueue;
+	SyncMessageQueue<RequestTradeHistoryMessage> _symbolQueue;
 	std::string _platformName;
 	TIMESTAMP _tickerInterval;
 	TIMESTAMP _notifyDistance;
@@ -47,13 +54,19 @@ private:
 	std::map<std::string, std::shared_ptr<std::list<UserListenerInfo*>>> _pairListenerMap;
 	std::map<std::string, bool> _degbugMap;
 	std::vector<CryptoBoardElmInfo> _symbolsStatistics;
+
+	typedef std::map<TRADE_ID, char> TradeLevelMap;
+	std::map<std::string, std::shared_ptr<TradeLevelMap>> _processLevelMap;
+	std::map<std::string, bool> _sentTradeSnapshotRequest;
+	std::future<void> _sendTradeHistoryRequestLoop;
 private:
 	void timeInterval();
 	void pushMessageLoop();
+	void sheduleQueryHistory();
 	void measurePriceIncrement(const std::vector<NAPMarketEventHandler*>& handlers);
 	void tickerAnalyze(NAPMarketEventHandler*);
-	bool processTickerLevel(const char* pair, TIMESTAMP timeBase, std::list<SimpleTicker>::iterator begin, std::list<SimpleTicker>::iterator& end, char level);
-	void updateSymbolStatistic(CryptoBoardElmInfo* info, NAPMarketEventHandler* sender, TradeItem* tradeItem);
+	bool processTradesLevel(const char* pair, TIMESTAMP timeBase, std::list<TradeItem>::iterator begin, std::list<TradeItem>::iterator& end, char level);
+	void updateSymbolStatistic(CryptoBoardElmInfo* info, NAPMarketEventHandler* sender, TradeItem* tradeItem, int, bool);
 public:
 	PlatformEngine(const char* platformName);
 	virtual ~PlatformEngine();

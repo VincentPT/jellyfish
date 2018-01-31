@@ -17,12 +17,10 @@ struct CryptoBoardElmInfo {
 	double pricePeriod2;
 	double pricePeriod3;
 	double pricePeriod4;
-	double pricePeriod5;
 	VolumePeriod volPeriod1;
 	VolumePeriod volPeriod2;
 	VolumePeriod volPeriod3;
 	VolumePeriod volPeriod4;
-	VolumePeriod volPeriod5;
 
 	CryptoBoardElmInfo() :
 		price(-1),
@@ -30,8 +28,7 @@ struct CryptoBoardElmInfo {
 		pricePeriod1(-1),
 		pricePeriod2(-1),
 		pricePeriod3(-1),
-		pricePeriod4(-1),
-		pricePeriod5(-1) {
+		pricePeriod4(-1) {
 
 	}
 };

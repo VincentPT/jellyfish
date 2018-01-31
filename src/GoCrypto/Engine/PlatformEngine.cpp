@@ -127,9 +127,9 @@ void PlatformEngine::timeInterval() {
 	TIMESTAMP processTime;
 	while (_runFlag) {
 		t1 = getCurrentTimeStamp();
-		if (_platform->isServerTimeReady()) {
-			_platform->broadcastServerTime(_platform->getSyncTime(getCurrentTimeStamp()));
-		}
+		//if (_platform->isServerTimeReady()) {
+		//	_platform->broadcastServerTime(_platform->getSyncTime(getCurrentTimeStamp()));
+		//}
 		measurePriceIncrement(handlers);
 
 		t2 = getCurrentTimeStamp();
@@ -149,8 +149,7 @@ void PlatformEngine::pushMessageLoop() {
 	InternalNotificationData notification;
 	Notifier notifier;
 	while (_runFlag) {
-		_messageQueue.popMessage(notification);
-		if (_runFlag) {
+		if (_messageQueue.popMessage(notification, 1000) && _runFlag) {
 			auto it = _pairListenerMap.find(notification.pair);
 			if (it != _pairListenerMap.end()) {
 				auto& users = it->second;
@@ -181,14 +180,57 @@ void PlatformEngine::pushMessageLoop() {
 	}
 }
 
-void PlatformEngine::updateSymbolStatistic(CryptoBoardElmInfo* info, NAPMarketEventHandler* sender, TradeItem* tradeItem) {
+void PlatformEngine::sheduleQueryHistory() {
+	RequestTradeHistoryMessage message;
+	while (_runFlag)
+	{
+		if (_symbolQueue.popMessage(message, 1000) && _runFlag) {
+			auto symbol = message.pair.c_str();
+			auto hander = _platform->getHandler(symbol);
+			if (hander) {
+				TradingList tradeItems;
+
+				pushLog("requesting trade snapshot for %s\n", symbol);
+				_platform->getTradeHistory(symbol, message.duration, message.endTime, tradeItems);
+				vector<TradeItem> tradeRawItems(tradeItems.size());
+				TradeItem* pItem = tradeRawItems.data();
+				for (auto iter = tradeItems.head(); iter; iter = iter->nextNode) {
+					*pItem++ = iter->value;
+				}
+
+				pushLog("received trade snapshot for %s\n", symbol);
+				hander->onTradesUpdate(tradeRawItems.data(), (int)tradeRawItems.size(), true);
+			}
+		}
+	}
+}
+
+void PlatformEngine::updateSymbolStatistic(CryptoBoardElmInfo* info, NAPMarketEventHandler* sender, TradeItem* tradeItem, int, bool) {
 	info->price = tradeItem->price;
 	info->volume = fabs(tradeItem->amount);
 
-	auto& tickers = sender->getTickerHistoriesNonSync();
+	auto& trades = sender->getTradeHistoriesNonSync();
+	if (_sentTradeSnapshotRequest.find(sender->getPair()) == _sentTradeSnapshotRequest.end()) {
+		TIMESTAMP tEnd = 0;
+		TIMESTAMP duration = 4 * 3600 * 1000;
+		if (trades.size()) {
+			tEnd = trades.back().timestamp;
+
+			duration -= trades.front().timestamp - tEnd;
+		}
+		RequestTradeHistoryMessage message;
+		message.pair = sender->getPair();
+		message.duration = duration;
+		message.endTime = tEnd;
+
+		_sentTradeSnapshotRequest[sender->getPair()] = true;
+		_symbolQueue.pushMessage(message);
+
+		//pushLog("send request trade snapshot for %s\n", sender->getPair());
+	}
+
 
 	static TIMESTAMP pricePeriods[] = {
-		30 * 60 * 1000,
 		1 * 60 * 60 * 1000,
 		2 * 60 * 60 * 1000,
 		3 * 60 * 60 * 1000,
@@ -196,57 +238,39 @@ void PlatformEngine::updateSymbolStatistic(CryptoBoardElmInfo* info, NAPMarketEv
 	};
 
 	static TIMESTAMP volPeriods[] = {
-		30 * 60 * 1000,
 		1 * 60 * 60 * 1000,
 		2 * 60 * 60 * 1000,
 		3 * 60 * 60 * 1000,
 		4 * 60 * 60 * 1000,
 	};
 
-	auto it = tickers.begin();
-	for (; it != tickers.end(); it++) {
-		if (it->firstPrice.price >= 0) {
-			break;
-		}
-	}
-	if (it == tickers.end()) return;
-
+	auto it = trades.begin();
 	auto jt = it;
 
 	auto& ticker = *it;
-	TIMESTAMP totalTime;
-	double sumPrice;
+	double amount, amountABS;
+	double cost;
 	double* pValue = &info->pricePeriod1;
 
-	PricePoint* prevPricePoint = nullptr;
 	TIMESTAMP serverTimeNow = _platform->getSyncTime(getCurrentTimeStamp());
 
 	TIMESTAMP prevPeriod = 0;
 	for (auto& period : pricePeriods) {
-		totalTime = 0;
-		sumPrice = 0;
-		for (; it != tickers.end(); it++) {
-			if (it->lastPrice.price < 0 || (it->boughtVolume <= 0 && it->soldVolume <= 0)) {
-				continue;
-			}
-
-			auto duration = serverTimeNow - it->firstPrice.at;
+		amount = 0;
+		cost = 0;
+		for (; it != trades.end(); it++) {
+			auto duration = serverTimeNow - it->timestamp;
 			if (duration > period) {
 				break;
 			}
+			amountABS = abs(it->amount);
 
-			duration = it->lastPrice.at - it->firstPrice.at;
-			if (duration < 0) {
-				pushLog("time synchronizing error %lld\n", duration);
-			}
-			sumPrice += it->averagePrice * duration;
-			totalTime += (it->lastPrice.at - it->firstPrice.at);
-
-			prevPricePoint = &it->lastPrice;
+			cost += it->price * amountABS;
+			amount += amountABS;
 		}
 
-		if (totalTime) {
-			*pValue = sumPrice / totalTime;
+		if (amount) {
+			*pValue = cost / amount;
 		}
 		pValue++;
 	}
@@ -254,26 +278,26 @@ void PlatformEngine::updateSymbolStatistic(CryptoBoardElmInfo* info, NAPMarketEv
 	auto pVolumePeriod = &info->volPeriod1;
 
 	it = jt;
-	double sumVol;
 	for (auto& period : volPeriods) {
-		sumVol = 0;
-		for (; it != tickers.end(); it++) {
-			if (it->lastPrice.price < 0 || (it->boughtVolume <= 0 && it->soldVolume <= 0)) {
-				continue;
-			}
-			auto duration = serverTimeNow - it->firstPrice.at;
+		amount = 0;
+		for (; it != trades.end(); it++) {
+			auto duration = serverTimeNow - it->timestamp;
 			if (duration > period) {
 				break;
 			}
-
-			pVolumePeriod->bought += it->boughtVolume;
-			pVolumePeriod->sold += it->soldVolume;
+			if (it->amount > 0) {
+				pVolumePeriod->bought += it->amount;
+			}
+			else if (it->amount < 0) {
+				pVolumePeriod->sold -= it->amount;
+			}
 		}
 		pVolumePeriod++;
 	}
 }
 
 void PlatformEngine::run() {
+	using namespace std::placeholders;
 	if (_platform == nullptr) return;
 	_runFlag = true;
 
@@ -361,7 +385,8 @@ void PlatformEngine::run() {
 
 		pSymbolStatisticsinfo->symbol = it->first;
 
-		auto eventListener = std::bind(&PlatformEngine::updateSymbolStatistic, this, pSymbolStatisticsinfo, std::placeholders::_1 , std::placeholders::_2);
+		auto eventListener = 
+			std::bind(&PlatformEngine::updateSymbolStatistic, this, pSymbolStatisticsinfo, _1 , _2, _3, _4);
 		eventHandler->addTradeEventListener(eventListener);
 
 		pSymbolStatisticsinfo++;
@@ -370,6 +395,7 @@ void PlatformEngine::run() {
 	// start interval thread
 	_broadCastIntervalTask = std::async(std::launch::async, [this]() {timeInterval(); });
 	_messageLoopTask = std::async(std::launch::async, [this]() {pushMessageLoop(); });
+	_sendTradeHistoryRequestLoop = std::async(std::launch::async, [this]() {sheduleQueryHistory(); });
 
 	// starting query time from server
 	_platform->startServerTimeQuery(5000);
@@ -386,7 +412,8 @@ void PlatformEngine::run() {
 
 void PlatformEngine::stop() {
 	cout << "exiting..." << endl;
-	_runFlag = false;	
+	_runFlag = false;
+	_platform->disconnect();
 	if (_broadCastIntervalTask.valid()) {
 		_broadCastIntervalTask.wait();
 	}
@@ -394,6 +421,9 @@ void PlatformEngine::stop() {
 		// push an empty message
 		_messageQueue.pushMessage({});
 		_messageLoopTask.wait();
+	}
+	if (_sendTradeHistoryRequestLoop.valid()) {
+		_sendTradeHistoryRequestLoop.wait();
 	}
 }
 
@@ -412,86 +442,89 @@ void formatPriceChanged(char* buffer, size_t bufferSize, const char* pair, const
 		(float)priceChangedPercent, (duration / (60 * 1000.0f)), basePrice.price, lastPrice.price);
 }
 
-bool PlatformEngine::processTickerLevel(const char* pair, TIMESTAMP timeBase, std::list<SimpleTicker>::iterator it, std::list<SimpleTicker>::iterator& end, char level) {
+#define PROCESS_LEVEL(trade) ((levelIt = tradeLevelMap->find((trade).oderId)) != tradeLevelMap->end() ? levelIt->second : -1)
+#define SET_PROCESS_LEVEL(trade, level) tradeLevelMap->operator[]((trade).oderId) = (level)
+
+bool PlatformEngine::processTradesLevel(const char* pair, TIMESTAMP timeBase, std::list<TradeItem>::iterator it, std::list<TradeItem>::iterator& end, char level) {
 	auto& trigger = _triggers[level];
 
-	auto& lastTicker = *it;
-	auto& lastPricePoint = lastTicker.lastPrice;
+	TradeLevelMap* tradeLevelMap;
+	TradeLevelMap::iterator levelIt;
+	auto levelMapIt = _processLevelMap.find(pair);
+	if (levelMapIt == _processLevelMap.end()) {
+		auto emptyLevelMapRef = make_shared<TradeLevelMap>();
+		_processLevelMap[pair] = emptyLevelMapRef;
+		tradeLevelMap = emptyLevelMapRef.get();
+	}
+	else {
+		tradeLevelMap = levelMapIt->second.get();
+	}
+
+	auto& lastTrade = *it;
 	TIMESTAMP duration;
 	for (;it != end; end--)
 	{
-		auto& ticker = *end;
-		duration = timeBase - ticker.firstPrice.at;
+		duration = timeBase - end->timestamp;
 		if (duration <= trigger.endTime) {
 			break;
 		}
 	}
 
-	if (lastTicker.processLevel == level) {
+	if (PROCESS_LEVEL(lastTrade) == level) {
 		return false;
 	}
 
 	double priceChanged;
-	decltype(lastTicker.lastPrice)* pricePoint;
-
-	auto updatePriceChangedVariables = [&lastPricePoint, &priceChanged, &pricePoint](SimpleTicker& ticker) {
-		auto priceChanged1 = (lastPricePoint.price - ticker.low.price) / ticker.low.price;
-		auto priceChanged2 = (lastPricePoint.price - ticker.high.price) / ticker.high.price;
-		if (abs(priceChanged1) > abs(priceChanged2)) {
-			priceChanged = priceChanged1;
-			pricePoint = &ticker.low;
-		}
-		else {
-			priceChanged = priceChanged2;
-			pricePoint = &ticker.high;
-		}
-	};
-
-	decltype(lastTicker.lastPrice)* bestPricePoint = nullptr;
+	TradeItem* bestTradePoint = nullptr;
 	double bestPriceChanged = 0;
 	for (; it != end; it++) {
-		auto& ticker = *it;
-		if (ticker.lastPrice.price < 0 || (ticker.boughtVolume <= 0 && ticker.soldVolume <= 0)) {
-			continue;
-		}
-
+		auto& trade = *it;
+		
 		// prevent process for a same processed level
-		if (ticker.processLevel == level) {
-			bestPricePoint = nullptr;
+		if (PROCESS_LEVEL(trade) == level) {
+			bestTradePoint = nullptr;
 			break;
 		}
-		duration = timeBase - ticker.firstPrice.at;
+		duration = timeBase - trade.timestamp;
 		// don't send notify again if the time distance is too short
-		if (ticker.processLevel >= 0 && duration < _notifyDistance) {
-			bestPricePoint = nullptr;
+		if ( PROCESS_LEVEL(trade) >= 0 && duration < _notifyDistance) {
+			bestTradePoint = nullptr;
 			break;
 		}
 
-		updatePriceChangedVariables(ticker);
+		priceChanged = (lastTrade.price - trade.price) / trade.price;
 
-		if (bestPricePoint == nullptr || abs(bestPriceChanged) < abs(priceChanged)) {
+		if (bestTradePoint == nullptr || abs(bestPriceChanged) < abs(priceChanged)) {
 			bestPriceChanged = priceChanged;
-			bestPricePoint = pricePoint;
+			bestTradePoint = &trade;
 		}
-		else if (abs(bestPriceChanged) == abs(priceChanged) && bestPricePoint->at < pricePoint->at) {
+		else if (abs(bestPriceChanged) == abs(priceChanged) && bestTradePoint->timestamp < trade.timestamp) {
 			bestPriceChanged = priceChanged;
-			bestPricePoint = pricePoint;
+			bestTradePoint = &trade;
 		}
 	}
 
 	char buffer[256];
-	if (bestPricePoint) {
-		duration = timeBase - bestPricePoint->at;
+	if (bestTradePoint) {
+		duration = timeBase - bestTradePoint->timestamp;
 		if (duration >= trigger.startTime) {
 			auto priceChangePerMin = bestPriceChanged * 60 * 1000 / duration;
 			if (abs(priceChangePerMin) >= trigger.priceChangePerMin) {
-				// mark the ticker was process for this level
-				lastTicker.processLevel = level;
+				// mark the trade was process for this level
+				SET_PROCESS_LEVEL(lastTrade, level);
 				//if (_degbugMap.find(pair) != _degbugMap.end()) {
 				//	priceChanged = 0;
 				//}
 
-				formatPriceChanged(buffer, sizeof(buffer), pair, lastPricePoint, *bestPricePoint);
+				PricePoint lastPricePoint;
+				PricePoint bestPricePoint;
+
+				lastPricePoint.price = lastTrade.price;
+				lastPricePoint.at = lastTrade.timestamp;
+				bestPricePoint.price = bestTradePoint->price;
+				bestPricePoint.at = bestTradePoint->timestamp;
+
+				formatPriceChanged(buffer, sizeof(buffer), pair, lastPricePoint, bestPricePoint);
 
 				InternalNotificationData notification;
 				notification.message.title = _platformName;
@@ -510,26 +543,17 @@ bool PlatformEngine::processTickerLevel(const char* pair, TIMESTAMP timeBase, st
 }
 
 void PlatformEngine::tickerAnalyze(NAPMarketEventHandler* eventHandler) {
-	auto& tickers = eventHandler->getTickerHistoriesNonSync();
+	auto& trades = eventHandler->getTradeHistoriesNonSync();
+	if (trades.size() == 0) return;
 
-	auto it = tickers.begin();
-	for (; it != tickers.end(); it++) {
-		if (it->lastPrice.price > 0 && (it->boughtVolume > 0 || it->soldVolume > 0)) {
-			break;
-		}
-	}
-	if (it == tickers.end()) {
-		return;
-	}
-
-	auto end = tickers.end();
+	auto it = trades.begin();
+	auto end = trades.end();
 	end--;
 
-	high_resolution_clock::time_point t = high_resolution_clock::now();
-	TIMESTAMP serverTimeNow = _platform->getSyncTime(t.time_since_epoch().count());
+	TIMESTAMP serverTimeNow = _platform->getSyncTime(getCurrentTimeStamp());
 
 	for (char level = (char)(_triggers.size() - 1); level >= 0; level--) {
-		if (processTickerLevel(eventHandler->getPair(), serverTimeNow, it, end, level)) {
+		if (processTradesLevel(eventHandler->getPair(), serverTimeNow, it, end, level)) {
 			break;
 		}
 	}

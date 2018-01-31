@@ -32,18 +32,18 @@ struct SimpleTicker
 
 class NAPMarketEventHandler;
 typedef std::function<void(NAPMarketEventHandler*)> AccessEventDataFunc;
-typedef std::function<void(NAPMarketEventHandler*, TradeItem*)> TradeEventListener;
+typedef std::function<void(NAPMarketEventHandler*, TradeItem*, int, bool)> TradeEventListener;
 
 class NAPMarketEventHandler : public MarketEventHandler
 {
 private:
 	std::mutex _m;
-	std::list<SimpleTicker> _tradeHistory;
+	std::list<TradeItem> _tradeHistory;
 	int _autoId;
 	std::map<int, TradeEventListener> _tradeEventListeners;
 	void* _tag;
 	TIMESTAMP _tickerDuration;
-	void addEmptyTicker(TIMESTAMP t);
+	//void addEmptyTicker(TIMESTAMP t);
 public:
 	NAPMarketEventHandler(TIMESTAMP tickerDuration, const char* pair);
 	virtual ~NAPMarketEventHandler();
@@ -54,9 +54,9 @@ public:
 	virtual void onCandlesUpdate(CandleItem* candles, int count, bool snapShot);
 
 	void accessSharedData(const AccessEventDataFunc& f);
-	virtual void onTimeUpdate(TIMESTAMP t);
-	const std::list<SimpleTicker>& getTickerHistoriesNonSync() const;
-	std::list<SimpleTicker>& getTickerHistoriesNonSync();
+	//virtual void onTimeUpdate(TIMESTAMP t);
+	const std::list<TradeItem>& getTradeHistoriesNonSync() const;
+	std::list<TradeItem>& getTradeHistoriesNonSync();
 	void setTag(void*p);
 	void* getTag();
 	int addTradeEventListener(TradeEventListener&& eventListener);

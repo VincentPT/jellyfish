@@ -605,6 +605,10 @@ bool HitBTCTradingPlatform::isServerTimeReady() {
 	return false;
 }
 
+void HitBTCTradingPlatform::getTradeHistory(const char* pair, TIMESTAMP duration, TIMESTAMP endTime, TradingList& tradeItems) {
+
+}
+
 extern "C" {
 	__declspec(dllexport) TradingPlatform* createPlatformInstance() {
 		return new HitBTCTradingPlatform();

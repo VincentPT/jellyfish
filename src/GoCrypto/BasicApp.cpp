@@ -28,6 +28,7 @@ class BasicApp : public App {
 	thread _liveGraphWorker;
 	LogAdapter* _logAdapter;
 	TIMESTAMP _baseTime;
+	float _pixelPerTime;
 
 	int _lastEventId;
 	NAPMarketEventHandler* _lastSelectedHandler;
@@ -45,7 +46,9 @@ public:
 		}
 	}
 
-	void onSelectedTradeEvent(NAPMarketEventHandler*, TradeItem*);
+	void onSelectedTradeEvent(NAPMarketEventHandler*, TradeItem* tradeItem, int, bool);
+
+	float convertRealTimeToDisplayTime(TIMESTAMP t);
 
 	static void intializeApp(App::Settings* settings);
 };
@@ -86,8 +89,7 @@ BasicApp::~BasicApp() {
 
 void BasicApp::setup()
 {
-	_baseTime = getCurrentTimeStamp();
-
+	using namespace std::placeholders;
 	ui::Options uiOptions;
 	ui::initialize(uiOptions);
 
@@ -128,6 +130,9 @@ void BasicApp::setup()
 
 	_graph = graphLine;
 
+	_baseTime = getCurrentTimeStamp();
+	_graph->baseTime();
+
 	cryptoBoard->setItemSelectionChangedHandler([this, graphLine](Widget* sender) {
 		auto selectedSymbol = ((WxCryptoBoardInfo*)sender)->getSelectedSymbol();
 		if (selectedSymbol == nullptr) {
@@ -155,36 +160,47 @@ void BasicApp::setup()
 		_lastSelectedHandler = ((NAPMarketEventHandler*)handler);
 
 		_lastSelectedHandler->accessSharedData([this](NAPMarketEventHandler* handler) {
-			auto& tickers = handler->getTickerHistoriesNonSync();
+			auto& tickers = handler->getTradeHistoriesNonSync();
 			if (tickers.size()) {
-				float timeScale = 1.0f / 500;
-				float xScale;
 
-				// import the first n - 1 points
-				int firstPointsCount = (int)(tickers.size() - 1);
-				for (auto it = tickers.rbegin(); firstPointsCount > 0; firstPointsCount--, it++) {
-					auto& lastPricePoint = it->lastPrice;
-					xScale = (float)((lastPricePoint.at - _baseTime) * timeScale);
-					vec2 point(xScale, (float)lastPricePoint.price);
-					_graph->addPointAndConstruct(point);
-				}
+				_graph->acessSharedData([this, &tickers](WxLineGraphLive* graph) {
+					TIMESTAMP timeLength = 1 * 60 * 60 * 1000;
+					_pixelPerTime = (float)(graph->getWidth() / timeLength);
+					float timeScale;
 
-				// add last point and adjust the transform
-				auto& lastTicker = tickers.front();
-				auto& lastPricePoint = lastTicker.lastPrice;
+					// import the first n - 1 points
+					for (auto it = tickers.rbegin(); it != tickers.rend(); it++) {
+						timeScale = convertRealTimeToDisplayTime(it->timestamp);
+						vec2 point(timeScale, (float)it->price);
+						graph->addPointAndConstruct(point);
+					}
 
-				auto& area = _graph->getGraphRegion();
-				_graph->scale(1.0f, (float)(area.getHeight() / (lastPricePoint.price / 200)));
-				_graph->setTimeScale(timeScale);
+					// add last point and adjust the transform
+					auto& lastTicker = tickers.front();
 
-				xScale = (float)((lastPricePoint.at- _baseTime) * timeScale);
+					auto& area = graph->getGraphRegion();
+					graph->scale(1.0f, (float)(area.getHeight() / (lastTicker.price / 200)));
 
-				vec2 point(xScale, (float)lastPricePoint.price);
-				_graph->addPoint(point);
+					// at time zero, the point will display at x = graph->getWidth() * 4 / 5
+					float expectedXAtBeginTime = graph->getWidth() * 4 / 5;
+					graph->mapZeroTime(expectedXAtBeginTime);
+					graph->adjustTransform();
+					graph->setTimeScale(_pixelPerTime);
+
+					auto t = convertRealTimeToDisplayTime(lastTicker.timestamp);
+					auto actualPointAtT = graph->pointToLocal(t, (float)lastTicker.price);
+
+					auto expectedXAtT = expectedXAtBeginTime + t;
+					auto correctionX = expectedXAtT - actualPointAtT.x;
+					if (correctionX > 0) {
+						graph->translate(correctionX, 0);
+					}
+					graph->adjustTransform();
+				});
 			}
 		});
 
-		auto eventListener = std::bind(&BasicApp::onSelectedTradeEvent, this, std::placeholders::_1, std::placeholders::_2);
+		auto eventListener = std::bind(&BasicApp::onSelectedTradeEvent, this, _1, _2, _3, _4);
 		_lastEventId = _lastSelectedHandler->addTradeEventListener(eventListener);
 	});
 
@@ -238,19 +254,39 @@ void BasicApp::setup()
 		}
 	});
 
-	_platformRunner = new PlatformEngine("binance");
+	_platformRunner = new PlatformEngine("bitfinex");
 	_platformRunner->getPlatform()->setLogger(_logAdapter);
 	_platformRunner->run();
 	auto& items = _platformRunner->getSymbolsStatistics();
 	cryptoBoard->setItems(&items);
 }
 
-void BasicApp::onSelectedTradeEvent(NAPMarketEventHandler* handler, TradeItem* item) {
-	auto timeScale = _graph->getTimeScale();
-	float xScale = (float)( (item->timestamp - _baseTime) * timeScale);
+void BasicApp::onSelectedTradeEvent(NAPMarketEventHandler* handler, TradeItem* item, int count, bool) {
+	_graph->acessSharedData([this, item, count, handler](WxLineGraphLive* graph) {
+		graph->clearPoints();
 
-	vec2 point(xScale, (float)item->price);
-	_graph->addPoint(point);
+		auto& tradeItems = handler->getTradeHistoriesNonSync();
+		auto platform = _platformRunner->getPlatform();
+		TIMESTAMP timeDiff = 0;
+		if (platform->isServerTimeReady()) {
+			auto localTime = getCurrentTimeStamp();
+			auto serverTime = platform->getSyncTime(localTime);
+			timeDiff = localTime - serverTime;
+		}
+
+		for (auto it = tradeItems.rbegin(); it != tradeItems.rend(); it++) {
+			float timeScale = convertRealTimeToDisplayTime(it->timestamp + timeDiff);
+
+			vec2 point(timeScale, (float)it->price);
+			graph->addPointAndConstruct(point);
+		}
+		
+		graph->adjustTransform();
+	});
+}
+
+float BasicApp::convertRealTimeToDisplayTime(TIMESTAMP t) {
+	return (float)((t - _baseTime) *_pixelPerTime);
 }
 
 void BasicApp::mouseDown( MouseEvent event )

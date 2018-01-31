@@ -479,6 +479,10 @@ void BinanceTradingPlatform::startServerTimeQuery(TIMESTAMP updateInterval) {
 	_pingServerTask = std::async(std::launch::async, [this]() { pingServerLoop(); });
 }
 
+void BinanceTradingPlatform::getTradeHistory(const char* pair, TIMESTAMP duration, TIMESTAMP endTime, TradingList& tradeItems) {
+
+}
+
 TIMESTAMP BinanceTradingPlatform::getSyncTime(TIMESTAMP localTime) {
 	return localTime + _timeDiff;
 }

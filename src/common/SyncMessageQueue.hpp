@@ -30,6 +30,23 @@ public:
 			return false;
 		});
 	}
+
+	bool popMessage(T& message, unsigned int waitTimeMiliSeconds) {
+		std::unique_lock<std::mutex> lk(_messageQueueMutex);
+
+		std::chrono::duration<decltype(waitTimeMiliSeconds), std::milli> timeout(waitTimeMiliSeconds);
+		bool res = _hasMessageCV.wait_for(lk, timeout, [this, &message] {
+			if (_messageQueue.size() > 0) {
+				message = _messageQueue.front();
+				_messageQueue.pop_front();
+				return true;
+			}
+
+			return false;
+		});
+
+		return res;
+	}
 };
 
 template <class T>
@@ -52,7 +69,7 @@ public:
 		std::lock_guard<std::mutex> lk(_messageQueueMutex);
 		_signal = signal;
 		_signalReceived = true;
-		_hasMessageCV.notify_one();
+		_hasMessageCV.notify_all();
 	}
 
 	bool waitSignal(T& signal, unsigned int miliseconds) {

@@ -26,28 +26,17 @@ void WxLineGraph::draw() {
 		gl::drawSolidRect(graphRect);
 	}
 	{
-		gl::ScopedMatrices modelMatrix;
 		gl::ScopedColor color(_lineColor);
-		//gl::ScopedViewport(_displayArea.x1 + tl_x, _displayArea.y1 + tl_y, _displayArea.x2 + tl_x, _displayArea.y2 + tl_y);
-		//gl::translate(_translate.x, _translate.y);
-		//gl::scale(_scale.x, _scale.y);
-		//gl::setModelMatrix(_transform);
 		gl::begin(GL_LINE_STRIP);
-		//gl::setModelMatrix()
 
 		auto leftPoint = localToPoint(_displayArea.x1, 0);
-
-		if (_lines.size()) {
-			vec2 pos = pointToWindow(_lines.back().x, _lines.back().y);
-			gl::drawSolidCircle(pos, 3);
-		}
-
+		
 		for (auto it = _lines.rbegin(); it != _lines.rend(); it++) {
+			vec2 pos = pointToWindow(it->x, it->y);
+			gl::vertex(pos);
 			if (it->x < leftPoint.x) {
 				break;
 			}
-			vec2 pos = pointToWindow(it->x, it->y);
-			gl::vertex(pos);
 		}
 		gl::end();
 	}
@@ -72,6 +61,10 @@ void WxLineGraph::clearPoints() {
 
 size_t WxLineGraph::getPointCount() const {
 	return _lines.size();
+}
+
+const std::list<glm::vec2>& WxLineGraph::getPoints() {
+	return _lines;
 }
 
 void WxLineGraph::setInitalGraphRegion(const ci::Area& area) {

@@ -53,6 +53,7 @@ public:
 	virtual void startServerTimeQuery(TIMESTAMP updateInterval) = 0;
 	virtual TIMESTAMP getSyncTime(TIMESTAMP localTime) = 0;
 	virtual bool isServerTimeReady() = 0;
+	virtual void getTradeHistory(const char* pair, TIMESTAMP duration, TIMESTAMP endTime, TradingList& tradeItems) = 0;
 	// return pairs seperate by ';', caller must using free to free the string buffer after use
 	virtual char* getAllPairs() = 0;
 	virtual void subscribeTicker(const char* pair);

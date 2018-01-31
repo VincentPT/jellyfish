@@ -192,21 +192,18 @@ WxCryptoBoardInfo::WxCryptoBoardInfo() : _selected(-1), _fixedItems(nullptr)
 		{ "symbol", 50, 0 },
 		{ "price", 80, 1 },
 		{ "vol", 70, 2 },
-		{ "p 30m", 80, 3 },
-		{ "p 1h", 80, 4 },
-		{ "p 2h", 80, 5 },
-		{ "p 3h", 80, 6 },
-		{ "p 4h", 80, 7 },
-		{ "vol 30", 70, 8 },
-		{ "vol 1h", 70, 9 },
-		{ "vol 2h", 70, 10 },
-		{ "vol 3h", 70, 11 },
-		{ "vol 4h", 70, 12 },
-		{ "BPV 30", 70, 13 },
-		{ "BPV 1h", 70, 14 },
-		{ "BPV 2h", 70, 15 },
-		{ "BPV 3h", 70, 16 },
-		{ "BPV 4h", 70, 17 },
+		{ "p 1h", 80, 3 },
+		{ "p 2h", 80, 4 },
+		{ "p 3h", 80, 5 },
+		{ "p 4h", 80, 6 },
+		{ "vol 1h", 70, 7 },
+		{ "vol 2h", 70, 8 },
+		{ "vol 3h", 70, 9 },
+		{ "vol 4h", 70, 10 },
+		{ "BPV 1h", 70, 11 },
+		{ "BPV 2h", 70, 12 },
+		{ "BPV 3h", 70, 13 },
+		{ "BPV 4h", 70, 14 },
 	};
 
 	_rawElmInfoOffsets = {
@@ -217,12 +214,10 @@ WxCryptoBoardInfo::WxCryptoBoardInfo() : _selected(-1), _fixedItems(nullptr)
 		offsetof(CryptoBoardElmInfo, pricePeriod2),
 		offsetof(CryptoBoardElmInfo, pricePeriod3),
 		offsetof(CryptoBoardElmInfo, pricePeriod4),
-		offsetof(CryptoBoardElmInfo, pricePeriod5),
 		offsetof(CryptoBoardElmInfo, volPeriod1),
 		offsetof(CryptoBoardElmInfo, volPeriod2),
 		offsetof(CryptoBoardElmInfo, volPeriod3),
 		offsetof(CryptoBoardElmInfo, volPeriod4),
-		offsetof(CryptoBoardElmInfo, volPeriod5),
 	};
 	using namespace std::placeholders;
 	_columnAdditionalInfo = {
@@ -269,9 +264,9 @@ WxCryptoBoardInfo::WxCryptoBoardInfo() : _selected(-1), _fixedItems(nullptr)
 			SortType::NotSort,
 		},
 		{
-			bind(&WxCryptoBoardInfo::comparePricePeriod, this, _1, _2, 7),
-			bind(&WxCryptoBoardInfo::convert2StringForPricePeriod, this, _1, 7),
-			bind(&WxCryptoBoardInfo::checkValidPricePeriod, this, _1, 7),
+			bind(&WxCryptoBoardInfo::compareVolPeriod, this, _1, _2, 7),
+			bind(&WxCryptoBoardInfo::convert2StringForVolPeriod, this, _1, 7),
+			bind(&WxCryptoBoardInfo::checkValidVolPeriod, this, _1, 7),
 			SortType::NotSort,
 		},
 		{
@@ -293,15 +288,9 @@ WxCryptoBoardInfo::WxCryptoBoardInfo() : _selected(-1), _fixedItems(nullptr)
 			SortType::NotSort,
 		},
 		{
-			bind(&WxCryptoBoardInfo::compareVolPeriod, this, _1, _2, 11),
-			bind(&WxCryptoBoardInfo::convert2StringForVolPeriod, this, _1, 11),
-			bind(&WxCryptoBoardInfo::checkValidVolPeriod, this, _1, 11),
-			SortType::NotSort,
-		},
-		{
-			bind(&WxCryptoBoardInfo::compareVolPeriod, this, _1, _2, 12),
-			bind(&WxCryptoBoardInfo::convert2StringForVolPeriod, this, _1, 12),
-			bind(&WxCryptoBoardInfo::checkValidVolPeriod, this, _1, 12),
+			bind(&WxCryptoBoardInfo::compareVolBPSh, this, _1, _2, 7),
+			bind(&WxCryptoBoardInfo::convert2StringForBPSh, this, _1, 7),
+			bind(&WxCryptoBoardInfo::checkValidBPSh, this, _1, 7),
 			SortType::NotSort,
 		},
 		{
@@ -321,19 +310,7 @@ WxCryptoBoardInfo::WxCryptoBoardInfo() : _selected(-1), _fixedItems(nullptr)
 			bind(&WxCryptoBoardInfo::convert2StringForBPSh, this, _1, 10),
 			bind(&WxCryptoBoardInfo::checkValidBPSh, this, _1, 10),
 			SortType::NotSort,
-		},
-		{
-			bind(&WxCryptoBoardInfo::compareVolBPSh, this, _1, _2, 11),
-			bind(&WxCryptoBoardInfo::convert2StringForBPSh, this, _1, 11),
-			bind(&WxCryptoBoardInfo::checkValidBPSh, this, _1, 11),
-			SortType::NotSort,
-		},
-		{
-			bind(&WxCryptoBoardInfo::compareVolBPSh, this, _1, _2, 12),
-			bind(&WxCryptoBoardInfo::convert2StringForBPSh, this, _1, 12),
-			bind(&WxCryptoBoardInfo::checkValidBPSh, this, _1, 12),
-			SortType::NotSort,
-		},
+		}
 	};
 
 	float totalSize = 0;

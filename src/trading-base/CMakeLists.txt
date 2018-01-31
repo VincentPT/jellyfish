@@ -7,6 +7,7 @@ SET (MAIN_SOURCES
     TradingBase.h
     TradingPlatform.cpp
     TradingPlatform.h
+    SingleList.h
 )
 
 SET (SOURCES ${MAIN_SOURCES})
