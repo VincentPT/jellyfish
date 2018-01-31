@@ -9,6 +9,7 @@
 #include "UI/WxAppLog.h"
 #include "UI/Spliter.h"
 #include "UI/WxLineGraphLive.h"
+#include "UI/WxControlBoard.h"
 
 #include "Engine/PlatformEngine.h"
 #include "LogAdapter.h"
@@ -20,12 +21,20 @@ using namespace std;
 const char* platformName = "dummy.txt";
 
 class BasicApp : public App {
+
+	typedef std::function<void()> Task;
+
 	Spliter _spliter;
 	shared_ptr<WxAppLog> _applog;
 	shared_ptr<WxLineGraphLive> _graph;
+	shared_ptr<WxCryptoBoardInfo> _cryptoBoard;
+	SyncMessageQueue<Task> _tasks;
+
+	
 	PlatformEngine* _platformRunner;
 	bool _runFlag;
-	thread _liveGraphWorker;
+	//thread _liveGraphWorker;
+	thread _asynTasksWorkder;
 	LogAdapter* _logAdapter;
 	TIMESTAMP _baseTime;
 	float _pixelPerTime;
@@ -39,6 +48,9 @@ public:
 	void mouseDown( MouseEvent event ) override;
 	void update() override;
 	void draw() override;
+	void cleanup();
+	void startServices();
+	void stopServices();
 
 	void addLog(const char* fmt, va_list args) {
 		if (_applog) {
@@ -74,17 +86,21 @@ BasicApp::BasicApp() :
 }
 
 BasicApp::~BasicApp() {
-	if (_liveGraphWorker.joinable()) {
-		_liveGraphWorker.join();
-	}
-	if (_platformRunner) {
-		_platformRunner->getPlatform()->setLogger(nullptr);
-		_platformRunner->stop();
-		delete _platformRunner;
+	//if (_liveGraphWorker.joinable()) {
+	//	_liveGraphWorker.join();
+	//}
+	stopServices();
+
+	_runFlag = false;
+	if (_asynTasksWorkder.joinable()) {
+		_asynTasksWorkder.join();
 	}
 	if (_logAdapter) {
 		delete _logAdapter;
 	}
+}
+
+void BasicApp::cleanup() {
 }
 
 void BasicApp::setup()
@@ -104,12 +120,20 @@ void BasicApp::setup()
 	_spliter.setSize((float)w, (float)h);
 	_spliter.setPos(0, 0);
 
-	auto cryptoBoard = std::make_shared<WxCryptoBoardInfo>();
+	_cryptoBoard = std::make_shared<WxCryptoBoardInfo>();
 	auto bottomSpliter = std::make_shared<Spliter>();
+	auto topSpliter = std::make_shared<Spliter>();
 	_applog = std::make_shared<WxAppLog>();
 	auto graphLine = std::make_shared<WxLineGraphLive>();
+	auto controlBoard = std::make_shared<WxControlBoard>();
 
 	_logAdapter = new LogAdapter(_applog.get());
+
+	topSpliter->setVertical(true);
+	topSpliter->setFixedPanelSize(200);
+	topSpliter->setFixPanel(FixedPanel::Panel2);
+	topSpliter->setChild1(_cryptoBoard);
+	topSpliter->setChild2(controlBoard);
 
 	bottomSpliter->setVertical(true);
 	bottomSpliter->setFixedPanelSize(800);
@@ -119,21 +143,23 @@ void BasicApp::setup()
 
 	_spliter.setFixedPanelSize(300);
 	_spliter.setFixPanel(FixedPanel::Panel2);
-	_spliter.setChild1(cryptoBoard);
+	_spliter.setChild1(topSpliter);
 	_spliter.setChild2(bottomSpliter);
 
 	graphLine->setInitalGraphRegion(Area(20, 20, graphLine->getWidth() - 20, graphLine->getHeight() - 20));
 	graphLine->setGraphRegionColor(ColorA8u(0, 0, 0, 255));
 	graphLine->setLineColor(ColorA8u(255, 255, 0, 255));
 
-	getWindow()->getSignalClose().connect([this]() { _runFlag = false; });
+	getWindow()->getSignalClose().connect([this]() {
+		_runFlag = false;
+	});
 
 	_graph = graphLine;
 
 	_baseTime = getCurrentTimeStamp();
 	_graph->baseTime();
 
-	cryptoBoard->setItemSelectionChangedHandler([this, graphLine](Widget* sender) {
+	_cryptoBoard->setItemSelectionChangedHandler([this, graphLine](Widget* sender) {
 		auto selectedSymbol = ((WxCryptoBoardInfo*)sender)->getSelectedSymbol();
 		if (selectedSymbol == nullptr) {
 			return;
@@ -254,11 +280,56 @@ void BasicApp::setup()
 		}
 	});
 
+	controlBoard->setOnStartButtonClickHandler([this](Widget*) {
+		Task task = std::bind(&BasicApp::startServices, this);
+		_tasks.pushMessage(task);
+	});
+	controlBoard->setOnStopButtonClickHandler([this](Widget*) {
+		Task task = std::bind(&BasicApp::stopServices, this);
+		_tasks.pushMessage(task);
+	});
+
+	_asynTasksWorkder = std::thread([this]() {
+		while (_runFlag)
+		{
+			BasicApp::Task task;
+			if (_tasks.popMessage(task, 1000)) {
+				task();
+			}
+		}
+	});
+}
+
+void BasicApp::startServices() {
+	if (_platformRunner) {
+		pushLog("services have been already started\n");
+		return;
+	}
+
+	pushLog("starting services...\n");
 	_platformRunner = new PlatformEngine("bitfinex");
 	_platformRunner->getPlatform()->setLogger(_logAdapter);
 	_platformRunner->run();
 	auto& items = _platformRunner->getSymbolsStatistics();
-	cryptoBoard->setItems(&items);
+	_cryptoBoard->setItems(&items);
+
+	pushLog("started\n");
+}
+
+void BasicApp::stopServices() {
+	if (!_platformRunner) {
+		pushLog("services are not running\n");
+		return;
+	}
+	
+	pushLog("stoping services...\n");
+	_platformRunner->stop();
+
+	_cryptoBoard->setItems(nullptr);
+	_platformRunner->getPlatform()->setLogger(nullptr);
+	delete _platformRunner;
+	_platformRunner = nullptr;
+	pushLog("stopped\n");
 }
 
 void BasicApp::onSelectedTradeEvent(NAPMarketEventHandler* handler, TradeItem* item, int count, bool) {

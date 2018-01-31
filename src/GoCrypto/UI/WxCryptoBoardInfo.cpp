@@ -491,11 +491,17 @@ void WxCryptoBoardInfo::update() {
 }
 
 void WxCryptoBoardInfo::setItems(const std::vector<CryptoBoardElmInfo>* fixedItems) {
-	_fixedItems = fixedItems;
-	_dataIndexcies.resize(_fixedItems->size());
+	if (fixedItems == nullptr) {
+		_fixedItems = nullptr;
+		_dataIndexcies.resize(0);
+	}
+	else {
+		_fixedItems = fixedItems;
+		_dataIndexcies.resize(_fixedItems->size());
 
-	for (int i = 0; i < (int)_dataIndexcies.size(); i++) {
-		_dataIndexcies[i] = i;
+		for (int i = 0; i < (int)_dataIndexcies.size(); i++) {
+			_dataIndexcies[i] = i;
+		}
 	}
 }
 

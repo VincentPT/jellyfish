@@ -411,20 +411,29 @@ void PlatformEngine::run() {
 }
 
 void PlatformEngine::stop() {
-	cout << "exiting..." << endl;
 	_runFlag = false;
+
+	pushLog("disconnecting to server...\n");
 	_platform->disconnect();
+	pushLog("disconnected!\n");
+
+	pushLog("stoping interval task...\n");
 	if (_broadCastIntervalTask.valid()) {
 		_broadCastIntervalTask.wait();
 	}
+	pushLog("stopped!\n");
+	pushLog("stoping message loop task...\n");
 	if (_messageLoopTask.valid()) {
 		// push an empty message
 		_messageQueue.pushMessage({});
 		_messageLoopTask.wait();
 	}
+	pushLog("stopped!\n");
+	pushLog("stop querying trade history...\n");
 	if (_sendTradeHistoryRequestLoop.valid()) {
 		_sendTradeHistoryRequestLoop.wait();
 	}
+	pushLog("stopped!\n");
 }
 
 void formatPriceChanged(char* buffer, size_t bufferSize, const char* pair, const PricePoint& lastPrice, const PricePoint& basePrice) {
