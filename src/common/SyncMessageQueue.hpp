@@ -53,11 +53,12 @@ template <class T>
 class Signal
 {
 	T _signal;
+	bool _notifyAll;
 	bool _signalReceived;
 	std::mutex _messageQueueMutex;
 	std::condition_variable _hasMessageCV;
 public:
-	Signal() : _signalReceived(false) {}
+	Signal(bool notifyToAll) : _notifyAll(notifyToAll), _signalReceived(false) {}
 	virtual ~Signal() {}
 
 	void resetState(const T& resetSignalVale) {
@@ -69,7 +70,12 @@ public:
 		std::lock_guard<std::mutex> lk(_messageQueueMutex);
 		_signal = signal;
 		_signalReceived = true;
-		_hasMessageCV.notify_all();
+		if (_notifyAll) {
+			_hasMessageCV.notify_all();
+		}
+		else {
+			_hasMessageCV.notify_one();
+		}
 	}
 
 	bool waitSignal(T& signal, unsigned int miliseconds) {
@@ -79,7 +85,7 @@ public:
 
 		bool res = _hasMessageCV.wait_for(lk, timeout, [this] {
 			if (_signalReceived) {
-				_signalReceived = false;
+				if (!_notifyAll) _signalReceived = false;
 				return true;
 			}
 
@@ -97,7 +103,7 @@ public:
 		std::unique_lock<std::mutex> lk(_messageQueueMutex);
 		_hasMessageCV.wait(lk, [this]() {
 			if (_signalReceived) {
-				_signalReceived = false;
+				if(!_notifyAll) _signalReceived = false;
 				return true;
 			}
 

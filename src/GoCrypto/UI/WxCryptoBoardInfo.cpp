@@ -371,6 +371,8 @@ WxCryptoBoardInfo::~WxCryptoBoardInfo()
 //extern ImGuiContext*           GImGui;
 
 void WxCryptoBoardInfo::update() {
+	std::unique_lock<std::mutex> lk(_mutex);
+
 	ImGui::SetNextWindowSize(_window_size, ImGuiCond_Always);
 	ImGui::SetNextWindowPos(_window_pos);
 
@@ -420,8 +422,8 @@ void WxCryptoBoardInfo::update() {
 				auto& elmInfo = _fixedItems->at(_dataIndexcies[i]);
 				
 				// symbol id
-				if (ImGui::Selectable(elmInfo.symbol.c_str(), i == _selected, ImGuiSelectableFlags_SpanAllColumns))
-					_selected = i;
+				if (ImGui::Selectable(elmInfo.symbol.c_str(), _dataIndexcies[i] == _selected, ImGuiSelectableFlags_SpanAllColumns))
+					_selected = _dataIndexcies[i];
 				
 				ImGui::SetColumnOffset(j, offset);
 				offset += _columns[j].size;
@@ -491,6 +493,7 @@ void WxCryptoBoardInfo::update() {
 }
 
 void WxCryptoBoardInfo::setItems(const std::vector<CryptoBoardElmInfo>* fixedItems) {
+	std::unique_lock<std::mutex> lk(_mutex);
 	if (fixedItems == nullptr) {
 		_fixedItems = nullptr;
 		_dataIndexcies.resize(0);
@@ -513,6 +516,5 @@ const char* WxCryptoBoardInfo::getSelectedSymbol() const {
 	if (_selected < 0 || _fixedItems == nullptr || _selected >= _fixedItems->size()) {
 		return nullptr;
 	}
-
 	return _fixedItems->at(_selected).symbol.c_str();
 }

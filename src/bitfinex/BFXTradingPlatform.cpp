@@ -15,7 +15,7 @@ using namespace web::http;                  // Common HTTP functionality
 using namespace web::http::client;          // HTTP client features
 
 
-BFXTradingPlatform::BFXTradingPlatform() : _timeDiff(0), _serverTimeIsReady(false) {
+BFXTradingPlatform::BFXTradingPlatform() : _timeDiff(0), _serverTimeIsReady(false), _stopLoopTask(true), _restartEvents(false) {
 	resetClient();
 }
 
@@ -187,6 +187,7 @@ void BFXTradingPlatform::messageHandlerImpl(const websocket_incoming_message& ms
 }
 
 bool BFXTradingPlatform::connectImpl() {
+	LOG_SCOPE_ACCESS(getLogger(), __FUNCTION__);
 	using namespace std::chrono_literals;
 
 	_client->set_message_handler(std::bind(&BFXTradingPlatform::messageHandlerImpl, this, std::placeholders::_1));
@@ -215,11 +216,14 @@ bool BFXTradingPlatform::connectImpl() {
 }
 
 bool BFXTradingPlatform::disconnectImpl() {
+	LOG_SCOPE_ACCESS(getLogger(), __FUNCTION__);
 	_restartEvents.sendSignal(false);
 	_maintenanceTask.wait();
+	pushLog("maintenance task stopped\n");
 
 	_stopLoopTask.sendSignal(false);
 	_pingServerTask.wait();
+	pushLog("ping server task stopped\n");
 
 	_client->close().wait();
 	return true;
@@ -765,7 +769,7 @@ void BFXTradingPlatform::getTradeHistory(const char* pair, TIMESTAMP duration, T
 					if (tradeItems.size()) {
 						lastTimeStamp = tradeItems.back().timestamp;
 					}
-					
+					size_t skippedItem = 0;
 					for (auto it = items.begin(); it != items.end(); it++) {
 
 						auto& itemElm = it->as_array();
@@ -775,8 +779,9 @@ void BFXTradingPlatform::getTradeHistory(const char* pair, TIMESTAMP duration, T
 						tradeItem.timestamp = itemElm[1].as_number().to_uint64();
 						// skip existing trade items
 						if (lastTimeStamp == tradeItem.timestamp && existingTrades.find(tradeItem.oderId) != existingTrades.end() ){
+							skippedItem++;
 							//pushLogV("skip trade item %lld\n", tradeItem.oderId);
-							if (items.size() == 1) {
+							if (items.size() == skippedItem) {
 								//pushLog("there is only one item\n");
 								shouldStop = true;
 							}

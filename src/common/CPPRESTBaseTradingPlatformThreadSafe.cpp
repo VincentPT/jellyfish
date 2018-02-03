@@ -1,4 +1,5 @@
 #include "CPPRESTBaseTradingPlatformThreadSafe.h"
+#include "Utility.h"
 
 using namespace web;
 using namespace web::websockets::client;
@@ -46,6 +47,7 @@ void CPPRESTBaseTradingPlatformThreadSafe::unsubscribeCandle(const char* pair) {
 }
 
 void CPPRESTBaseTradingPlatformThreadSafe::connect() {
+	LOG_SCOPE_ACCESS(getLogger(), __FUNCTION__);
 	std::unique_lock<std::mutex> lk(_connectionMutex);
 	if (_blConnected == true) {
 		std::cout << "client instance is already connected" << std::endl;
@@ -56,6 +58,7 @@ void CPPRESTBaseTradingPlatformThreadSafe::connect() {
 }
 
 void CPPRESTBaseTradingPlatformThreadSafe::disconnect() {
+	LOG_SCOPE_ACCESS(getLogger(), __FUNCTION__);
 	std::unique_lock<std::mutex> lk(_connectionMutex);
 	if (_blConnected == false) {
 		std::cout << "client instance is already disconnected" << std::endl;

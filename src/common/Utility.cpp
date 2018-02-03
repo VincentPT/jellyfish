@@ -33,3 +33,14 @@ std::string Utility::time2str(TIMESTAMP t) {
 	formatTime(buffer, sizeof(buffer), t);
 	return buffer;
 }
+
+void Utility::logScopeAccess(ILogger* logger, const char* functionName, bool access) {
+	if (logger) {
+		if (access) {
+			logger->logV(">>> %s\n", functionName);
+		}
+		else {
+			logger->logV("<<< %s\n", functionName);
+		}
+	}
+}

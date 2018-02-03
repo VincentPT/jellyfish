@@ -2,6 +2,7 @@
 #include "ImWidget.h"
 #include "GoCrypto.h"
 #include <functional>
+#include <mutex>
 
 struct ColumnHeader
 {
@@ -38,6 +39,7 @@ class WxCryptoBoardInfo :
 	int _selected;
 
 	std::vector<int> _rawElmInfoOffsets;
+	std::mutex _mutex;
 private:
 	ItemSelecionChangedHandler onItemSelectedChanged;
 private:

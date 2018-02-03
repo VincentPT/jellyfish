@@ -299,6 +299,9 @@ void PlatformEngine::updateSymbolStatistic(CryptoBoardElmInfo* info, NAPMarketEv
 void PlatformEngine::run() {
 	using namespace std::placeholders;
 	if (_platform == nullptr) return;
+
+	LOG_SCOPE_ACCESS(_platform->getLogger(), __FUNCTION__);
+
 	_runFlag = true;
 
 	bool needGetAll = false;
@@ -411,11 +414,11 @@ void PlatformEngine::run() {
 }
 
 void PlatformEngine::stop() {
+	LOG_SCOPE_ACCESS(_platform->getLogger(), __FUNCTION__);
+
 	_runFlag = false;
 
-	pushLog("disconnecting to server...\n");
 	_platform->disconnect();
-	pushLog("disconnected!\n");
 
 	pushLog("stoping interval task...\n");
 	if (_broadCastIntervalTask.valid()) {

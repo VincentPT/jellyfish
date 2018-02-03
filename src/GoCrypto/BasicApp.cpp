@@ -13,6 +13,7 @@
 
 #include "Engine/PlatformEngine.h"
 #include "LogAdapter.h"
+#include "../common/Utility.h"
 
 using namespace ci;
 using namespace ci::app;
@@ -190,7 +191,7 @@ void BasicApp::setup()
 			if (tickers.size()) {
 
 				_graph->acessSharedData([this, &tickers](WxLineGraphLive* graph) {
-					TIMESTAMP timeLength = 1 * 60 * 60 * 1000;
+					TIMESTAMP timeLength = 5 * 60 * 1000;
 					_pixelPerTime = (float)(graph->getWidth() / timeLength);
 					float timeScale;
 
@@ -301,35 +302,32 @@ void BasicApp::setup()
 }
 
 void BasicApp::startServices() {
+	LOG_SCOPE_ACCESS(_logAdapter, __FUNCTION__);
 	if (_platformRunner) {
 		pushLog("services have been already started\n");
 		return;
 	}
 
-	pushLog("starting services...\n");
 	_platformRunner = new PlatformEngine("bitfinex");
 	_platformRunner->getPlatform()->setLogger(_logAdapter);
 	_platformRunner->run();
 	auto& items = _platformRunner->getSymbolsStatistics();
 	_cryptoBoard->setItems(&items);
-
-	pushLog("started\n");
 }
 
 void BasicApp::stopServices() {
+	LOG_SCOPE_ACCESS(_logAdapter, __FUNCTION__);
 	if (!_platformRunner) {
 		pushLog("services are not running\n");
 		return;
 	}
 	
-	pushLog("stoping services...\n");
 	_platformRunner->stop();
 
 	_cryptoBoard->setItems(nullptr);
 	_platformRunner->getPlatform()->setLogger(nullptr);
 	delete _platformRunner;
 	_platformRunner = nullptr;
-	pushLog("stopped\n");
 }
 
 void BasicApp::onSelectedTradeEvent(NAPMarketEventHandler* handler, TradeItem* item, int count, bool) {

@@ -2,7 +2,7 @@
 
 #include <string>
 #include "TradingPlatform.h"
-
+#include "AutoScope.h"
 
 template <class T>
 struct Range {
@@ -58,6 +58,7 @@ public:
 	static std::string toString(const std::wstring& str);
 	static std::string toMultibytes(const std::wstring& str);
 	static std::string time2str(TIMESTAMP t);
+	static void logScopeAccess(ILogger* logger, const char* functionName, bool access);
 };
 
 #ifdef _WIN32
@@ -69,6 +70,8 @@ public:
 #define CPPREST_FROM_STRING(str) (str)
 #define TO_STRING_T(a) std::to_string(a)
 #endif // _WIN32
+
+#define LOG_SCOPE_ACCESS(logger, staticScopeName) AutoScope __theScope(std::bind(&Utility::logScopeAccess, logger, staticScopeName, std::placeholders::_1))
 
 
 

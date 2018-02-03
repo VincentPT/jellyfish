@@ -12,7 +12,7 @@ using namespace web;
 using namespace web::websockets::client;
 
 
-BinanceTradingPlatform::BinanceTradingPlatform() : _timeDiff(0)
+BinanceTradingPlatform::BinanceTradingPlatform() : _timeDiff(0), _stopPingTask(true)
 {
 	resetClient();
 }

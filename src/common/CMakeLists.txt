@@ -2,6 +2,8 @@ cmake_minimum_required (VERSION 3.2)
 project(common C CXX)
 
 SET (MAIN_SOURCES
+    ../common/AutoScope.h
+    ../common/AutoScope.cpp
     ../common/utility.cpp
     ../common/utility.h
     ../common/CPPRESTBaseTradingPlatform.cpp

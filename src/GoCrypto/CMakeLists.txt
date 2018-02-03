@@ -4,6 +4,8 @@ project(GoCrypto C CXX)
 SET (COMMON_SRC
     ../common/Utility.h
     ../common/Utility.cpp
+    ../common/AutoScope.cpp
+    ../common/AutoScope.h
     ../common/SyncMessageQueue.hpp
 )
 
