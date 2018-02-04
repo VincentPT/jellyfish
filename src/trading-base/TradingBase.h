@@ -61,4 +61,6 @@ struct CandleItem {
 #include "SingleList.h"
 
 TEMPLATE_EXTERN template class TRADING_PLATFORM_API SingleList<TradeItem>;
+TEMPLATE_EXTERN template class TRADING_PLATFORM_API SingleList<char*>;
 typedef SingleList<TradeItem> TradingList;
+typedef SingleList<char*> StringList;

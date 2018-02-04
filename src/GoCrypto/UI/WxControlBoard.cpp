@@ -24,13 +24,13 @@ void WxControlBoard::update() {
 		return;
 	}
 
-	if (ImGui::Button("start", ImVec2(150, 40))) {
+	if (ImGui::Button("start", ImVec2(120, 35))) {
 		if (_startButtonClickHandler) {
 			_startButtonClickHandler(this);
 		}
 	}
 
-	if (ImGui::Button("stop", ImVec2(150, 40))) {
+	if (ImGui::Button("stop", ImVec2(120, 35))) {
 		if (_stopButtonClickHandler) {
 			_stopButtonClickHandler(this);
 		}

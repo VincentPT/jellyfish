@@ -538,7 +538,7 @@ void HitBTCTradingPlatform::invokeCandleEvent(MarketEventHandler* handler, web::
 	handler->onCandlesUpdate(candleRawItems.data(), (int)candleRawItems.size(), snapShot);
 }
 
-char* HitBTCTradingPlatform::getAllPairs() {
+void HitBTCTradingPlatform::getAllPairs(StringList& pairs) {
 	http_client client(U("https://api.hitbtc.com/api/2/public/symbol"));
 	auto task = client.request(methods::GET);
 	task.wait();
@@ -551,8 +551,6 @@ char* HitBTCTradingPlatform::getAllPairs() {
 
 		if (value.is_array()) {
 			auto& symbols = value.as_array();
-			list<string> pairs;
-			size_t bufferSize = 0;
 			for (auto it = symbols.begin(); it != symbols.end(); it++) {
 				auto& elm = *it;
 				if (!elm.is_object() || !elm.has_field(U("id"))) {
@@ -560,28 +558,17 @@ char* HitBTCTradingPlatform::getAllPairs() {
 					continue;
 				}
 
-				auto symbolId = elm[U("id")].as_string();
-				std::transform(symbolId.begin(), symbolId.end(), symbolId.begin(), toupper);
+				auto symbol_t = elm[U("id")].as_string();
+				std::transform(symbol_t.begin(), symbol_t.end(), symbol_t.begin(), toupper);
 
-				pairs.emplace_back(CPPREST_FROM_STRING(symbolId));
+				auto symbol = CPPREST_FROM_STRING(symbol_t);
+				char* uSymbol = (char*)malloc(symbol.size() + 1);
+				memcpy_s(uSymbol, symbol.size(), symbol.c_str(), symbol.size());
+				uSymbol[symbol.size()] = 0;
 
-				bufferSize += pairs.back().size() + 1;
-
-				if (pairs.size() == 2) {
-					break;
-				}
+				pairs.push_back(uSymbol);
 			}
-
-			char* bufferPairs = (char*)malloc(bufferSize + 1);
-			char* c = bufferPairs;
-			for (auto it = pairs.begin(); it != pairs.end(); it++) {
-				memcpy_s(c, it->size(), it->data(), it->size());
-				c += it->size();
-				*c++ = ';';
-			}
-			*c = 0;
-
-			return bufferPairs;
+			return;
 		}
 		else {
 			string erroreMsg("API error: unknow response format");

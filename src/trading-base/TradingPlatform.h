@@ -55,7 +55,7 @@ public:
 	virtual bool isServerTimeReady() = 0;
 	virtual void getTradeHistory(const char* pair, TIMESTAMP duration, TIMESTAMP endTime, TradingList& tradeItems) = 0;
 	// return pairs seperate by ';', caller must using free to free the string buffer after use
-	virtual char* getAllPairs() = 0;
+	virtual void getAllPairs(StringList& pairs) = 0;
 	virtual void subscribeTicker(const char* pair);
 	virtual void subscribeBook(const char* pair);
 	virtual void subscribeTrade(const char* pair);

@@ -131,7 +131,7 @@ void BasicApp::setup()
 	_logAdapter = new LogAdapter(_applog.get());
 
 	topSpliter->setVertical(true);
-	topSpliter->setFixedPanelSize(200);
+	topSpliter->setFixedPanelSize(130);
 	topSpliter->setFixPanel(FixedPanel::Panel2);
 	topSpliter->setChild1(_cryptoBoard);
 	topSpliter->setChild2(controlBoard);
@@ -191,7 +191,7 @@ void BasicApp::setup()
 			if (tickers.size()) {
 
 				_graph->acessSharedData([this, &tickers](WxLineGraphLive* graph) {
-					TIMESTAMP timeLength = 5 * 60 * 1000;
+					TIMESTAMP timeLength = 60 * 60 * 1000;
 					_pixelPerTime = (float)(graph->getWidth() / timeLength);
 					float timeScale;
 

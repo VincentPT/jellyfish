@@ -238,6 +238,7 @@ void PlatformEngine::updateSymbolStatistic(CryptoBoardElmInfo* info, NAPMarketEv
 	};
 
 	static TIMESTAMP volPeriods[] = {
+		1 * 60 * 1000,
 		1 * 60 * 60 * 1000,
 		2 * 60 * 60 * 1000,
 		3 * 60 * 60 * 1000,
@@ -250,7 +251,7 @@ void PlatformEngine::updateSymbolStatistic(CryptoBoardElmInfo* info, NAPMarketEv
 	auto& ticker = *it;
 	double amount, amountABS;
 	double cost;
-	double* pValue = &info->pricePeriod1;
+	double* pValue = info->pricePeriods;
 
 	TIMESTAMP serverTimeNow = _platform->getSyncTime(getCurrentTimeStamp());
 
@@ -275,11 +276,12 @@ void PlatformEngine::updateSymbolStatistic(CryptoBoardElmInfo* info, NAPMarketEv
 		pValue++;
 	}
 
-	auto pVolumePeriod = &info->volPeriod1;
+	auto pVolumePeriod = info->volPeriods;
 
 	it = jt;
 	for (auto& period : volPeriods) {
-		amount = 0;
+		pVolumePeriod->bought = 0;
+		pVolumePeriod->sold = 0;
 		for (; it != trades.end(); it++) {
 			auto duration = serverTimeNow - it->timestamp;
 			if (duration > period) {
@@ -319,24 +321,13 @@ void PlatformEngine::run() {
 		_pairListenerMap.clear();
 		// get symbols and regist event handler for each symbol
 		try {
-			auto pairs = _platform->getAllPairs();
-			if (pairs) {
-				auto c = pairs;
-				while (*c)
-				{
-					auto s = c;
-					c = strchr(c, ';');
-					if (c) {
-						*c = 0;
-					}
-
-					_pairListenerMap[s] = nullptr;
-
-					if (c == nullptr) { break; }
-					c++;
-				}
-				//_pairListenerMap["ETHBTC"] = nullptr;
-				::free(pairs);
+			StringList pairs;
+			_platform->getAllPairs(pairs);
+			for (auto it = pairs.head(); it; it = it->nextNode)
+			{
+				auto s = it->value;
+				_pairListenerMap[s] = nullptr;
+				free(s);
 			}
 		}
 		catch (std::exception& e) {

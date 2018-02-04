@@ -318,7 +318,7 @@ void BinanceTradingPlatform::invokeCandleEvent(MarketEventHandler* handler, web:
 using namespace web::http;                  // Common HTTP functionality
 using namespace web::http::client;          // HTTP client features
 
-char* BinanceTradingPlatform::getAllPairs() {
+void BinanceTradingPlatform::getAllPairs(StringList& pairs) {
 	/// https://api.binance.com
 	/// api/v3/ticker/
 	// Create http_client to send the request.
@@ -342,8 +342,6 @@ char* BinanceTradingPlatform::getAllPairs() {
 		}
 		if (value.is_array()) {
 			auto& prices = value.as_array();
-			list<string> pairs;
-			size_t bufferSize = 0;
 			for (auto it = prices.begin(); it != prices.end(); it++) {
 				auto& elm = *it;
 				if (!elm.is_object()) {
@@ -356,27 +354,21 @@ char* BinanceTradingPlatform::getAllPairs() {
 					continue;
 				}
 
-				auto symbol = elm[U("symbol")];
-				if (!symbol.is_string()) {
+				auto symbolVal = elm[U("symbol")];
+				if (!symbolVal.is_string()) {
 					cout << "price element is wrong format" << endl;
 					continue;
 				}
 
-				pairs.emplace_back(CPPREST_FROM_STRING(symbol.as_string()));
+				auto symbol_t = elm[U("symbol")].as_string();
+				std::transform(symbol_t.begin(), symbol_t.end(), symbol_t.begin(), toupper);
 
-				bufferSize += pairs.back().size() + 1;
+				auto symbol = CPPREST_FROM_STRING(symbol_t);
+				char* uSymbol = (char*)malloc(symbol.size() + 1);
+				memcpy_s(uSymbol, symbol.size(), symbol.c_str(), symbol.size());
+				uSymbol[symbol.size()] = 0;
 			}
-
-			char* bufferPairs = (char*)malloc(bufferSize + 1);
-			char* c = bufferPairs;
-			for (auto it = pairs.begin(); it != pairs.end(); it++) {
-				memcpy_s(c, it->size(), it->data(), it->size());
-				c += it->size();
-				*c++ = ';';
-			}
-			*(c-1) = 0;
-
-			return bufferPairs;
+			return;
 		}
 		else {
 			string erroreMsg("API error: unknow response format");

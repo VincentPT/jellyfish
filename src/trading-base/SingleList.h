@@ -12,7 +12,8 @@ private:
 	SingleNode* _head;
 	SingleNode* _tail;
 	int _size;
-
+private:
+	const SingleList& operator=(const SingleList&) = delete;
 public:
 	SingleList() : _head(nullptr), _tail(nullptr), _size(0) {}
 	~SingleList() {
@@ -23,6 +24,7 @@ public:
 				pNode = pTempNode->nextNode;
 				delete pTempNode;
 			}
+			_head = nullptr;
 		}
 	}
 	void push_back(const T& value) {

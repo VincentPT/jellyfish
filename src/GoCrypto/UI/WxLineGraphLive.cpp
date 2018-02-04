@@ -86,6 +86,11 @@ void WxLineGraphLive::adjustVerticalTransform(const glm::vec2& point) {
 	}
 }
 
+inline auto getCurrentExternalTime(const double& baseTime) {
+	auto currentTime = ci::app::App::get()->getElapsedSeconds();
+	return  0 + (currentTime - baseTime) * 1000;
+}
+
 void WxLineGraphLive::adjustHorizontalTransform(const glm::vec2& point) {
 	auto localPoint = pointToLocal(point.x, point.y);
 
@@ -96,9 +101,8 @@ void WxLineGraphLive::adjustHorizontalTransform(const glm::vec2& point) {
 	if (translateX >= 0) {
 		auto lastestPoint = point;
 
-		auto currentTime = ci::app::App::get()->getElapsedSeconds();
-		auto currentExternalTime = 0 + (currentTime - _baseTime) * 1000;
-		auto actualExternalTime = lastestPoint.x / _pixelPerMicroSeconds;
+		auto currentExternalTime = getCurrentExternalTime(_baseTime);
+		auto actualExternalTime = _lastestX / _pixelPerMicroSeconds;
 		auto paddingTime = currentExternalTime - actualExternalTime;
 		
 		auto expectXForPoint = expectedX - paddingTime * _pixelPerMicroSeconds;
@@ -152,12 +156,11 @@ void WxLineGraphLive::draw() {
 		auto points = _lines;
 		//auto lastestPoint = points.back();
 
-		auto currentTime = ci::app::App::get()->getElapsedSeconds();
-		auto currentExternalTime = 0 + (currentTime - _baseTime) * 1000;
+		auto currentExternalTime = getCurrentExternalTime(_baseTime);
 		auto actualExternalTime = _lastestX / _pixelPerMicroSeconds;
 		auto paddingTime = currentExternalTime - actualExternalTime;
 
-		_lastestX += paddingTime * _pixelPerMicroSeconds;
+		_lastestX +=(float)(paddingTime * _pixelPerMicroSeconds);
 		adjustHorizontalTransform(vec2(_lastestX,0));
 
 		auto localPoint = pointToWindow(points.back().x, points.back().y);

@@ -60,7 +60,7 @@ public:
 	virtual bool isServerTimeReady();
 	virtual bool addEventHandler(MarketEventHandler* handler, bool allowDelete = false);
 	virtual void removeEventHandler(const char* pair);
-	virtual char* getAllPairs();
+	virtual void getAllPairs(StringList& pairs);
 	virtual void getTradeHistory(const char* pair, TIMESTAMP duration, TIMESTAMP endTime, TradingList& tradeItems);
 };
 

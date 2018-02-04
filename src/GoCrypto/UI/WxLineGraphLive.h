@@ -2,6 +2,7 @@
 #include "WxLineGraph.h"
 #include <mutex>
 #include <functional>
+#include "TradingPlatform.h"
 
 class WxLineGraphLive;
 typedef std::function<void(WxLineGraphLive* graph)> AccessSharedDataFunc;

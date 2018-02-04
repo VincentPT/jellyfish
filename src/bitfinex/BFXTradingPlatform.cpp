@@ -575,7 +575,7 @@ void BFXTradingPlatform::invokeCandleEvent(MarketEventHandler* handler, web::jso
 	handler->onCandlesUpdate(itemarr.data(), (int)itemarr.size(), true);
 }
 
-char* BFXTradingPlatform::getAllPairs() {
+void BFXTradingPlatform::getAllPairs(StringList& pairs) {
 	http_client client(U("https://api.bitfinex.com/v1/symbols"));
 	auto task = client.request(methods::GET);
 	task.wait();
@@ -588,8 +588,6 @@ char* BFXTradingPlatform::getAllPairs() {
 
 		if (value.is_array()) {
 			auto& symbols = value.as_array();
-			list<string> pairs;
-			size_t bufferSize = 0;
 			for (auto it = symbols.begin(); it != symbols.end(); it++) {
 				auto& elm = *it;
 				if (!elm.is_string()) {
@@ -597,24 +595,19 @@ char* BFXTradingPlatform::getAllPairs() {
 					continue;
 				}
 
-				auto symbol = elm.as_string();
-				std::transform(symbol.begin(), symbol.end(), symbol.begin(), toupper);
+				auto symbol_t = elm.as_string();
+				std::transform(symbol_t.begin(), symbol_t.end(), symbol_t.begin(), toupper);
 
-				pairs.emplace_back(CPPREST_FROM_STRING(symbol));
+				auto symbol = CPPREST_FROM_STRING(symbol_t);
+				char* uSymbol = (char*)malloc(symbol.size() + 1);
+				memcpy_s(uSymbol, symbol.size(), symbol.c_str(), symbol.size());
+				uSymbol[symbol.size()] = 0;
 
-				bufferSize += pairs.back().size() + 1;
+				pairs.push_back(uSymbol);
 			}
 
-			char* bufferPairs = (char*)malloc(bufferSize + 1);
-			char* c = bufferPairs;
-			for (auto it = pairs.begin(); it != pairs.end(); it++) {
-				memcpy_s(c, it->size(), it->data(), it->size());
-				c += it->size();
-				*c++ = ';';
-			}
-			*c = 0;
 
-			return bufferPairs;
+			return;
 		}
 		else {
 			string erroreMsg("API error: unknow response format");
