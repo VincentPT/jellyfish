@@ -53,6 +53,7 @@ public:
 	void cleanup();
 	void startServices();
 	void stopServices();
+	void applySelectedCurrency(const std::string& currency);
 
 	void addLog(const char* fmt, va_list args) {
 		if (_applog) {
@@ -191,7 +192,9 @@ void BasicApp::setup()
 			auto& tickers = handler->getTradeHistoriesNonSync();
 			if (tickers.size()) {
 
-				_graph->acessSharedData([this, &tickers](WxLineGraphLive* graph) {
+				_graph->acessSharedData([this, &tickers](Widget* sender) {
+					WxLineGraphLive* graph = (WxLineGraphLive*)sender;
+
 					TIMESTAMP timeLength = 60 * 60 * 1000;
 					_pixelPerTime = (float)(graph->getWidth() / timeLength);
 					float timeScale;
@@ -290,6 +293,9 @@ void BasicApp::setup()
 		Task task = std::bind(&BasicApp::stopServices, this);
 		_tasks.pushMessage(task);
 	});
+	_controlBoard->setOnSelectedCurrencyChangedHandler([this](Widget*) {
+		applySelectedCurrency(_controlBoard->getCurrentCurrency());
+	});
 
 	_asynTasksWorkder = std::thread([this]() {
 		while (_runFlag)
@@ -312,9 +318,13 @@ void BasicApp::startServices() {
 	_platformRunner = new PlatformEngine("bitfinex");
 	_platformRunner->getPlatform()->setLogger(_logAdapter);
 	_platformRunner->run();
-	auto& items = _platformRunner->getSymbolsStatistics();
-	_cryptoBoard->setItems(&items);
-	_controlBoard->setBaseCurrencies(_platformRunner->getCurrencies());
+	_cryptoBoard->accessSharedData([this](Widget*) {
+		auto& items = _platformRunner->getSymbolsStatistics();
+		_cryptoBoard->setItems(&items);
+	});
+	_controlBoard->accessSharedData([this](Widget*) {
+		_controlBoard->setBaseCurrencies(_platformRunner->getCurrencies());
+	});
 }
 
 void BasicApp::stopServices() {
@@ -325,15 +335,22 @@ void BasicApp::stopServices() {
 	}
 	
 	_platformRunner->stop();
-
-	_cryptoBoard->setItems(nullptr);
+	_cryptoBoard->accessSharedData([this](Widget*) {
+		_cryptoBoard->setItems(nullptr);
+	});
+	
 	_platformRunner->getPlatform()->setLogger(nullptr);
 	delete _platformRunner;
 	_platformRunner = nullptr;
 }
 
+void BasicApp::applySelectedCurrency(const std::string& currency) {
+	pushLog("selected currency %s\n", currency.c_str());
+}
+
 void BasicApp::onSelectedTradeEvent(NAPMarketEventHandler* handler, TradeItem* item, int count, bool) {
-	_graph->acessSharedData([this, item, count, handler](WxLineGraphLive* graph) {
+	_graph->acessSharedData([this, item, count, handler](Widget* sender) {
+		WxLineGraphLive* graph = (WxLineGraphLive*)sender;
 		graph->clearPoints();
 
 		auto& tradeItems = handler->getTradeHistoriesNonSync();

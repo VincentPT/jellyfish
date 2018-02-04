@@ -1,6 +1,6 @@
 #include "WxControlBoard.h"
 
-WxControlBoard::WxControlBoard() : _checkedButton(0)
+WxControlBoard::WxControlBoard() : _checkedButton(-1)
 {
 	_window_flags |= ImGuiWindowFlags_NoTitleBar;
 	_window_flags |= ImGuiWindowFlags_NoMove;
@@ -36,14 +36,20 @@ void WxControlBoard::update() {
 		}
 	}
 	ImGui::Separator();
-	if (ImGui::CollapsingHeader("Currencies")) {
+	if (ImGui::CollapsingHeader("Currencies", ImGuiTreeNodeFlags_DefaultOpen)) {
 		std::unique_lock<std::mutex> lk(_mutex);
+		int oldSelected = _checkedButton;
+
 		ImGui::BeginGroup();
-		ImGui::RadioButton("As is", &_checkedButton, 0);
+
 		for (int i = 0; i < _currencies.size(); i++) {
-			ImGui::RadioButton(_currencies[i].c_str(), &_checkedButton, i + 1);
+			ImGui::RadioButton(_currencies[i].c_str(), &_checkedButton, i);
 		}
 		ImGui::EndGroup();
+
+		if (oldSelected != _checkedButton && _selectedCurrencyChangedHandler) {
+			_selectedCurrencyChangedHandler(this);
+		}
 	}
 	ImGui::End();
 }
@@ -56,8 +62,21 @@ void WxControlBoard::setOnStopButtonClickHandler(ButtonClickEventHandler&& handl
 	_stopButtonClickHandler = handler;
 }
 
-void WxControlBoard::setBaseCurrencies(const std::vector<std::string>& currencies) {
+void WxControlBoard::setOnSelectedCurrencyChangedHandler(ButtonClickEventHandler&& handler) {
+	_selectedCurrencyChangedHandler = handler;
+}
+
+void WxControlBoard::accessSharedData(const AccessSharedDataFunc& f) {
 	std::unique_lock<std::mutex> lk(_mutex);
-	_checkedButton = 0;
+	f(this);
+}
+
+void WxControlBoard::setBaseCurrencies(const std::vector<std::string>& currencies) {
 	_currencies = currencies;
+	_currencies.push_back(DEFAULT_CURRENCY);
+	_checkedButton = (int)(_currencies.size() - 1);
+}
+
+const std::string& WxControlBoard::getCurrentCurrency() const {
+	return _currencies[_checkedButton];
 }

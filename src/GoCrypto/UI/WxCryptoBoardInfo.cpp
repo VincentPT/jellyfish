@@ -510,8 +510,12 @@ void WxCryptoBoardInfo::update() {
 	}
 }
 
-void WxCryptoBoardInfo::setItems(const std::vector<CryptoBoardElmInfo>* fixedItems) {
+void WxCryptoBoardInfo::accessSharedData(const AccessSharedDataFunc& f) {
 	std::unique_lock<std::mutex> lk(_mutex);
+	f(this);
+}
+
+void WxCryptoBoardInfo::setItems(const std::vector<CryptoBoardElmInfo>* fixedItems) {
 	if (fixedItems == nullptr) {
 		_fixedItems = nullptr;
 		_dataIndexcies.resize(0);

@@ -5,16 +5,15 @@
 #include <vector>
 #include <mutex>
 
-typedef std::function<void(Widget*)> ButtonClickEventHandler;
-
 class WxControlBoard :
 	public ImWidget
 {
 	ButtonClickEventHandler _startButtonClickHandler;
 	ButtonClickEventHandler _stopButtonClickHandler;
+	ButtonClickEventHandler _selectedCurrencyChangedHandler;
 	int _checkedButton;
 	std::vector<std::string> _currencies;
-	std::mutex _mutex;
+	mutable std::mutex _mutex;
 public:
 	WxControlBoard();
 	virtual ~WxControlBoard();
@@ -23,7 +22,10 @@ public:
 
 	void setOnStartButtonClickHandler(ButtonClickEventHandler&& handler);
 	void setOnStopButtonClickHandler(ButtonClickEventHandler&& handler);
+	void setOnSelectedCurrencyChangedHandler(ButtonClickEventHandler&& handler);
 
+	void accessSharedData(const AccessSharedDataFunc&);
 	void setBaseCurrencies(const std::vector<std::string>& currencies);
+	const std::string& getCurrentCurrency() const;
 };
 

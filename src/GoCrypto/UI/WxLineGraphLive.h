@@ -5,7 +5,6 @@
 #include "TradingPlatform.h"
 
 class WxLineGraphLive;
-typedef std::function<void(WxLineGraphLive* graph)> AccessSharedDataFunc;
 
 class WxLineGraphLive :
 	public WxLineGraph

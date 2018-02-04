@@ -70,6 +70,8 @@ public:
 	virtual ~WxCryptoBoardInfo();
 
 	virtual void update();
+
+	void accessSharedData(const AccessSharedDataFunc&);
 	virtual void setItems(const std::vector<CryptoBoardElmInfo>* fixedItems);
 	virtual void setItemSelectionChangedHandler(ItemSelecionChangedHandler&& handler);
 	const char* getSelectedSymbol() const;

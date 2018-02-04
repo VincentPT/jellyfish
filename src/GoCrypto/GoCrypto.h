@@ -15,3 +15,5 @@ struct CryptoBoardElmInfo {
 };
 
 void pushLog(const char* fmt, ...);
+
+#define DEFAULT_CURRENCY "As is"

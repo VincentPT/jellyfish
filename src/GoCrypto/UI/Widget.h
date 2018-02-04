@@ -16,3 +16,8 @@ public:
 	virtual float getY() = 0;
 };
 
+
+#include <functional>
+typedef std::function<void(Widget*)> ButtonClickEventHandler;
+typedef std::function<void(Widget*)> AccessSharedDataFunc;
+
