@@ -581,7 +581,7 @@ void HitBTCTradingPlatform::getAllPairs(StringList& pairs) {
 }
 
 void HitBTCTradingPlatform::startServerTimeQuery(TIMESTAMP updateInterval) {
-
+	throw runtime_error("not implemented");
 }
 
 TIMESTAMP HitBTCTradingPlatform::getSyncTime(TIMESTAMP localTime) {
@@ -593,7 +593,11 @@ bool HitBTCTradingPlatform::isServerTimeReady() {
 }
 
 void HitBTCTradingPlatform::getTradeHistory(const char* pair, TIMESTAMP duration, TIMESTAMP endTime, TradingList& tradeItems) {
+	throw runtime_error("not implemented");
+}
 
+void HitBTCTradingPlatform::getBaseCurrencies(StringList& currencies) {
+	throw runtime_error("not implemented");
 }
 
 extern "C" {

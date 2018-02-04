@@ -619,6 +619,12 @@ void BFXTradingPlatform::getAllPairs(StringList& pairs) {
 	throw std::runtime_error(erroreMsg);
 }
 
+void BFXTradingPlatform::getBaseCurrencies(StringList& currencies) {
+	currencies.push_back("USDT");
+	currencies.push_back("BTC");
+	currencies.push_back("ETH");
+}
+
 void BFXTradingPlatform::pingServerLoop() {
 	bool temp;
 	bool sent;

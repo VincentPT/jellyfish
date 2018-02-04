@@ -380,6 +380,10 @@ void BinanceTradingPlatform::getAllPairs(StringList& pairs) {
 	throw std::runtime_error(erroreMsg);
 }
 
+void BinanceTradingPlatform::getBaseCurrencies(StringList& currencies) {
+
+}
+
 void BinanceTradingPlatform::pingServerLoop() {
 	bool temp;
 	bool sent;

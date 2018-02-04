@@ -61,6 +61,7 @@ public:
 	virtual bool addEventHandler(MarketEventHandler* handler, bool allowDelete = false);
 	virtual void removeEventHandler(const char* pair);
 	virtual void getAllPairs(StringList& pairs);
+	virtual void getBaseCurrencies(StringList& currencies);
 	virtual void getTradeHistory(const char* pair, TIMESTAMP duration, TIMESTAMP endTime, TradingList& tradeItems);
 };
 

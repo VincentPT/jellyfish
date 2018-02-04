@@ -56,6 +56,7 @@ public:
 	virtual void getTradeHistory(const char* pair, TIMESTAMP duration, TIMESTAMP endTime, TradingList& tradeItems) = 0;
 	// return pairs seperate by ';', caller must using free to free the string buffer after use
 	virtual void getAllPairs(StringList& pairs) = 0;
+	virtual void getBaseCurrencies(StringList& currencies) = 0;
 	virtual void subscribeTicker(const char* pair);
 	virtual void subscribeBook(const char* pair);
 	virtual void subscribeTrade(const char* pair);
