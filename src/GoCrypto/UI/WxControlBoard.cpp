@@ -1,6 +1,6 @@
 #include "WxControlBoard.h"
 
-WxControlBoard::WxControlBoard()
+WxControlBoard::WxControlBoard() : _checkedButton(0)
 {
 	_window_flags |= ImGuiWindowFlags_NoTitleBar;
 	_window_flags |= ImGuiWindowFlags_NoMove;
@@ -35,7 +35,16 @@ void WxControlBoard::update() {
 			_stopButtonClickHandler(this);
 		}
 	}
-	
+	ImGui::Separator();
+	if (ImGui::CollapsingHeader("Currencies")) {
+		std::unique_lock<std::mutex> lk(_mutex);
+		ImGui::BeginGroup();
+		ImGui::RadioButton("As is", &_checkedButton, 0);
+		for (int i = 0; i < _currencies.size(); i++) {
+			ImGui::RadioButton(_currencies[i].c_str(), &_checkedButton, i + 1);
+		}
+		ImGui::EndGroup();
+	}
 	ImGui::End();
 }
 
@@ -45,4 +54,10 @@ void WxControlBoard::setOnStartButtonClickHandler(ButtonClickEventHandler&& hand
 
 void WxControlBoard::setOnStopButtonClickHandler(ButtonClickEventHandler&& handler) {
 	_stopButtonClickHandler = handler;
+}
+
+void WxControlBoard::setBaseCurrencies(const std::vector<std::string>& currencies) {
+	std::unique_lock<std::mutex> lk(_mutex);
+	_checkedButton = 0;
+	_currencies = currencies;
 }

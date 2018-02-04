@@ -80,6 +80,15 @@ PlatformEngine::PlatformEngine(const char* platformName) : _runFlag(false), _hLi
 
 				_userRawListeners.push_back(raw);
 			}
+			if (settings.has_field(U("currencies"))) {
+				auto currenciesVal = settings[U("currencies")];
+				if (currenciesVal.is_array()) {
+					auto& currencies = currenciesVal.as_array();
+					for (auto cit = currencies.begin(); cit != currencies.end(); cit++) {
+					   _currencies.push_back(CPPREST_FROM_STRING(cit->as_string()));
+					}
+				}
+			}
 		}
 	}
 	catch(...) {
@@ -574,4 +583,8 @@ const std::vector<CryptoBoardElmInfo>& PlatformEngine::getSymbolsStatistics() co
 
 TradingPlatform* PlatformEngine::getPlatform() {
 	return _platform;
+}
+
+const std::vector<string>& PlatformEngine::getCurrencies() const {
+	return _currencies;
 }

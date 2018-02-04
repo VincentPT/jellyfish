@@ -29,6 +29,7 @@ class BasicApp : public App {
 	shared_ptr<WxAppLog> _applog;
 	shared_ptr<WxLineGraphLive> _graph;
 	shared_ptr<WxCryptoBoardInfo> _cryptoBoard;
+	shared_ptr<WxControlBoard> _controlBoard;
 	SyncMessageQueue<Task> _tasks;
 
 	
@@ -126,7 +127,7 @@ void BasicApp::setup()
 	auto topSpliter = std::make_shared<Spliter>();
 	_applog = std::make_shared<WxAppLog>();
 	auto graphLine = std::make_shared<WxLineGraphLive>();
-	auto controlBoard = std::make_shared<WxControlBoard>();
+	_controlBoard = std::make_shared<WxControlBoard>();
 
 	_logAdapter = new LogAdapter(_applog.get());
 
@@ -134,7 +135,7 @@ void BasicApp::setup()
 	topSpliter->setFixedPanelSize(130);
 	topSpliter->setFixPanel(FixedPanel::Panel2);
 	topSpliter->setChild1(_cryptoBoard);
-	topSpliter->setChild2(controlBoard);
+	topSpliter->setChild2(_controlBoard);
 
 	bottomSpliter->setVertical(true);
 	bottomSpliter->setFixedPanelSize(800);
@@ -281,11 +282,11 @@ void BasicApp::setup()
 		}
 	});
 
-	controlBoard->setOnStartButtonClickHandler([this](Widget*) {
+	_controlBoard->setOnStartButtonClickHandler([this](Widget*) {
 		Task task = std::bind(&BasicApp::startServices, this);
 		_tasks.pushMessage(task);
 	});
-	controlBoard->setOnStopButtonClickHandler([this](Widget*) {
+	_controlBoard->setOnStopButtonClickHandler([this](Widget*) {
 		Task task = std::bind(&BasicApp::stopServices, this);
 		_tasks.pushMessage(task);
 	});
@@ -313,6 +314,7 @@ void BasicApp::startServices() {
 	_platformRunner->run();
 	auto& items = _platformRunner->getSymbolsStatistics();
 	_cryptoBoard->setItems(&items);
+	_controlBoard->setBaseCurrencies(_platformRunner->getCurrencies());
 }
 
 void BasicApp::stopServices() {

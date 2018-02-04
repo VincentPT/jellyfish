@@ -54,6 +54,7 @@ private:
 	std::map<std::string, std::shared_ptr<std::list<UserListenerInfo*>>> _pairListenerMap;
 	std::map<std::string, bool> _degbugMap;
 	std::vector<CryptoBoardElmInfo> _symbolsStatistics;
+	std::vector<std::string> _currencies;
 
 	typedef std::map<TRADE_ID, char> TradeLevelMap;
 	std::map<std::string, std::shared_ptr<TradeLevelMap>> _processLevelMap;
@@ -75,6 +76,7 @@ public:
 	void stop();
 	const std::vector<CryptoBoardElmInfo>& getSymbolsStatistics() const;
 	TradingPlatform* getPlatform();
+	const std::vector<std::string>& getCurrencies() const;
 };
 
 typedef std::shared_ptr<Notifier> TraderRef;
