@@ -150,7 +150,7 @@ void BasicApp::setup()
 	_spliter.setChild1(topSpliter);
 	_spliter.setChild2(bottomSpliter);
 
-	graphLine->setInitalGraphRegion(Area(20, 20, graphLine->getWidth() - 20, graphLine->getHeight() - 20));
+	graphLine->setInitalGraphRegion(Area(20, 20, (int)graphLine->getWidth() - 20, (int)graphLine->getHeight() - 20));
 	graphLine->setGraphRegionColor(ColorA8u(0, 0, 0, 255));
 	graphLine->setLineColor(ColorA8u(255, 255, 0, 255));
 
@@ -319,6 +319,7 @@ void BasicApp::startServices() {
 	_platformRunner = new PlatformEngine("bitfinex");
 	_platformRunner->getPlatform()->setLogger(_logAdapter);
 	_platformRunner->run();
+
 	_cryptoBoard->accessSharedData([this](Widget*) {
 		auto& items = _platformRunner->getSymbolsStatistics();
 		_cryptoBoard->setItems(&items);
@@ -337,7 +338,12 @@ void BasicApp::stopServices() {
 	
 	_platformRunner->stop();
 	_cryptoBoard->accessSharedData([this](Widget*) {
+		_cryptoBoard->resetCryptoAdapterToDefault();
 		_cryptoBoard->setItems(nullptr);
+	});
+	_controlBoard->accessSharedData([this](Widget*) {
+		// reset currencies to empty
+		_controlBoard->setBaseCurrencies({});
 	});
 	
 	_platformRunner->getPlatform()->setLogger(nullptr);
@@ -347,15 +353,20 @@ void BasicApp::stopServices() {
 
 void BasicApp::applySelectedCurrency(const std::string& currency) {
 	if (currency == DEFAULT_CURRENCY) {
-		_cryptoBoard->accessSharedData([](Widget* sender) {
+		_cryptoBoard->accessSharedData([this](Widget* sender) {
 			((WxCryptoBoardInfo*)sender)->resetCryptoAdapterToDefault();
+			auto& items = _platformRunner->getSymbolsStatistics();
+			((WxCryptoBoardInfo*)sender)->setItems(&items);
 		});
 	}
 	else {
-		_cryptoBoard->accessSharedData([](Widget* sender) {
+		_cryptoBoard->accessSharedData([&currency, this](Widget* sender) {
 			auto crytoBoard = (WxCryptoBoardInfo*)sender;
 			auto& elmInfoOffsets = crytoBoard->getRawElemInfoOffsets();
 			auto adapter = make_shared<ConvertableCryptoInfoAdapter>(elmInfoOffsets);
+			adapter->setCurrency(currency);
+			adapter->intialize(crytoBoard->getItems(), _platformRunner);
+
 			crytoBoard->setAdapter(adapter);
 		});
 	}

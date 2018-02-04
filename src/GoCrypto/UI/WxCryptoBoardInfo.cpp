@@ -1,59 +1,5 @@
 #include "WxCryptoBoardInfo.h"
 
-inline bool IS_INVALID_PRICE(const double& price) {
-	return price <= 0;
-}
-
-inline bool IS_INVALID_VOL(const double& vol) {
-	return vol == 0;
-}
-
-inline double computeBuy(const VolumePeriod& vol) {
-	return vol.bought / (vol.bought + vol.sold);
-}
-
-inline int comparePrice(const double& price1, const double& price2) {
-	if (IS_INVALID_PRICE(price1) && IS_INVALID_PRICE(price2)) {
-		if (IS_INVALID_PRICE(price1)) {
-			return -1;
-		}
-		if (IS_INVALID_PRICE(price2)) {
-			return 1;
-		}
-		return 0;
-	}
-
-	if (price2 == price1) {
-		return 0;
-	}
-	else if (price1 > price2) {
-		return 1;
-	}
-
-	return -1;
-}
-
-inline int compareVol(const double& vol1, const double& vol2) {
-	if (IS_INVALID_VOL(vol1) || IS_INVALID_VOL(vol2)) {
-		if (IS_INVALID_VOL(vol1)) {
-			return -1;
-		}
-		if (IS_INVALID_VOL(vol2)) {
-			return 1;
-		}
-		return 0;
-	}
-
-	if (vol1 == vol2) {
-		return 0;
-	}
-	else if (vol1 > vol2) {
-		return 1;
-	}
-
-	return -1;
-}
-
 CryptoBoardInfoDefaultAdapter::CryptoBoardInfoDefaultAdapter(const std::vector<int>& rawElmInfoOffsets) :_rawElmInfoOffsets(rawElmInfoOffsets) {
 
 }
@@ -185,6 +131,8 @@ std::string CryptoBoardInfoDefaultAdapter::convert2StringForBPSh(int i, int iOff
 	sprintf(buffer, "%0.2f %%", (computeBuy(*pValue) * 100));
 	return buffer;
 }
+void CryptoBoardInfoDefaultAdapter::updateData() {}
+
 ////////////////////////////////////////////////////////////////////////
 
 bool WxCryptoBoardInfo::checkValidSymbol(int i) {
@@ -454,8 +402,6 @@ WxCryptoBoardInfo::~WxCryptoBoardInfo()
 {
 }
 
-//extern ImGuiContext*           GImGui;
-
 void WxCryptoBoardInfo::update() {
 	std::unique_lock<std::mutex> lk(_mutex);
 
@@ -475,6 +421,10 @@ void WxCryptoBoardInfo::update() {
 	ImGui::Columns((int)_columns.size(), "symbols", true);
 	ImGui::Separator();
 	float offset = 0.0f;
+
+	// for adapter prepares data before display
+	_cryptoBoardInfoAdapter->updateData();
+
 	for (int i = 0; i < (int)_columns.size(); i++)
 	{
 		auto& column = _columns[i];
@@ -530,44 +480,6 @@ void WxCryptoBoardInfo::update() {
 		ImGui::Columns(1);
 		ImGui::EndChild();
 	}
-	//else {
-	//	int ITEMS_COUNT = 200;
-	//	auto windowHeight = ImGui::GetWindowHeight() - itemHeight - 10;
-	//	//ImGui::SetNextWindowContentSize(ImVec2(0, 0));
-	//	ImGui::BeginChild("##ScrollingRegion", ImVec2(0, windowHeight), false, ImGuiWindowFlags_HorizontalScrollbar);
-	//	ImGui::Columns(_columns.size());
-
-	//	ImGuiListClipper clipper(ITEMS_COUNT);  // Also demonstrate using the clipper for large list
-
-	//	char label[32];
-	//	while (clipper.Step()) {
-	//		for (int i = clipper.DisplayStart; i < clipper.DisplayEnd; i++) {
-	//			offset = 0.0f;
-	//			int j = 0;
-	//			//sprintf(label, "%04d", i);
-	//			sprintf(label, "N/A");
-
-	//			if (ImGui::Selectable(label, i == _selected, ImGuiSelectableFlags_SpanAllColumns)) {
-	//				_selected = i;
-	//			}
-
-	//			ImGui::SetColumnOffset(j, offset);
-	//			offset += _columns[j].size;
-	//			ImGui::NextColumn();
-
-	//			for (j++; j < (int)_columns.size(); j++) {
-	//				//ImGui::Text("%d:%d", i, j);
-	//				ImGui::Text("N/A", i, j);
-	//				ImGui::SetColumnOffset(j, offset);
-	//				offset += _columns[j].size;
-	//				ImGui::NextColumn();
-	//			}
-	//			ImGui::Separator();
-	//		}
-	//	}
-	//	ImGui::Columns(1);
-	//	ImGui::EndChild();
-	//}
 
 	ImGui::End();
 
@@ -596,8 +508,11 @@ void WxCryptoBoardInfo::setItems(const std::vector<CryptoBoardElmInfo>* fixedIte
 			_dataIndexcies[i] = i;
 		}
 	}
-
 	_cryptoBoardInfoAdapter->setItems(_fixedItems);
+}
+
+const std::vector<CryptoBoardElmInfo>* WxCryptoBoardInfo::getItems() const {
+	return _fixedItems;
 }
 
 void WxCryptoBoardInfo::setItemSelectionChangedHandler(ItemSelecionChangedHandler&& handler) {
@@ -612,7 +527,8 @@ const char* WxCryptoBoardInfo::getSelectedSymbol() const {
 }
 
 void WxCryptoBoardInfo::resetCryptoAdapterToDefault() {
-	setAdapter(std::make_shared<CryptoBoardInfoDefaultAdapter>(_rawElmInfoOffsets));
+	auto adapter = std::make_shared<CryptoBoardInfoDefaultAdapter>(_rawElmInfoOffsets);
+	setAdapter(adapter);
 }
 
 const std::vector<int>& WxCryptoBoardInfo::getRawElemInfoOffsets() const {
@@ -621,5 +537,4 @@ const std::vector<int>& WxCryptoBoardInfo::getRawElemInfoOffsets() const {
 
 void WxCryptoBoardInfo::setAdapter(std::shared_ptr<CryptoBoardInfoModeAdapterBase> adapter) {
 	_cryptoBoardInfoAdapter = adapter;
-	_cryptoBoardInfoAdapter->setItems(_fixedItems);
 }

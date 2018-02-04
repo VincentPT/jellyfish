@@ -53,13 +53,14 @@ public:
 	virtual bool checkValidPricePeriod(int i, int iOffset) = 0;
 	virtual bool checkValidVolPeriod(int i, int iOffset) = 0;
 	virtual bool checkValidBPSh(int i, int iOffset) = 0;
-
+	virtual void updateData() = 0;
 	virtual void setItems(const std::vector<CryptoBoardElmInfo>* fixedItems) {
 		_fixedItems = fixedItems;
 	}
 };
 
 class CryptoBoardInfoDefaultAdapter : public CryptoBoardInfoModeAdapterBase {
+protected:
 	const std::vector<int>& _rawElmInfoOffsets;
 public:
 	CryptoBoardInfoDefaultAdapter(const std::vector<int>& rawElmInfoOffsets);
@@ -84,7 +85,65 @@ public:
 	virtual bool checkValidPricePeriod(int i, int iOffset);
 	virtual bool checkValidVolPeriod(int i, int iOffset);
 	virtual bool checkValidBPSh(int i, int iOffset);
+
+	virtual void updateData();
 };
+
+
+inline bool IS_INVALID_PRICE(const double& price) {
+	return price <= 0;
+}
+
+inline bool IS_INVALID_VOL(const double& vol) {
+	return vol == 0;
+}
+
+inline double computeBuy(const VolumePeriod& vol) {
+	return vol.bought / (vol.bought + vol.sold);
+}
+
+inline int comparePrice(const double& price1, const double& price2) {
+	if (IS_INVALID_PRICE(price1) && IS_INVALID_PRICE(price2)) {
+		if (IS_INVALID_PRICE(price1)) {
+			return -1;
+		}
+		if (IS_INVALID_PRICE(price2)) {
+			return 1;
+		}
+		return 0;
+	}
+
+	if (price2 == price1) {
+		return 0;
+	}
+	else if (price1 > price2) {
+		return 1;
+	}
+
+	return -1;
+}
+
+inline int compareVol(const double& vol1, const double& vol2) {
+	if (IS_INVALID_VOL(vol1) || IS_INVALID_VOL(vol2)) {
+		if (IS_INVALID_VOL(vol1)) {
+			return -1;
+		}
+		if (IS_INVALID_VOL(vol2)) {
+			return 1;
+		}
+		return 0;
+	}
+
+	if (vol1 == vol2) {
+		return 0;
+	}
+	else if (vol1 > vol2) {
+		return 1;
+	}
+
+	return -1;
+}
+
 
 
 class WxCryptoBoardInfo :
@@ -133,6 +192,7 @@ public:
 
 	void accessSharedData(const AccessSharedDataFunc&);
 	virtual void setItems(const std::vector<CryptoBoardElmInfo>* fixedItems);
+	virtual const std::vector<CryptoBoardElmInfo>* getItems() const;
 	virtual void setItemSelectionChangedHandler(ItemSelecionChangedHandler&& handler);
 	const char* getSelectedSymbol() const;
 	void resetCryptoAdapterToDefault();
