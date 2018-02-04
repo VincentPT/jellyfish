@@ -44,6 +44,8 @@ SET (MAIN_SOURCES
     GoCrypto.h
     LogAdapter.h
     LogAdapter.cpp
+    ConvertableCryptoInfoAdapter.h
+    ConvertableCryptoInfoAdapter.cpp
     Resources/Resources.h
     Resources/Resources.rc
     ${UI_SRC}

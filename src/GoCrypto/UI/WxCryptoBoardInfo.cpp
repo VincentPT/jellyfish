@@ -54,33 +54,39 @@ inline int compareVol(const double& vol1, const double& vol2) {
 	return -1;
 }
 
-bool WxCryptoBoardInfo::checkValidSymbol(int i) {
+CryptoBoardInfoDefaultAdapter::CryptoBoardInfoDefaultAdapter(const std::vector<int>& rawElmInfoOffsets) :_rawElmInfoOffsets(rawElmInfoOffsets) {
+
+}
+CryptoBoardInfoDefaultAdapter::~CryptoBoardInfoDefaultAdapter() {}
+
+//////////////////////////////////////////////////////////////////////////
+bool CryptoBoardInfoDefaultAdapter::checkValidSymbol(int i) {
 	auto& item = _fixedItems->at(i);
 	static std::string NA = "NA";
 	return item.symbol.length() > 0 && item.symbol != NA;
 }
-bool WxCryptoBoardInfo::checkValidPrice(int i) {
+bool CryptoBoardInfoDefaultAdapter::checkValidPrice(int i) {
 	auto& item = _fixedItems->at(i);
 	return !IS_INVALID_PRICE(item.price);
 }
-bool WxCryptoBoardInfo::checkValidVol(int i) {
+bool CryptoBoardInfoDefaultAdapter::checkValidVol(int i) {
 	auto& item = _fixedItems->at(i);
 	return !IS_INVALID_VOL(item.volume);
 }
-bool WxCryptoBoardInfo::checkValidPricePeriod(int i, int iOffset) {
+bool CryptoBoardInfoDefaultAdapter::checkValidPricePeriod(int i, int iOffset) {
 	auto pValue = (double*)((char*)&_fixedItems->at(i) + _rawElmInfoOffsets[iOffset]);
 	return !IS_INVALID_PRICE(*pValue);
 }
-bool WxCryptoBoardInfo::checkValidVolPeriod(int i, int iOffset) {
+bool CryptoBoardInfoDefaultAdapter::checkValidVolPeriod(int i, int iOffset) {
 	auto pValue = (VolumePeriod*)((char*)&_fixedItems->at(i) + _rawElmInfoOffsets[iOffset]);
 	return !IS_INVALID_VOL(pValue->bought + pValue->sold);
 }
-bool WxCryptoBoardInfo::checkValidBPSh(int i, int iOffset) {
+bool CryptoBoardInfoDefaultAdapter::checkValidBPSh(int i, int iOffset) {
 	auto pValue = (VolumePeriod*)((char*)&_fixedItems->at(i) + _rawElmInfoOffsets[iOffset]);
 	return !IS_INVALID_VOL(pValue->bought + pValue->sold);
 }
 
-bool WxCryptoBoardInfo::compareSymbol(int i1, int i2) {
+bool CryptoBoardInfoDefaultAdapter::compareSymbol(int i1, int i2) {
 
 	auto& item1 = _fixedItems->at(i1);
 	auto& item2 = _fixedItems->at(i2);
@@ -88,28 +94,28 @@ bool WxCryptoBoardInfo::compareSymbol(int i1, int i2) {
 	return item1.symbol < item2.symbol;
 }
 
-bool WxCryptoBoardInfo::comparePrice(int i1, int i2) {
+bool CryptoBoardInfoDefaultAdapter::comparePrice(int i1, int i2) {
 
 	auto& item1 = _fixedItems->at(i1);
 	auto& item2 = _fixedItems->at(i2);
 
 	return item1.price < item2.price;
 }
-bool WxCryptoBoardInfo::compareVol(int i1, int i2) {
+bool CryptoBoardInfoDefaultAdapter::compareVol(int i1, int i2) {
 
 	auto& item1 = _fixedItems->at(i1);
 	auto& item2 = _fixedItems->at(i2);
 
 	return std::abs(item1.volume) < std::abs(item2.volume);
 }
-bool WxCryptoBoardInfo::comparePricePeriod(int i1, int i2, int iOffset) {
+bool CryptoBoardInfoDefaultAdapter::comparePricePeriod(int i1, int i2, int iOffset) {
 
 	auto pValue1 = (double*)((char*)&_fixedItems->at(i1) + _rawElmInfoOffsets[iOffset]);
 	auto pValue2 = (double*)((char*)&_fixedItems->at(i2) + _rawElmInfoOffsets[iOffset]);
 
 	return *pValue1 < *pValue2;
 }
-bool WxCryptoBoardInfo::compareVolPeriod(int i1, int i2, int iOffset) {
+bool CryptoBoardInfoDefaultAdapter::compareVolPeriod(int i1, int i2, int iOffset) {
 
 	auto pValue1 = (VolumePeriod*)((char*)&_fixedItems->at(i1) + _rawElmInfoOffsets[iOffset]);
 	auto pValue2 = (VolumePeriod*)((char*)&_fixedItems->at(i2) + _rawElmInfoOffsets[iOffset]);
@@ -117,19 +123,19 @@ bool WxCryptoBoardInfo::compareVolPeriod(int i1, int i2, int iOffset) {
 	return (pValue1->bought + pValue1->sold) < (pValue2->bought + pValue2->sold);
 }
 
-bool WxCryptoBoardInfo::compareVolBPSh(int i1, int i2, int iOffset) {
+bool CryptoBoardInfoDefaultAdapter::compareVolBPSh(int i1, int i2, int iOffset) {
 	auto pValue1 = (VolumePeriod*)((char*)&_fixedItems->at(i1) + _rawElmInfoOffsets[iOffset]);
 	auto pValue2 = (VolumePeriod*)((char*)&_fixedItems->at(i2) + _rawElmInfoOffsets[iOffset]);
 
 	return computeBuy(*pValue1) < computeBuy(*pValue2);
 }
 
-std::string WxCryptoBoardInfo::convert2StringForSymbol(int i) {
-	return _fixedItems->at(_dataIndexcies[i]).symbol;
+std::string CryptoBoardInfoDefaultAdapter::convert2StringForSymbol(int i) {
+	return _fixedItems->at(i).symbol;
 }
-std::string WxCryptoBoardInfo::convert2StringForPrice(int i) {
+std::string CryptoBoardInfoDefaultAdapter::convert2StringForPrice(int i) {
 	char buffer[32];
-	auto price = _fixedItems->at(_dataIndexcies[i]).price;
+	auto price = _fixedItems->at(i).price;
 	if (IS_INVALID_PRICE(price)) {
 		return "N/A";
 	}
@@ -137,9 +143,9 @@ std::string WxCryptoBoardInfo::convert2StringForPrice(int i) {
 	sprintf(buffer, "%.8f", price);
 	return buffer;
 }
-std::string WxCryptoBoardInfo::convert2StringForPricePeriod(int i, int iOffset) {
+std::string CryptoBoardInfoDefaultAdapter::convert2StringForPricePeriod(int i, int iOffset) {
 	char buffer[32];
-	auto pValue = (double*)((char*)&_fixedItems->at(_dataIndexcies[i]) + _rawElmInfoOffsets[iOffset]);
+	auto pValue = (double*)((char*)&_fixedItems->at(i) + _rawElmInfoOffsets[iOffset]);
 	auto price = *pValue;
 	if (IS_INVALID_PRICE(price)) {
 		return "N/A";
@@ -148,9 +154,9 @@ std::string WxCryptoBoardInfo::convert2StringForPricePeriod(int i, int iOffset) 
 	sprintf(buffer, "%.8f", price);
 	return buffer;
 }
-std::string WxCryptoBoardInfo::convert2StringForVol(int i) {
+std::string CryptoBoardInfoDefaultAdapter::convert2StringForVol(int i) {
 	char buffer[32];
-	auto vol = std::abs(_fixedItems->at(_dataIndexcies[i]).volume);
+	auto vol = std::abs(_fixedItems->at(i).volume);
 	if (IS_INVALID_VOL(vol)) {
 		return "N/A";
 	}
@@ -158,26 +164,86 @@ std::string WxCryptoBoardInfo::convert2StringForVol(int i) {
 	sprintf(buffer, "%.8f", vol);
 	return buffer;
 }
-std::string WxCryptoBoardInfo::convert2StringForVolPeriod(int i, int iOffset) {
+std::string CryptoBoardInfoDefaultAdapter::convert2StringForVolPeriod(int i, int iOffset) {
 	char buffer[32];
-	auto pValue = (VolumePeriod*)((char*)&_fixedItems->at(_dataIndexcies[i]) + _rawElmInfoOffsets[iOffset]);
+	auto pValue = (VolumePeriod*)((char*)&_fixedItems->at(i) + _rawElmInfoOffsets[iOffset]);
 	auto vol = pValue->bought + pValue->sold;
-	if ( IS_INVALID_VOL(vol)) {
+	if (IS_INVALID_VOL(vol)) {
 		return "N/A";
 	}
 
 	sprintf(buffer, "%.8f", vol);
 	return buffer;
 }
-std::string WxCryptoBoardInfo::convert2StringForBPSh(int i, int iOffset) {
+std::string CryptoBoardInfoDefaultAdapter::convert2StringForBPSh(int i, int iOffset) {
 	char buffer[32];
-	auto pValue = (VolumePeriod*)((char*)&_fixedItems->at(_dataIndexcies[i]) + _rawElmInfoOffsets[iOffset]);
+	auto pValue = (VolumePeriod*)((char*)&_fixedItems->at(i) + _rawElmInfoOffsets[iOffset]);
 	if (IS_INVALID_VOL(pValue->bought + pValue->sold)) {
 		return "N/A";
 	}
 
 	sprintf(buffer, "%0.2f %%", (computeBuy(*pValue) * 100));
 	return buffer;
+}
+////////////////////////////////////////////////////////////////////////
+
+bool WxCryptoBoardInfo::checkValidSymbol(int i) {
+	return _cryptoBoardInfoAdapter->checkValidSymbol(i);
+}
+bool WxCryptoBoardInfo::checkValidPrice(int i) {
+	return _cryptoBoardInfoAdapter->checkValidPrice(i);
+}
+bool WxCryptoBoardInfo::checkValidVol(int i) {
+	return _cryptoBoardInfoAdapter->checkValidVol(i);
+}
+bool WxCryptoBoardInfo::checkValidPricePeriod(int i, int iOffset) {
+	return _cryptoBoardInfoAdapter->checkValidPricePeriod(i, iOffset);
+}
+bool WxCryptoBoardInfo::checkValidVolPeriod(int i, int iOffset) {
+	return _cryptoBoardInfoAdapter->checkValidVolPeriod(i, iOffset);
+}
+bool WxCryptoBoardInfo::checkValidBPSh(int i, int iOffset) {
+	return _cryptoBoardInfoAdapter->checkValidBPSh(i, iOffset);
+}
+
+bool WxCryptoBoardInfo::compareSymbol(int i1, int i2) {
+	return _cryptoBoardInfoAdapter->compareSymbol(i1, i2);
+}
+
+bool WxCryptoBoardInfo::comparePrice(int i1, int i2) {
+	return _cryptoBoardInfoAdapter->comparePrice(i1, i2);
+}
+bool WxCryptoBoardInfo::compareVol(int i1, int i2) {
+	return _cryptoBoardInfoAdapter->compareVol(i1, i2);
+}
+bool WxCryptoBoardInfo::comparePricePeriod(int i1, int i2, int iOffset) {
+	return _cryptoBoardInfoAdapter->comparePricePeriod(i1, i2, iOffset);
+}
+bool WxCryptoBoardInfo::compareVolPeriod(int i1, int i2, int iOffset) {
+	return _cryptoBoardInfoAdapter->compareVolPeriod(i1, i2, iOffset);
+}
+
+bool WxCryptoBoardInfo::compareVolBPSh(int i1, int i2, int iOffset) {
+	return _cryptoBoardInfoAdapter->compareVolBPSh(i1, i2, iOffset);
+}
+
+std::string WxCryptoBoardInfo::convert2StringForSymbol(int i) {
+	return _cryptoBoardInfoAdapter->convert2StringForSymbol(i);
+}
+std::string WxCryptoBoardInfo::convert2StringForPrice(int i) {
+	return _cryptoBoardInfoAdapter->convert2StringForPrice(i);
+}
+std::string WxCryptoBoardInfo::convert2StringForPricePeriod(int i, int iOffset) {
+	return _cryptoBoardInfoAdapter->convert2StringForPricePeriod(i, iOffset);
+}
+std::string WxCryptoBoardInfo::convert2StringForVol(int i) {
+	return _cryptoBoardInfoAdapter->convert2StringForVol(i);
+}
+std::string WxCryptoBoardInfo::convert2StringForVolPeriod(int i, int iOffset) {
+	return _cryptoBoardInfoAdapter->convert2StringForVolPeriod(i, iOffset);
+}
+std::string WxCryptoBoardInfo::convert2StringForBPSh(int i, int iOffset) {
+	return _cryptoBoardInfoAdapter->convert2StringForBPSh(i, iOffset);
 }
 
 WxCryptoBoardInfo::WxCryptoBoardInfo() : _selected(-1), _fixedItems(nullptr)
@@ -341,6 +407,8 @@ WxCryptoBoardInfo::WxCryptoBoardInfo() : _selected(-1), _fixedItems(nullptr)
 
 	setSize(totalSize + 2 * style.WindowPadding.x, 0);
 	setPos(0, 0);
+
+	resetCryptoAdapterToDefault();
 }
 
 void WxCryptoBoardInfo::onSort(int columnIdx) {
@@ -449,7 +517,7 @@ void WxCryptoBoardInfo::update() {
 
 				for (j++; j < (int)_columns.size(); j++) {
 					auto& columnInfo = _columnAdditionalInfo[_columns[j].additionalIdx];
-					auto str = (columnInfo.toString)(i);
+					auto str = (columnInfo.toString)(_dataIndexcies[i]);
 					ImGui::Text("%s", str.c_str());
 					ImGui::SetColumnOffset(j, offset);
 					offset += _columns[j].size;
@@ -528,6 +596,8 @@ void WxCryptoBoardInfo::setItems(const std::vector<CryptoBoardElmInfo>* fixedIte
 			_dataIndexcies[i] = i;
 		}
 	}
+
+	_cryptoBoardInfoAdapter->setItems(_fixedItems);
 }
 
 void WxCryptoBoardInfo::setItemSelectionChangedHandler(ItemSelecionChangedHandler&& handler) {
@@ -539,4 +609,17 @@ const char* WxCryptoBoardInfo::getSelectedSymbol() const {
 		return nullptr;
 	}
 	return _fixedItems->at(_selected).symbol.c_str();
+}
+
+void WxCryptoBoardInfo::resetCryptoAdapterToDefault() {
+	setAdapter(std::make_shared<CryptoBoardInfoDefaultAdapter>(_rawElmInfoOffsets));
+}
+
+const std::vector<int>& WxCryptoBoardInfo::getRawElemInfoOffsets() const {
+	return _rawElmInfoOffsets;
+}
+
+void WxCryptoBoardInfo::setAdapter(std::shared_ptr<CryptoBoardInfoModeAdapterBase> adapter) {
+	_cryptoBoardInfoAdapter = adapter;
+	_cryptoBoardInfoAdapter->setItems(_fixedItems);
 }

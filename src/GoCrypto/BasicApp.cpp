@@ -14,6 +14,7 @@
 #include "Engine/PlatformEngine.h"
 #include "LogAdapter.h"
 #include "../common/Utility.h"
+#include <ConvertableCryptoInfoAdapter.h>
 
 using namespace ci;
 using namespace ci::app;
@@ -345,7 +346,19 @@ void BasicApp::stopServices() {
 }
 
 void BasicApp::applySelectedCurrency(const std::string& currency) {
-	pushLog("selected currency %s\n", currency.c_str());
+	if (currency == DEFAULT_CURRENCY) {
+		_cryptoBoard->accessSharedData([](Widget* sender) {
+			((WxCryptoBoardInfo*)sender)->resetCryptoAdapterToDefault();
+		});
+	}
+	else {
+		_cryptoBoard->accessSharedData([](Widget* sender) {
+			auto crytoBoard = (WxCryptoBoardInfo*)sender;
+			auto& elmInfoOffsets = crytoBoard->getRawElemInfoOffsets();
+			auto adapter = make_shared<ConvertableCryptoInfoAdapter>(elmInfoOffsets);
+			crytoBoard->setAdapter(adapter);
+		});
+	}
 }
 
 void BasicApp::onSelectedTradeEvent(NAPMarketEventHandler* handler, TradeItem* item, int count, bool) {
