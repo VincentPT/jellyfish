@@ -139,7 +139,7 @@ void PlatformEngine::timeInterval() {
 		//if (_platform->isServerTimeReady()) {
 		//	_platform->broadcastServerTime(_platform->getSyncTime(getCurrentTimeStamp()));
 		//}
-		measurePriceIncrement(handlers);
+		//measurePriceIncrement(handlers);
 
 		t2 = getCurrentTimeStamp();
 		processTime = (t2 - t1);
@@ -214,11 +214,263 @@ void PlatformEngine::sheduleQueryHistory() {
 	}
 }
 
-void PlatformEngine::updateSymbolStatistic(CryptoBoardElmInfo* info, NAPMarketEventHandler* sender, TradeItem* tradeItem, int, bool) {
-	info->price = tradeItem->price;
-	info->volume = fabs(tradeItem->amount);
+template <class Iter>
+inline void updateTicker(Iter item, double& cost, double& sold, double& bought, PricePoint& price, PricePoint& low, PricePoint& high) {
+	price.at = item->timestamp;
+	price.price = item->price;
 
+	if (high.price < price.price) {
+		high = price;
+	}
+	if (low.price > price.price) {
+		low = price;
+	}
+
+	if (item->amount < 0) {
+		sold += -item->amount;
+		cost -= price.price * item->amount;
+	}
+	else {
+		bought += item->amount;
+		cost += price.price * item->amount;
+	}
+}
+
+template <class Iter, class NextIterFunc>
+void buildFromEmptyTickers(Iter begin, Iter end, const NextIterFunc& nextIter, list<TickerUI>& tickers) {
+	auto it = begin;
+	TIMESTAMP baseTime = (it->timestamp / TICKER_DURATION + 1) * TICKER_DURATION;
+	TickerUI* pLastTicker = nullptr;
+	// build a new tickers
+	for (auto it = begin; it != end;) {
+		TickerUI ticker;
+		// check if the current trade is belong to current time frame
+		if (it->timestamp < baseTime) {
+			ticker.firstPrice.at = it->timestamp;
+			ticker.firstPrice.price = it->price;
+
+			auto& lastPrice = ticker.lastPrice;
+			auto& high = ticker.high;
+			auto& low = ticker.low;
+
+			// initialze last price, low price, high price as fisrt trade in current time frame
+			lastPrice = ticker.firstPrice;
+			high = lastPrice;
+			low = lastPrice;
+
+			// set bought or sold value
+			if (it->amount < 0) {
+				ticker.boughtVolume = 0;
+				ticker.soldVolume = -it->amount;
+			}
+			else {
+				ticker.boughtVolume = it->amount;
+				ticker.soldVolume = 0;
+			}
+			// default the ticker is not processed
+			ticker.processLevel = -1;
+
+			// update first price, low price, high price base on the next trade events
+			double cost = lastPrice.price * (ticker.boughtVolume + ticker.soldVolume);
+			for (nextIter(it); it != end && it->timestamp < baseTime; nextIter(it)) {
+				updateTicker(it, cost, ticker.soldVolume, ticker.boughtVolume, lastPrice, low, high);
+			}
+
+			ticker.averagePrice = cost / (ticker.boughtVolume + ticker.soldVolume);
+		}
+		else {
+			ticker.averagePrice = pLastTicker->lastPrice.price;
+			ticker.processLevel = -1;
+			ticker.boughtVolume = 0;
+			ticker.soldVolume = 0;
+
+			ticker.firstPrice.at = baseTime;
+			ticker.firstPrice.price = ticker.averagePrice;
+
+			ticker.lastPrice.at = ticker.firstPrice.at + TICKER_DURATION - 1;
+			ticker.lastPrice.price = ticker.averagePrice;
+
+			ticker.high = ticker.firstPrice;
+			ticker.low = ticker.firstPrice;
+		}
+		tickers.push_front(ticker);
+		pLastTicker = &tickers.front();
+		baseTime += TICKER_DURATION;
+	}
+}
+
+//
+//void correctTickers(list<TickerUI>& tickers) {
+//	if (tickers.size()) {
+//		auto it = tickers.rbegin();
+//		auto* previousTicker = &*it;
+//		for (it++; it != tickers.rend(); it++) {
+//			auto& ticker = *it;
+//			// check if the ticker is an empty ticker...
+//			if (ticker.averagePrice <= 0) {
+//				// then update some member of the empty ticker to
+//				// the previous ticker
+//				ticker.averagePrice = previousTicker->lastPrice.price;
+//
+//				auto& firstPrice = ticker.firstPrice;
+//				// update the first price is the last price of previous price
+//				firstPrice.price = previousTicker->lastPrice.price;
+//				// but the time is beginning of the time frame
+//				firstPrice.at = (previousTicker->lastPrice.at / TICKER_DURATION + 1) * TICKER_DURATION;
+//
+//				// update all other prices is same
+//				ticker.lastPrice.price = firstPrice.price;
+//				// but the time of last price is end of the time frame
+//				ticker.lastPrice.at = firstPrice.at + TICKER_DURATION - 1;
+//
+//				ticker.high = firstPrice;
+//				ticker.low = firstPrice;
+//			}
+//		}
+//	}
+//}
+
+void PlatformEngine::updateSymbolStatistic(int i, NAPMarketEventHandler* sender, TradeItem* incommingTrades, int count, bool snapshot) {
 	auto& trades = sender->getTradeHistoriesNonSync();
+
+	if (incommingTrades == nullptr || count == 0) return;
+
+	auto& tickers = _symbolsTickers[i];
+
+	auto pTradeItemStart = incommingTrades + count - 1;
+	auto pTradeItemEnd = incommingTrades - count;
+
+	// check if it is a snapshot event or update event not the lastest item in the trade history list
+	if (snapshot || incommingTrades->oderId != trades.front().oderId) {
+		// build tickers for all trade items of curent pair on snapshot event
+		tickers.clear();
+		if (trades.size()) {
+			auto& lastTrade = trades.front();
+			TIMESTAMP baseTime = lastTrade.timestamp - lastTrade.timestamp % TICKER_DURATION;
+
+			typedef decltype(trades.rbegin()) ITERATOR;
+			auto nextIter = [](ITERATOR& it) { it++; };
+
+			buildFromEmptyTickers(trades.rbegin(), trades.rend(), nextIter, tickers);
+		}
+		//pushLog("built ticker as snapshot event\n");
+	}
+	else if(incommingTrades && count > 0) {
+		// update tickers for the last trade events
+		if (tickers.size() == 0) {
+
+			typedef decltype(incommingTrades) ITERATOR;
+			auto nextIter = [](ITERATOR& it) { it--; };
+
+			buildFromEmptyTickers(pTradeItemStart, pTradeItemEnd, nextIter, tickers);
+		}
+		else {
+			auto pTicker = &tickers.front();
+			auto timeRangeBase = pTicker->firstPrice.at - pTicker->firstPrice.at % TICKER_DURATION;
+
+			// check if the new trade event is belong to last exist time frame
+			if (timeRangeBase < pTradeItemStart->timestamp && incommingTrades->timestamp < timeRangeBase + TICKER_DURATION) {
+				auto& lastPrice = pTicker->lastPrice;
+				auto& high = pTicker->high;
+				auto& low = pTicker->low;
+
+				auto cost = pTicker->averagePrice * (pTicker->soldVolume + pTicker->boughtVolume);
+				for (auto it = pTradeItemStart; it != pTradeItemEnd; it--) {
+					updateTicker(it, cost, pTicker->soldVolume, pTicker->boughtVolume, lastPrice, low, high);
+				}
+
+				pTicker->averagePrice = cost / (pTicker->soldVolume + pTicker->boughtVolume);
+
+				//pushLog("updated the last ticker\n");
+			}
+			else {
+				typedef decltype(incommingTrades) ITERATOR;
+				auto nextIter = [](ITERATOR& it) { it--; };
+
+				list<TickerUI> newTickers;
+				buildFromEmptyTickers(pTradeItemStart, pTradeItemEnd, nextIter, newTickers);
+				if (newTickers.size()) {
+
+					auto& oldLastTicker = tickers.front();
+					auto newOldestTicker = newTickers.back();
+
+					TIMESTAMP oldBaseTime = oldLastTicker.firstPrice.at - oldLastTicker.firstPrice.at % TICKER_DURATION;
+					TIMESTAMP newBaseTime = newOldestTicker.firstPrice.at - newOldestTicker.firstPrice.at % TICKER_DURATION;
+					if (oldBaseTime == newBaseTime) {
+						// merge ticker
+						// fisrt pop the last ticker of new tickers
+						newTickers.pop_back();
+
+						// merge volumes and average price
+						auto oldCost = oldLastTicker.averagePrice * (oldLastTicker.boughtVolume + oldLastTicker.soldVolume);
+						auto newCost = newOldestTicker.averagePrice * (newOldestTicker.boughtVolume + newOldestTicker.soldVolume);
+
+						oldLastTicker.boughtVolume += newOldestTicker.boughtVolume;
+						oldLastTicker.soldVolume += newOldestTicker.soldVolume;
+						oldLastTicker.averagePrice = (oldCost + newCost) / (oldLastTicker.boughtVolume + oldLastTicker.soldVolume);
+
+						// re-calculate high, low
+						if (oldLastTicker.high.price < newOldestTicker.high.price) {
+							oldLastTicker.high = newOldestTicker.high;
+						}
+						if (oldLastTicker.low.price > newOldestTicker.low.price) {
+							oldLastTicker.low = newOldestTicker.low;
+						}
+
+						// update last price
+						oldLastTicker.lastPrice = newOldestTicker.lastPrice;
+
+						// move other left tickers from the new to the existing list
+						for (auto it = newTickers.rbegin(); it != newTickers.rend(); it++) {
+							tickers.push_front(*it);
+						}
+
+						//pushLog("merged tickers \n");
+					}
+					else if (newBaseTime > oldBaseTime) {
+						// add empty tickers until reach the new time frame
+						auto pLastTicker = &tickers.front();
+						TIMESTAMP baseTime = oldBaseTime + TICKER_DURATION;
+						while (baseTime < newBaseTime) {
+							TickerUI ticker;
+							ticker.averagePrice = pLastTicker->lastPrice.price;
+							ticker.processLevel = -1;
+							ticker.boughtVolume = 0;
+							ticker.soldVolume = 0;
+
+							ticker.firstPrice.at = baseTime;
+							ticker.firstPrice.price = ticker.averagePrice;
+
+							ticker.lastPrice.at = ticker.firstPrice.at + TICKER_DURATION - 1;
+							ticker.lastPrice.price = ticker.averagePrice;
+
+							ticker.high = ticker.firstPrice;
+							ticker.low = ticker.firstPrice;
+
+							tickers.push_front(ticker);
+
+							baseTime += TICKER_DURATION;
+						}
+
+						// move other left tickers from the new to the existing list
+						for (auto it = newTickers.rbegin(); it != newTickers.rend(); it++) {
+							tickers.push_front(*it);
+						}
+
+						//pushLog("add tickers\n");
+					}
+					else {
+						pushLog("something wrong, the update trade event is not newest event\n");
+					}
+				}
+			}
+		}
+	}
+
+	CryptoBoardElmInfo* info = &_symbolsStatistics[i];
+	info->price = trades.front().price;
+	info->volume = fabs(trades.front().amount);
+
 	if (_sentTradeSnapshotRequest.find(sender->getPair()) == _sentTradeSnapshotRequest.end()) {
 		TIMESTAMP tEnd = 0;
 		TIMESTAMP duration = 4 * 3600 * 1000;
@@ -234,8 +486,6 @@ void PlatformEngine::updateSymbolStatistic(CryptoBoardElmInfo* info, NAPMarketEv
 
 		_sentTradeSnapshotRequest[sender->getPair()] = true;
 		_symbolQueue.pushMessage(message);
-
-		//pushLog("send request trade snapshot for %s\n", sender->getPair());
 	}
 
 
@@ -254,28 +504,23 @@ void PlatformEngine::updateSymbolStatistic(CryptoBoardElmInfo* info, NAPMarketEv
 		4 * 60 * 60 * 1000,
 	};
 
-	auto it = trades.begin();
-	auto jt = it;
-
-	auto& ticker = *it;
 	double amount, amountABS;
 	double cost;
 	double* pValue = info->pricePeriods;
 
 	TIMESTAMP serverTimeNow = _platform->getSyncTime(getCurrentTimeStamp());
 
-	TIMESTAMP prevPeriod = 0;
+	auto it = tickers.begin();
 	for (auto& period : pricePeriods) {
 		amount = 0;
 		cost = 0;
-		for (; it != trades.end(); it++) {
-			auto duration = serverTimeNow - it->timestamp;
+		for (; it != tickers.end(); it++) {
+			auto duration = serverTimeNow - it->firstPrice.at;
 			if (duration > period) {
 				break;
 			}
-			amountABS = abs(it->amount);
-
-			cost += it->price * amountABS;
+			amountABS = (it->boughtVolume + it->soldVolume);
+			cost += it->averagePrice * amountABS;
 			amount += amountABS;
 		}
 
@@ -287,23 +532,23 @@ void PlatformEngine::updateSymbolStatistic(CryptoBoardElmInfo* info, NAPMarketEv
 
 	auto pVolumePeriod = info->volPeriods;
 
-	it = jt;
+	it = tickers.begin();
 	for (auto& period : volPeriods) {
 		pVolumePeriod->bought = 0;
 		pVolumePeriod->sold = 0;
-		for (; it != trades.end(); it++) {
-			auto duration = serverTimeNow - it->timestamp;
+		for (; it != tickers.end(); it++) {
+			auto duration = serverTimeNow - it->firstPrice.at;
 			if (duration > period) {
 				break;
 			}
-			if (it->amount > 0) {
-				pVolumePeriod->bought += it->amount;
-			}
-			else if (it->amount < 0) {
-				pVolumePeriod->sold -= it->amount;
-			}
+			pVolumePeriod->bought += it->boughtVolume;
+			pVolumePeriod->sold = it->soldVolume;
 		}
 		pVolumePeriod++;
+	}
+
+	if (_onSymbolStatisticUpdated) {
+		_onSymbolStatisticUpdated(i);
 	}
 }
 
@@ -376,9 +621,14 @@ void PlatformEngine::run() {
 		}
 	}
 
+	_symbolsStatistics.clear();
+	_symbolsTickers.clear();
+
 	_symbolsStatistics.resize(_pairListenerMap.size());
+	_symbolsTickers.resize(_symbolsStatistics.size());
+	int i = 0;
 	CryptoBoardElmInfo* pSymbolStatisticsinfo = _symbolsStatistics.data();
-	for (auto it = _pairListenerMap.begin(); it != _pairListenerMap.end(); it++) {
+	for (auto it = _pairListenerMap.begin(); it != _pairListenerMap.end(); it++, i++) {
 		NAPMarketEventHandler* eventHandler = new NAPMarketEventHandler(_tickerInterval, it->first.c_str());
 		eventHandler->useTicker(false);
 		eventHandler->useOrderBook(false);
@@ -386,13 +636,11 @@ void PlatformEngine::run() {
 		eventHandler->useCandles(false);
 		_platform->addEventHandler(eventHandler, true);
 
-		pSymbolStatisticsinfo->symbol = it->first;
+		_symbolsStatistics[i].symbol = it->first;
 
 		auto eventListener = 
-			std::bind(&PlatformEngine::updateSymbolStatistic, this, pSymbolStatisticsinfo, _1 , _2, _3, _4);
+			std::bind(&PlatformEngine::updateSymbolStatistic, this, i, _1 , _2, _3, _4);
 		eventHandler->addTradeEventListener(eventListener);
-
-		pSymbolStatisticsinfo++;
 	}
 
 	// start interval thread
@@ -524,9 +772,6 @@ bool PlatformEngine::processTradesLevel(const char* pair, TIMESTAMP timeBase, st
 			if (abs(priceChangePerMin) >= trigger.priceChangePerMin) {
 				// mark the trade was process for this level
 				SET_PROCESS_LEVEL(lastTrade, level);
-				//if (_degbugMap.find(pair) != _degbugMap.end()) {
-				//	priceChanged = 0;
-				//}
 
 				PricePoint lastPricePoint;
 				PricePoint bestPricePoint;
@@ -543,8 +788,6 @@ bool PlatformEngine::processTradesLevel(const char* pair, TIMESTAMP timeBase, st
 				notification.message.message = buffer;
 				notification.pair = pair;
 				_messageQueue.pushMessage(notification);
-
-				_degbugMap[pair] = true;
 
 				return true;
 			}
@@ -587,4 +830,8 @@ TradingPlatform* PlatformEngine::getPlatform() {
 
 const std::vector<string>& PlatformEngine::getCurrencies() const {
 	return _currencies;
+}
+
+void PlatformEngine::setSymbolStatisticUpdatedHandler(SymbolStatisticUpdatedHandler&& handler) {
+	_onSymbolStatisticUpdated = handler;
 }

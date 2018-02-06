@@ -14,7 +14,7 @@ struct ColumnHeader
 typedef std::function<void(Widget* sender)> ItemSelecionChangedHandler;
 typedef std::function<int(int i1, int i2)> CompareFunction;
 typedef std::function<bool(int i)> CheckDataValidFunction;
-typedef std::function<std::string(int i)> ToStringFunc;
+typedef std::function<void(char* buffer, size_t bufferSize, int i)> UpdateBufferFunc;
 
 enum class SortType {
 	NotSort = 0,
@@ -24,7 +24,7 @@ enum class SortType {
 
 struct ColumnInfoExt {
 	CompareFunction compare;
-	ToStringFunc toString;
+	UpdateBufferFunc updateBuffer;
 	CheckDataValidFunction checkValid;
 	SortType sortType;
 };
@@ -40,12 +40,11 @@ public:
 	virtual bool compareVolPeriod(int i1, int i2, int iOffset) = 0;
 	virtual bool compareVolBPSh(int i1, int i2, int iOffset) = 0;
 
-	virtual std::string convert2StringForSymbol(int i) = 0;
-	virtual std::string convert2StringForPrice(int i) = 0;
-	virtual std::string convert2StringForVol(int i) = 0;
-	virtual std::string convert2StringForPricePeriod(int i, int iOffset) = 0;
-	virtual std::string convert2StringForVolPeriod(int i, int iOffset) = 0;
-	virtual std::string convert2StringForBPSh(int i, int iOffset) = 0;
+	virtual void updateCellBufferForPrice(char* buffer, size_t bufferSize, int i) = 0;
+	virtual void updateCellBufferForVol(char* buffer, size_t bufferSize, int i) = 0;
+	virtual void updateCellBufferForPricePeriod(char* buffer, size_t bufferSize, int i, int iOffset) = 0;
+	virtual void updateCellBufferForVolPeriod(char* buffer, size_t bufferSize, int i, int iOffset) = 0;
+	virtual void updateCellBufferForBPSh(char* buffer, size_t bufferSize, int i, int iOffset) = 0;
 
 	virtual bool checkValidSymbol(int i) = 0;
 	virtual bool checkValidPrice(int i) = 0;
@@ -72,12 +71,11 @@ public:
 	virtual bool compareVolPeriod(int i1, int i2, int iOffset);
 	virtual bool compareVolBPSh(int i1, int i2, int iOffset);
 
-	virtual std::string convert2StringForSymbol(int i);
-	virtual std::string convert2StringForPrice(int i);
-	virtual std::string convert2StringForVol(int i);
-	virtual std::string convert2StringForPricePeriod(int i, int iOffset);
-	virtual std::string convert2StringForVolPeriod(int i, int iOffset);
-	virtual std::string convert2StringForBPSh(int i, int iOffset);
+	virtual void updateCellBufferForPrice(char* buffer, size_t bufferSize, int i);
+	virtual void updateCellBufferForVol(char* buffer, size_t bufferSize, int i);
+	virtual void updateCellBufferForPricePeriod(char* buffer, size_t bufferSize, int i, int iOffset);
+	virtual void updateCellBufferForVolPeriod(char* buffer, size_t bufferSize, int i, int iOffset);
+	virtual void updateCellBufferForBPSh(char* buffer, size_t bufferSize, int i, int iOffset);
 
 	virtual bool checkValidSymbol(int i);
 	virtual bool checkValidPrice(int i);
@@ -144,15 +142,23 @@ inline int compareVol(const double& vol1, const double& vol2) {
 	return -1;
 }
 
-
-
 class WxCryptoBoardInfo :
 	public ImWidget
 {
+	struct CellBuffer {
+		char data[32];
+	};
+
+	struct RowBuffer {
+		CellBuffer rowData[16];
+		bool cached;
+	};
+
 	std::vector<ColumnHeader> _columns;
 	std::vector<ColumnInfoExt> _columnAdditionalInfo;
 	const std::vector<CryptoBoardElmInfo>* _fixedItems;
 	std::vector<int> _dataIndexcies;
+	std::vector<RowBuffer> _cellBuffers;
 	int _selected;
 
 	std::shared_ptr<CryptoBoardInfoModeAdapterBase> _cryptoBoardInfoAdapter;
@@ -169,12 +175,11 @@ private:
 	bool compareVolPeriod(int i1, int i2, int iOffset);
 	bool compareVolBPSh(int i1, int i2, int iOffset);
 
-	std::string convert2StringForSymbol(int i);
-	std::string convert2StringForPrice(int i);
-	std::string convert2StringForVol(int i);
-	std::string convert2StringForPricePeriod(int i, int iOffset);
-	std::string convert2StringForVolPeriod(int i, int iOffset);
-	std::string convert2StringForBPSh(int i, int iOffset);
+	void updateCellBufferForPrice(char* buffer, size_t bufferSize, int i);
+	void updateCellBufferForVol(char* buffer, size_t bufferSize, int i);
+	void updateCellBufferForPricePeriod(char* buffer, size_t bufferSize, int i, int iOffset);
+	void updateCellBufferForVolPeriod(char* buffer, size_t bufferSize, int i, int iOffset);
+	void updateCellBufferForBPSh(char* buffer, size_t bufferSize, int i, int iOffset);
 
 	bool checkValidSymbol(int i);
 	bool checkValidPrice(int i);
@@ -198,5 +203,7 @@ public:
 	void resetCryptoAdapterToDefault();
 	const std::vector<int>& getRawElemInfoOffsets() const;
 	void setAdapter(std::shared_ptr<CryptoBoardInfoModeAdapterBase> adapter);
+
+	void refreshCached(int symbolIndex);
 };
 

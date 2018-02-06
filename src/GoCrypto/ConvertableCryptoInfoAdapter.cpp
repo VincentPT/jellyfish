@@ -37,48 +37,43 @@ bool ConvertableCryptoInfoAdapter::compareVolPeriod(int i1, int i2, int iOffset)
 	return (pValue1->bought + pValue1->sold) < (pValue2->bought + pValue2->sold);
 }
 
-std::string ConvertableCryptoInfoAdapter::convert2StringForPrice(int i) {
-	char buffer[32];
+void ConvertableCryptoInfoAdapter::updateCellBufferForPrice(char* buffer, size_t bufferSize, int i) {
 	auto price = _convertedItems.at(i).price;
 	if (IS_INVALID_PRICE(price)) {
-		return "N/A";
+		strcpy_s(buffer, bufferSize, "N/A");
 	}
-
-	sprintf(buffer, "%.8f", price);
-	return buffer;
+	else {
+		sprintf_s(buffer, bufferSize, "%.8f", price);
+	}
 }
-std::string ConvertableCryptoInfoAdapter::convert2StringForVol(int i) {
-	char buffer[32];
+void ConvertableCryptoInfoAdapter::updateCellBufferForVol(char* buffer, size_t bufferSize, int i) {
 	auto vol = std::abs(_convertedItems.at(i).volume);
 	if (IS_INVALID_VOL(vol)) {
-		return "N/A";
+		strcpy_s(buffer, bufferSize, "N/A");
 	}
-
-	sprintf(buffer, "%.8f", vol);
-	return buffer;
+	else {
+		sprintf_s(buffer, bufferSize, "%.8f", vol);
+	}
 }
-std::string ConvertableCryptoInfoAdapter::convert2StringForPricePeriod(int i, int iOffset) {
-
-	char buffer[32];
+void ConvertableCryptoInfoAdapter::updateCellBufferForPricePeriod(char* buffer, size_t bufferSize, int i, int iOffset) {
 	auto pValue = (double*)((char*)&_convertedItems.at(i) + _rawElmInfoOffsets[iOffset]);
 	auto price = *pValue;
 	if (IS_INVALID_PRICE(price)) {
-		return "N/A";
+		strcpy_s(buffer, bufferSize, "N/A");
 	}
-
-	sprintf(buffer, "%.8f", price);
-	return buffer;
+	else {
+		sprintf_s(buffer, bufferSize, "%.8f", price);
+	}
 }
-std::string ConvertableCryptoInfoAdapter::convert2StringForVolPeriod(int i, int iOffset) {
-	char buffer[32];
+void ConvertableCryptoInfoAdapter::updateCellBufferForVolPeriod(char* buffer, size_t bufferSize, int i, int iOffset) {
 	auto pValue = (VolumePeriod*)((char*)&_convertedItems.at(i) + _rawElmInfoOffsets[iOffset]);
 	auto vol = pValue->bought + pValue->sold;
 	if (IS_INVALID_VOL(vol)) {
-		return "N/A";
+		strcpy_s(buffer, bufferSize, "N/A");
 	}
-
-	sprintf(buffer, "%.8f", vol);
-	return buffer;
+	else {
+		sprintf_s(buffer, bufferSize, "%.8f", vol);
+	}
 }
 
 bool ConvertableCryptoInfoAdapter::checkValidPrice(int i) {

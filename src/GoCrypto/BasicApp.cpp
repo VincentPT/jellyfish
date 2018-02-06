@@ -318,6 +318,11 @@ void BasicApp::startServices() {
 
 	_platformRunner = new PlatformEngine("bitfinex");
 	_platformRunner->getPlatform()->setLogger(_logAdapter);
+	_platformRunner->setSymbolStatisticUpdatedHandler([this](int i) {
+		_cryptoBoard->refreshCached(i);
+	}
+	);
+
 	_platformRunner->run();
 
 	_cryptoBoard->accessSharedData([this](Widget*) {

@@ -23,10 +23,10 @@ public:
 	virtual bool comparePricePeriod(int i1, int i2, int iOffset);
 	virtual bool compareVolPeriod(int i1, int i2, int iOffset);
 
-	virtual std::string convert2StringForPrice(int i);
-	virtual std::string convert2StringForVol(int i);
-	virtual std::string convert2StringForPricePeriod(int i, int iOffset);
-	virtual std::string convert2StringForVolPeriod(int i, int iOffset);
+	virtual void updateCellBufferForPrice(char* buffer, size_t bufferSize, int i);
+	virtual void updateCellBufferForVol(char* buffer, size_t bufferSize, int i);
+	virtual void updateCellBufferForPricePeriod(char* buffer, size_t bufferSize, int i, int iOffset);
+	virtual void updateCellBufferForVolPeriod(char* buffer, size_t bufferSize, int i, int iOffset);
 	
 	virtual bool checkValidPrice(int i);
 	virtual bool checkValidVol(int i);

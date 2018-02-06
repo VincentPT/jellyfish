@@ -13,23 +13,6 @@
 // maximum record count
 #define MAX_RECORDS_COUNT 100000
 
-struct PricePoint {
-	double price;
-	TIMESTAMP at;
-};
-
-struct SimpleTicker
-{
-	PricePoint firstPrice;
-	PricePoint lastPrice;
-	PricePoint low;
-	PricePoint high;
-	double averagePrice; // average price during the period
-	double soldVolume; // volume of shelling of takers
-	double boughtVolume;// volume of buying of takers
-	char processLevel;
-};
-
 class NAPMarketEventHandler;
 typedef std::function<void(NAPMarketEventHandler*)> AccessEventDataFunc;
 typedef std::function<void(NAPMarketEventHandler*, TradeItem*, int, bool)> TradeEventListener;

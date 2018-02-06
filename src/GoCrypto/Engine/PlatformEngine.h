@@ -11,6 +11,28 @@
 #include <string>
 #include <mutex>
 
+#include <functional>
+
+typedef std::function<void(int)> SymbolStatisticUpdatedHandler;
+
+struct PricePoint {
+	double price;
+	TIMESTAMP at;
+};
+
+struct TickerUI {
+	PricePoint firstPrice;
+	PricePoint lastPrice;
+	PricePoint low;
+	PricePoint high;
+	double averagePrice; // average price during the period
+	double soldVolume; // volume of shelling of takers
+	double boughtVolume;// volume of buying of takers
+	char processLevel;
+};
+
+#define TICKER_DURATION 60000
+
 class PlatformEngine
 {
 	struct TriggerTimeBase {
@@ -52,14 +74,15 @@ private:
 	std::list<UserListenerInfoRaw> _userRawListeners;
 	std::list<UserListenerInfo> _userListeners;
 	std::map<std::string, std::shared_ptr<std::list<UserListenerInfo*>>> _pairListenerMap;
-	std::map<std::string, bool> _degbugMap;
 	std::vector<CryptoBoardElmInfo> _symbolsStatistics;
+	std::vector<std::list<TickerUI>> _symbolsTickers;
 	std::vector<std::string> _currencies;
 
 	typedef std::map<TRADE_ID, char> TradeLevelMap;
 	std::map<std::string, std::shared_ptr<TradeLevelMap>> _processLevelMap;
 	std::map<std::string, bool> _sentTradeSnapshotRequest;
 	std::future<void> _sendTradeHistoryRequestLoop;
+	SymbolStatisticUpdatedHandler _onSymbolStatisticUpdated;
 private:
 	void timeInterval();
 	void pushMessageLoop();
@@ -67,7 +90,7 @@ private:
 	void measurePriceIncrement(const std::vector<NAPMarketEventHandler*>& handlers);
 	void tickerAnalyze(NAPMarketEventHandler*);
 	bool processTradesLevel(const char* pair, TIMESTAMP timeBase, std::list<TradeItem>::iterator begin, std::list<TradeItem>::iterator& end, char level);
-	void updateSymbolStatistic(CryptoBoardElmInfo* info, NAPMarketEventHandler* sender, TradeItem* tradeItem, int, bool);
+	void updateSymbolStatistic(int i, NAPMarketEventHandler* sender, TradeItem* tradeItem, int, bool);
 public:
 	PlatformEngine(const char* platformName);
 	virtual ~PlatformEngine();
@@ -77,6 +100,7 @@ public:
 	const std::vector<CryptoBoardElmInfo>& getSymbolsStatistics() const;
 	TradingPlatform* getPlatform();
 	const std::vector<std::string>& getCurrencies() const;
+	void setSymbolStatisticUpdatedHandler(SymbolStatisticUpdatedHandler&& handler);
 };
 
 typedef std::shared_ptr<Notifier> TraderRef;
