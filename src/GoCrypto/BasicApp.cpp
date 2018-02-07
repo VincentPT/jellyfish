@@ -294,6 +294,33 @@ void BasicApp::setup()
 		Task task = std::bind(&BasicApp::stopServices, this);
 		_tasks.pushMessage(task);
 	});
+	_controlBoard->setOnExportButtonClickHandler([this](Widget*) {
+		if (_platformRunner == nullptr) return;
+		auto& symbolsTickers = _platformRunner->getSymbolsTickers();
+		int symbolIdx = _cryptoBoard->getSelectedSymbolIndex();
+		const char* symbol = _cryptoBoard->getSelectedSymbol();
+		if (symbolIdx >= 0 && symbolIdx < (int)symbolsTickers.size()) {
+			auto tickers = symbolsTickers[symbolIdx];
+
+			ofstream fs;
+			string fileName(symbol);
+			fileName.append(".csv");
+			fs.open(fileName, std::ios::out);
+			if (fs.is_open()) {
+
+				fs << "time,buy,sell" << std::endl;
+				for (auto it = tickers.begin(); it != tickers.end(); it++) {
+					auto& ticker = *it;
+
+					fs << Utility::time2str(ticker.firstPrice.at) << ",";
+					fs << ticker.boughtVolume << ",";
+					fs << ticker.soldVolume << std::endl;
+				}
+			}
+		}
+	});
+
+
 	_controlBoard->setOnSelectedCurrencyChangedHandler([this](Widget*) {
 		applySelectedCurrency(_controlBoard->getCurrentCurrency());
 	});

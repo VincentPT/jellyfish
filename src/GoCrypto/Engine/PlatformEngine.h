@@ -98,6 +98,7 @@ public:
 	void run();
 	void stop();
 	const std::vector<CryptoBoardElmInfo>& getSymbolsStatistics() const;
+	const std::vector<std::list<TickerUI>>& getSymbolsTickers();
 	TradingPlatform* getPlatform();
 	const std::vector<std::string>& getCurrencies() const;
 	void setSymbolStatisticUpdatedHandler(SymbolStatisticUpdatedHandler&& handler);

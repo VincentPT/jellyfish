@@ -200,6 +200,7 @@ public:
 	virtual const std::vector<CryptoBoardElmInfo>* getItems() const;
 	virtual void setItemSelectionChangedHandler(ItemSelecionChangedHandler&& handler);
 	const char* getSelectedSymbol() const;
+	int getSelectedSymbolIndex() const;
 	void resetCryptoAdapterToDefault();
 	const std::vector<int>& getRawElemInfoOffsets() const;
 	void setAdapter(std::shared_ptr<CryptoBoardInfoModeAdapterBase> adapter);

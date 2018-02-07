@@ -35,6 +35,13 @@ void WxControlBoard::update() {
 			_stopButtonClickHandler(this);
 		}
 	}
+
+	if (ImGui::Button("export", ImVec2(120, 35))) {
+		if (_exportButtonClickHandler) {
+			_exportButtonClickHandler(this);
+		}
+	}
+
 	ImGui::Separator();
 	if (ImGui::CollapsingHeader("Currencies", ImGuiTreeNodeFlags_DefaultOpen)) {
 		std::unique_lock<std::mutex> lk(_mutex);
@@ -60,6 +67,10 @@ void WxControlBoard::setOnStartButtonClickHandler(ButtonClickEventHandler&& hand
 
 void WxControlBoard::setOnStopButtonClickHandler(ButtonClickEventHandler&& handler) {
 	_stopButtonClickHandler = handler;
+}
+
+void WxControlBoard::setOnExportButtonClickHandler(ButtonClickEventHandler&& handler) {
+	_exportButtonClickHandler = handler;
 }
 
 void WxControlBoard::setOnSelectedCurrencyChangedHandler(ButtonClickEventHandler&& handler) {

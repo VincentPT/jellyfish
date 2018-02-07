@@ -542,7 +542,7 @@ void PlatformEngine::updateSymbolStatistic(int i, NAPMarketEventHandler* sender,
 				break;
 			}
 			pVolumePeriod->bought += it->boughtVolume;
-			pVolumePeriod->sold = it->soldVolume;
+			pVolumePeriod->sold += it->soldVolume;
 		}
 		pVolumePeriod++;
 	}
@@ -822,6 +822,10 @@ void PlatformEngine::measurePriceIncrement(const std::vector<NAPMarketEventHandl
 
 const std::vector<CryptoBoardElmInfo>& PlatformEngine::getSymbolsStatistics() const {
 	return _symbolsStatistics;
+}
+
+const std::vector<std::list<TickerUI>>& PlatformEngine::getSymbolsTickers() {
+	return _symbolsTickers;
 }
 
 TradingPlatform* PlatformEngine::getPlatform() {

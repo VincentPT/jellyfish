@@ -222,11 +222,11 @@ WxCryptoBoardInfo::WxCryptoBoardInfo() : _selected(-1), _fixedItems(nullptr)
 		pricePeriodsOffset + 1 * sizeof(double),
 		pricePeriodsOffset + 2 * sizeof(double),
 		pricePeriodsOffset + 3 * sizeof(double),
-		volPeriodsOffset + 0 * sizeof(double),
-		volPeriodsOffset + 1 * sizeof(double),
-		volPeriodsOffset + 2 * sizeof(double),
-		volPeriodsOffset + 3 * sizeof(double),
-		volPeriodsOffset + 4 * sizeof(double),
+		volPeriodsOffset + 0 * sizeof(VolumePeriod),
+		volPeriodsOffset + 1 * sizeof(VolumePeriod),
+		volPeriodsOffset + 2 * sizeof(VolumePeriod),
+		volPeriodsOffset + 3 * sizeof(VolumePeriod),
+		volPeriodsOffset + 4 * sizeof(VolumePeriod),
 	};
 	using namespace std::placeholders;
 	_columnAdditionalInfo = {
@@ -528,6 +528,10 @@ const char* WxCryptoBoardInfo::getSelectedSymbol() const {
 		return nullptr;
 	}
 	return _fixedItems->at(_selected).symbol.c_str();
+}
+
+int WxCryptoBoardInfo::getSelectedSymbolIndex() const {
+	return _selected;
 }
 
 void WxCryptoBoardInfo::resetCryptoAdapterToDefault() {
