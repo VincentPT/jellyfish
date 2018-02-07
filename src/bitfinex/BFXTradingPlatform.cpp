@@ -645,63 +645,99 @@ void BFXTradingPlatform::pingServerLoop() {
 	obj[L"event"] = json::value::string(U("ping"));
 	obj[L"cid"] = json::value(chanelId);
 
+
+	auto pingServerClient = make_unique<websocket_client>();
+	pingServerClient->connect(U("wss://api.bitfinex.com/ws/2")).wait();
+
+	TIMESTAMP timeDiffTotal = 0;
+	int pingCount = 0;
+
 	do
 	{
 		t1 = getCurrentTimeStamp();
 		sent = false;
-		try {
-			::sendJsonContent(_pingServerClient, obj);
-			sent = true;
+
+		if (pingCount >= 100) {
+			// take 100 ping is enough to have a corrected time diff
+			break;
 		}
-		catch (const std::exception&e) {
-			pushLogV("ping server failed: %s\n", e.what());
+
+		while (sent == false)
+		{
+			try {
+				::sendJsonContent(*pingServerClient, obj);
+				sent = true;
+			}
+			catch (const std::exception&e) {
+				pushLogV("ping server failed: %s\n", e.what());
+			}
+			catch (...) {
+				pushLog("ping server failed: unknown error\n");
+			}
+			if (sent == false) {
+				pingServerClient = make_unique<websocket_client>();
+				pingServerClient->connect(U("wss://api.bitfinex.com/ws/2")).wait();
+				pushLog("attemp pinging server again\n");
+			}
 		}
-		catch (...) {
-			pushLog("ping server failed: unknown error\n");
-		}
+		
 		if(sent) {
 			while (true) {
-				auto task = _pingServerClient.receive();
-				task.wait();
-				t2 = getCurrentTimeStamp();
+				try {
+					auto task = pingServerClient->receive();
+					task.wait();
 
-				auto msg = task.get();
+					t2 = getCurrentTimeStamp();
+					auto msg = task.get();
 
-				auto bodyText = msg.extract_string().get();
+					auto bodyText = msg.extract_string().get();
 
-				stringstream sstream(bodyText);
-				std::error_code errorCode;
-				auto value = json::value::parse(sstream, errorCode);
+					stringstream sstream(bodyText);
+					std::error_code errorCode;
+					auto value = json::value::parse(sstream, errorCode);
 
-				if (errorCode.value()) {
-					pushLog("Parse response error\n");
-				}
-				if (value.is_object()) {
-					if (value.has_field(U("event"))) {
-						auto& eventVal = value[U("event")];
-						if (eventVal.is_string() && eventVal.as_string() == U("pong")) {
+					if (errorCode.value()) {
+						pushLog("Parse response error\n");
+					}
+					if (value.is_object()) {
+						if (value.has_field(U("event"))) {
+							auto& eventVal = value[U("event")];
+							if (eventVal.is_string() && eventVal.as_string() == U("pong")) {
 
-							//asume that sending time from client to server equal to
-							//response time from server to client
-							// then we can calculate coressponding time of server and client
-							auto localTime = t1 + (t2 - t1) / 2;
-							auto serverTime = value[U("ts")].as_number().to_int64();
+								pingCount++;
 
-							_timeDiff = serverTime - localTime;
-							_serverTimeIsReady = true;
+								//asume that sending time from client to server equal to
+								//response time from server to client
+								// then we can calculate coressponding time of server and client
+								auto localTime = t1 + (t2 - t1) / 2;
+								auto serverTime = value[U("ts")].as_number().to_int64();
 
-							//char buffer[64];
-							//formatTime(buffer, sizeof(buffer), serverTime);
-							//pushLog(buffer);
-							//pushLog("\n");
+								timeDiffTotal += serverTime - localTime;
 
-							//formatTime(buffer, sizeof(buffer), localTime);
-							//pushLog(buffer);
-							//pushLog("\n");
-							
-							break;
+								_timeDiff = (TIMESTAMP)(timeDiffTotal * 1.0 / pingCount);
+								_serverTimeIsReady = true;
+
+								//char buffer[64];
+								//formatTime(buffer, sizeof(buffer), serverTime);
+								//pushLog(buffer);
+								//pushLog("\n");
+
+								//formatTime(buffer, sizeof(buffer), localTime);
+								//pushLog(buffer);
+								//pushLog("\n");
+
+								break;
+							}
 						}
 					}
+				}
+				catch (const std::exception&e) {
+					pushLogV("ping server failed: %s\n", e.what());
+					break;
+				}
+				catch (...) {
+					pushLog("ping server failed: unknown error\n");
+					break;
 				}
 			}
 		}
@@ -713,12 +749,12 @@ void BFXTradingPlatform::pingServerLoop() {
 			sleepTime = (unsigned int)(interval - processTime);
 		}
 	} while (_stopLoopTask.waitSignal(temp, sleepTime) == false);
+	pushLog("ping server stopped!\n");
 }
 
 void BFXTradingPlatform::startServerTimeQuery(TIMESTAMP updateInterval) {
 	setQueryTimeInterval(updateInterval);
 
-	_pingServerClient.connect(U("wss://api.bitfinex.com/ws/2")).wait();
 	_pingServerTask = std::async(std::launch::async, [this]() { pingServerLoop(); });
 }
 

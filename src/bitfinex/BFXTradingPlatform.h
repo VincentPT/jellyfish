@@ -19,7 +19,6 @@ class BFXTradingPlatform : public CPPRESTBaseTradingPlatformThreadSafe
 	};
 
 private:
-	web::websockets::client::websocket_client _pingServerClient;
 	std::future<void> _pingServerTask;
 	Signal<bool> _stopLoopTask;
 
