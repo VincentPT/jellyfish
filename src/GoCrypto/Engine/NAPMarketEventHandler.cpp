@@ -9,8 +9,8 @@
 #include <algorithm>
 using namespace std;
 
-NAPMarketEventHandler::NAPMarketEventHandler(TIMESTAMP tickerDuration, const char* pair) :
-	MarketEventHandler(pair), _tag(nullptr), _tickerDuration(tickerDuration), _autoId(1)
+NAPMarketEventHandler::NAPMarketEventHandler(const char* pair) :
+	MarketEventHandler(pair), _tag(nullptr), _autoId(1)
 {
 }
 
@@ -237,87 +237,27 @@ void NAPMarketEventHandler::onTradesUpdate(TradeItem* trades, int count, bool sn
 			}
 		}
 		else {
-			//if (newestItem.timestamp > overlapped.end) {
-
-			//}
-			//else if (oldestItem.timestamp < overlapped.start) {
-
-			//}
-			//else if (newestItem.timestamp == overlapped.end) {
-			//	// collect trade item at the overlapped time
-			//	map<TRADE_ID, bool> itemsSameTime;
-			//	for (auto it = _tradeHistory.begin(); it != _tradeHistory.end() && it->timestamp == overlapped.end; it++) {
-			//		itemsSameTime[it->oderId] = true;
-			//	}
-
-			//	// add items that occurs at the same time
-			//	// so we need to avoid add duplicated item by check trade id
-			//	TradeItem* pItemEnd = trades + count;
-			//	auto pItem = trades;
-			//	for (; pItem < pItemEnd && pItem->timestamp == overlapped.end; pItem++) {
-			//		// check incoming trade item is not exist in existance trade history
-			//		if (itemsSameTime.find(pItem->oderId) == itemsSameTime.end()) {
-			//			_tradeHistory.push_front(*pItem);
-			//		}
-			//	}
-
-			//	itemsSameTime.clear();
-			//	for (auto it = _tradeHistory.rbegin(); it != _tradeHistory.rend() && it->timestamp == overlapped.end; it++) {
-			//		itemsSameTime[it->oderId] = true;
-			//	}
-
-			//	// add lhe left items that not exist in existance trade history
-			//	for (; pItem < pItemEnd; pItem++) {
-			//		_tradeHistory.push_back(*pItem);
-			//	}
-			//}
-			//else if (oldestItem.timestamp == overlapped.start) {
-
-			//}
-			//else if (newestItem.timestamp > incomNewestItem.timestamp) {
-			//	// if the existance range cover incoming range entirely
-			//	// then we don't need to update the range
-			//}
-			//else {
-			//	// if the incomming range cover existance range entirely
-			//	// then we use the whole incomming range instead existance range
-			//	_tradeHistory.clear();
-			//	TradeItem* pItemEnd = trades + count;
-			//	for (auto pItem = trades; pItem < pItemEnd; pItem++) {
-			//		_tradeHistory.push_back(*pItem);
-			//	}
-			//}
-
 			// for simply implementation but decrease performance
-			map<TRADE_ID, TradeItem*> itemsMap;
+			map<TRADE_ID, bool> duplicatedCheckMap;
 
-			// add non duplicate trade id for the two list
-			for (auto it = _tradeHistory.begin(); it != _tradeHistory.end() && it->timestamp == overlapped.end; it++) {
-				itemsMap[it->oderId] = &*it;
+			// add non duplicate trade id for the two lists
+			// first build trade id map for the first list
+			for (auto it = _tradeHistory.begin(); it != _tradeHistory.end(); it++) {
+				duplicatedCheckMap[it->oderId] = true;
 			}
-
+			// copy item non duplicated from the second list to the first list.
 			TradeItem* pItemEnd = trades + count;
 			auto pItem = trades;
 			for (; pItem < pItemEnd; pItem++) {
-				itemsMap[pItem->oderId] = pItem;
-			}
-
-			// merge two list into one
-			list<TradeItem> newList;
-			for (auto it = itemsMap.begin(); it != itemsMap.end(); it++) {
-				newList.push_back(*it->second);
+				if (duplicatedCheckMap.find(pItem->oderId) == duplicatedCheckMap.end()) {
+					_tradeHistory.push_back(*pItem);
+				}
 			}
 
 			// sort by timestap
-			newList.sort([](TradeItem& item1, TradeItem& item2) {
+			_tradeHistory.sort([](TradeItem& item1, TradeItem& item2) {
 				return item1.timestamp > item2.timestamp;
 			});
-
-			// clear existance trade history
-			_tradeHistory.clear();
-
-			// move new merged history to the trade history
-			_tradeHistory.splice(_tradeHistory.begin(), newList, newList.begin(), newList.end());
 
 			pushLog("merge trade event using general method\n");
 		}

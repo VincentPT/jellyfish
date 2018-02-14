@@ -25,10 +25,8 @@ private:
 	int _autoId;
 	std::map<int, TradeEventListener> _tradeEventListeners;
 	void* _tag;
-	TIMESTAMP _tickerDuration;
-	//void addEmptyTicker(TIMESTAMP t);
 public:
-	NAPMarketEventHandler(TIMESTAMP tickerDuration, const char* pair);
+	NAPMarketEventHandler(const char* pair);
 	virtual ~NAPMarketEventHandler();
 
 	virtual void onTickerUpdate(Ticker& ticker);

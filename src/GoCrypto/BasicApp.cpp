@@ -196,7 +196,7 @@ void BasicApp::setup()
 				_graph->acessSharedData([this, &tickers](Widget* sender) {
 					WxLineGraphLive* graph = (WxLineGraphLive*)sender;
 
-					TIMESTAMP timeLength = 60 * 60 * 1000;
+					TIMESTAMP timeLength = 4 * 60 * 60 * 1000;
 					_pixelPerTime = (float)(graph->getWidth() / timeLength);
 					float timeScale;
 
@@ -214,7 +214,7 @@ void BasicApp::setup()
 					graph->scale(1.0f, (float)(area.getHeight() / (lastTicker.price / 200)));
 
 					// at time zero, the point will display at x = graph->getWidth() * 4 / 5
-					float expectedXAtBeginTime = graph->getWidth() * 4 / 5;
+					float expectedXAtBeginTime = graph->getWidth() * 95 / 100;
 					graph->mapZeroTime(expectedXAtBeginTime);
 					graph->adjustTransform();
 					graph->setTimeScale(_pixelPerTime);

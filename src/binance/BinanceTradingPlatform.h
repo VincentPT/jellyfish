@@ -13,14 +13,10 @@ class BinanceTradingPlatform : public CPPRESTBaseTradingPlatformThreadSafe
 {
 private:
 	std::mutex _eventMutex;
-	//std::map<int, EventHandlerInfo> _chanelEventHandlerInfoMap;
-	//std::map<std::string, int> _chanelEventMap;
-	//std::map<std::string, BookIdGeneratorInfo> _bookCollectionMap;
-	//int _autoClientId;
 
 	std::future<void> _pingServerTask;
 	std::shared_ptr<web::http::client::http_client> _restClient;
-	Signal<bool> _stopPingTask;
+	Signal<bool> _stopLoopTask;
 	TIMESTAMP _timeDiff;
 	bool _serverTimeIsReady;
 
@@ -45,7 +41,7 @@ protected:
 
 	bool connectImpl();
 	bool disconnectImpl();
-
+	void safeRequest(web::http::client::http_client& client, const std::function<void(web::http::http_response&)>& f);
 public:
 	BinanceTradingPlatform();
 	virtual ~BinanceTradingPlatform();

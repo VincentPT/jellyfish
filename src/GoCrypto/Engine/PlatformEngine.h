@@ -69,8 +69,6 @@ private:
 	SyncMessageQueue<InternalNotificationData> _messageQueue;
 	SyncMessageQueue<RequestTradeHistoryMessage> _symbolQueue;
 	std::string _platformName;
-	TIMESTAMP _tickerInterval;
-	TIMESTAMP _notifyDistance;
 	std::list<UserListenerInfoRaw> _userRawListeners;
 	std::list<UserListenerInfo> _userListeners;
 	std::map<std::string, std::shared_ptr<std::list<UserListenerInfo*>>> _pairListenerMap;
@@ -84,13 +82,11 @@ private:
 	std::future<void> _sendTradeHistoryRequestLoop;
 	SymbolStatisticUpdatedHandler _onSymbolStatisticUpdated;
 private:
-	void timeInterval();
 	void pushMessageLoop();
 	void sheduleQueryHistory();
-	void measurePriceIncrement(const std::vector<NAPMarketEventHandler*>& handlers);
-	void tickerAnalyze(NAPMarketEventHandler*);
-	bool processTradesLevel(const char* pair, TIMESTAMP timeBase, std::list<TradeItem>::iterator begin, std::list<TradeItem>::iterator& end, char level);
-	void updateSymbolStatistic(int i, NAPMarketEventHandler* sender, TradeItem* tradeItem, int, bool);
+	void updateSymbolStatistics(CryptoBoardElmInfo* info, const std::list<TickerUI>&);
+	void analyzeTickerForNotification(NAPMarketEventHandler* handler, const std::list<TickerUI>&);
+	void onTrade(int i, NAPMarketEventHandler* sender, TradeItem* tradeItem, int, bool);
 public:
 	PlatformEngine(const char* platformName);
 	virtual ~PlatformEngine();

@@ -33,6 +33,7 @@ protected:
 	TIMESTAMP _updateInterval;
 protected:
 	void subcribeEventForHandler(MarketEventHandler* handler);
+	void unsubcribeEventForHandler(MarketEventHandler* handler);
 	virtual SubcribeStatus subscribeTickerImpl(const char* pair) = 0;
 	virtual SubcribeStatus subscribeBookImpl(const char* pair) = 0;
 	virtual SubcribeStatus subscribeTradeImpl(const char* pair) = 0;

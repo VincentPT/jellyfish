@@ -22,12 +22,15 @@ BFXTradingPlatform::BFXTradingPlatform() : _timeDiff(0), _serverTimeIsReady(fals
 BFXTradingPlatform::~BFXTradingPlatform()
 {
 	disconnect();
-	cout << "deleted BFXTradingPlatform object" << endl;
+	pushLog("deleted BFXTradingPlatform object\n");
 }
 
 void BFXTradingPlatform::maintenanceConnectionWorker() {
 	using namespace std::chrono_literals;
 	bool runFlag = true;
+
+	list<shared_ptr<websocket_callback_client>> inactiveClients;
+
 	while (runFlag)
 	{
 		_restartEvents.waitSignal(runFlag);
@@ -39,8 +42,32 @@ void BFXTradingPlatform::maintenanceConnectionWorker() {
 		pushLog("Received reconnect signal\n");
 		// sleep for 3 second and try to reconnect client
 		std::this_thread::sleep_for(3s);
+
+		// close current web socket client
+		_client->close();
+
+		// cannot unsubscribe events because connection was closed in server side
+		// but we need to set event handler to unsubcribe to able to restart the connection of this platform
+		int nHandler = getHandlerCount();
+		vector<MarketEventHandler*> handlers(nHandler);
+		getHandlers(handlers.data(), nHandler);
+
+		pushLog("reset event handlers status\n");
+		SubcribeStatus status = SubcribeStatus::Unsubcribed;
+		for (auto it = handlers.begin(); it != handlers.end(); it++) {
+			setEventSubscribed(MARKET_EVENT_TICKER, (*it)->getPair(), status);
+			setEventSubscribed(MARKET_EVENT_BOOK, (*it)->getPair(), status);
+			setEventSubscribed(MARKET_EVENT_TRADE, (*it)->getPair(), status);
+			setEventSubscribed(MARKET_EVENT_CANDLE, (*it)->getPair(), status);
+		}
+
+		// store it to temporary list because close operation may need time to complete
+		inactiveClients.push_back(_client);
+		// create new web socket client and set event handlers
 		resetClientNonSync();
 		pushLog("reconnecting...\n");
+
+		// connect web socket and subcrible market events
 		connect();
 		pushLog("executed reconnection\n");
 	}
@@ -54,12 +81,12 @@ void BFXTradingPlatform::messageHandlerImpl(const websocket_incoming_message& ms
 	auto value = json::value::parse(sstream, errorCode);
 
 	if (errorCode.value()) {
-		cout << "Parse response error" << endl;
+		pushLog("Parse response error\n");
 		return;
 	}
 	if (value.is_object())
 	{
-		std::cout << "response message: " << bodyText << std::endl;
+		pushLogV("response message: %s \n", bodyText.c_str());
 
 		if (value.has_field(U("event"))) {
 			auto eventValue = value[U("event")].as_string();
@@ -71,12 +98,11 @@ void BFXTradingPlatform::messageHandlerImpl(const websocket_incoming_message& ms
 						pushLog("receive reconnect signal\n");
 						pushLog("sending reconnect signal...\n");
 						_restartEvents.sendSignal(true);
-						
 					}
 					else if (code == 20060) {
 						pushLog("Entering in Maintenance mode.(it should take 120 seconds at most).\n");
 					}
-					else if (code == 20060) {
+					else if (code == 20061) {
 						pushLog("Maintenance mode end\n");
 					}
 				}
@@ -102,7 +128,7 @@ void BFXTradingPlatform::messageHandlerImpl(const websocket_incoming_message& ms
 					}
 				}
 				if (tpair.empty()) {
-					cout << "Event is not supported" << endl;
+					pushLog("Event is not supported\n");
 					return;
 				}
 				auto key = CPPREST_FROM_STRING(tpair);
@@ -132,7 +158,7 @@ void BFXTradingPlatform::messageHandlerImpl(const websocket_incoming_message& ms
 						eventName = MARKET_EVENT_CANDLE;
 					}
 					else {
-						cout << "chanel " << Utility::toString(chanel) << " is not support" << endl;
+						pushLogV("chanel %s is not support\n", Utility::toString(chanel).c_str());
 					}
 					if (marketEventHandler) {
 						if (value.has_field(U("chanId"))) {
@@ -157,7 +183,7 @@ void BFXTradingPlatform::messageHandlerImpl(const websocket_incoming_message& ms
 					}
 				}
 				else {
-					cout << "No event handler for the market event found" << endl;
+					pushLog("No event handler for the market event found\n");
 				}
 			}
 			else if (eventValue == U("unsubscribed") && value.has_field(U("chanId"))) {
@@ -168,7 +194,7 @@ void BFXTradingPlatform::messageHandlerImpl(const websocket_incoming_message& ms
 					setEventSubscribed(eventHandlerInfo.eventName, eventHandlerInfo.handler->getPair(), SubcribeStatus::Unsubcribed);
 				}
 				else {
-					cout << "unknown chanel was unsubcribed" << endl;
+					pushLog("unknown chanel was unsubcribed\n");
 				}
 			}
 		}
@@ -334,7 +360,7 @@ void BFXTradingPlatform::invokeTickerEvent(MarketEventHandler* handler, web::jso
 	auto& secondElm = value.at(1);
 	auto it = _lastickerMap.find(handler->getPair());
 	if (it == _lastickerMap.end()) {
-		cout << "internal error" << endl;
+		pushLog("internal error\n");
 		return;
 	}
 
@@ -342,11 +368,11 @@ void BFXTradingPlatform::invokeTickerEvent(MarketEventHandler* handler, web::jso
 
 	if (secondElm.is_array() == false) {
 		if (secondElm.is_string() == false) {
-			cout << "Expected result is an array" << endl;
+			pushLog("Expected result is an array\n");
 			return;
 		}
 		if (secondElm.as_string() != U("hb")) {
-			cout << "unknown ticker response" << endl;
+			pushLog("unknown ticker response\n");
 			return;
 		}
 	}
@@ -371,11 +397,11 @@ void BFXTradingPlatform::invokeBookEvent(MarketEventHandler* handler, web::json:
 
 	if (secondElm.is_array() == false) {
 		if (secondElm.is_string() == false) {
-			cout << "Expected result is an array" << endl;
+			pushLog("Expected result is an array\n");
 			return;
 		}
 		if (secondElm.as_string() != U("hb")) {
-			cout << "unknown ticker response" << endl;
+			pushLog("unknown ticker response\n");
 			return;
 		}
 		handler->onBooksUpdate(nullptr, false);
@@ -414,13 +440,13 @@ void BFXTradingPlatform::invokeBookEvent(MarketEventHandler* handler, web::json:
 	for (int i = 0; i < (int)secondElm.size(); i++) {
 		auto& bookElm = secondElm.at(i);
 		if (bookElm.is_array() == false) {
-			cout << "Expected result is an array" << endl;
+			pushLog("Expected result is an array\n");
 			continue;
 		}
 
 		auto& arr = bookElm.as_array();
 		if (arr.size() != 3) {
-			cout << "book item must contain atleast 3 elements" << endl;
+			pushLog("book item must contain atleast 3 elements\n");
 			continue;
 		}
 		BookItem bookItem;
@@ -458,7 +484,7 @@ void BFXTradingPlatform::invokeTradeEvent(MarketEventHandler* handler, web::json
 
 	if (secondElm.is_array() == false) {
 		if (secondElm.is_string() == false) {
-			cout << "Expected result is an array" << endl;
+			pushLog("Expected result is an array\n");
 			return;
 		}
 		auto valueStr = secondElm.as_string();
@@ -479,20 +505,20 @@ void BFXTradingPlatform::invokeTradeEvent(MarketEventHandler* handler, web::json
 	}
 
 	if (secondElm.size() <= 0 || secondElm.at(0).is_array() == false) {
-		cout << "Expected result is an array" << endl;
+		pushLog("Expected result is an array\n");
 		return;
 	}
 
 	for (int i = 0; i < (int)secondElm.size(); i++) {
 		auto& itemElm = secondElm.at(i);
 		if (itemElm.is_array() == false) {
-			cout << "Expected result is an array" << endl;
+			pushLog("Expected result is an array\n");
 			continue;
 		}
 
 		auto& arr = itemElm.as_array();
 		if (arr.size() != 4) {
-			cout << "trade item must contain atleast 4 elements" << endl;
+			pushLog("trade item must contain atleast 4 elements\n");
 			continue;
 		}
 		TradeItem tradeItem;
@@ -517,11 +543,11 @@ void BFXTradingPlatform::invokeCandleEvent(MarketEventHandler* handler, web::jso
 
 	if (secondElm.is_array() == false) {
 		if (secondElm.is_string() == false) {
-			cout << "Expected result is an array" << endl;
+			pushLog("Expected result is an array\n");
 			return;
 		}
 		if (secondElm.as_string() != U("hb")) {
-			cout << "unknown ticker response" << endl;
+			pushLog("unknown ticker response\n");
 			return;
 		}
 		handler->onCandlesUpdate(nullptr, 0, false);
@@ -531,7 +557,7 @@ void BFXTradingPlatform::invokeCandleEvent(MarketEventHandler* handler, web::jso
 	if (secondElm.size() > 0 && secondElm.at(0).is_array() == false) {
 		auto& itemElm = secondElm.as_array();
 		if(itemElm.size() != 6) {
-			cout << "unknown candle response" << endl;
+			pushLog("unknown candle response\n");
 			return;
 		}
 		CandleItem item;
@@ -549,13 +575,13 @@ void BFXTradingPlatform::invokeCandleEvent(MarketEventHandler* handler, web::jso
 	for (int i = 0; i < (int)secondElm.size(); i++) {
 		auto& bookElm = secondElm.at(i);
 		if (bookElm.is_array() == false) {
-			cout << "Expected result is an array" << endl;
+			pushLog("Expected result is an array\n");
 			continue;
 		}
 
 		auto& itemElm = bookElm.as_array();
 		if (itemElm.size() != 6) {
-			cout << "book item must contain atleast 6 elements" << endl;
+			pushLog("book item must contain atleast 6 elements\n");
 			continue;
 		}
 		CandleItem item;
@@ -591,7 +617,7 @@ void BFXTradingPlatform::getAllPairs(StringList& pairs) {
 			for (auto it = symbols.begin(); it != symbols.end(); it++) {
 				auto& elm = *it;
 				if (!elm.is_string()) {
-					cout << "element is not a string" << endl;
+					pushLog("element is not a string\n");
 					continue;
 				}
 
@@ -657,8 +683,8 @@ void BFXTradingPlatform::pingServerLoop() {
 		t1 = getCurrentTimeStamp();
 		sent = false;
 
-		if (pingCount >= 100) {
-			// take 100 ping is enough to have a corrected time diff
+		if (pingCount >= 300) {
+			// take 300 ping is enough to have a corrected time diff
 			break;
 		}
 
@@ -791,7 +817,7 @@ void BFXTradingPlatform::getTradeHistory(const char* pair, TIMESTAMP duration, T
 
 	std::map<TRADE_ID, bool> existingTrades;
 
-	auto parseTrades = [this, &tradeItems, &duration, &existingTrades, &shouldStop, &additionalTime](http_response response) {
+	auto parseTrades = [this, &tradeItems, &duration, &existingTrades, &shouldStop, &additionalTime](http_response& response) {
 		additionalTime = 0;
 		if (response.status_code() == 200) {
 			auto js = response.extract_json().get();
@@ -868,14 +894,14 @@ void BFXTradingPlatform::getTradeHistory(const char* pair, TIMESTAMP duration, T
 			task.wait();
 		}
 		catch (const std::exception&e) {
-			pushLogV("ping server failed: %s\n", e.what());
+			pushLogV("get trade history failed: %s\n", e.what());
 		}
 		catch (...) {
-			pushLog("ping server failed: unknown error\n");
+			pushLog("get trade history failed: unknown error\n");
 		}
 		
 		if (tradeItems.size() == 0 || shouldStop) {
-			return;
+			break;
 		}
 
 		tStart = tradeItems.back().timestamp;
@@ -911,6 +937,10 @@ void BFXTradingPlatform::getTradeHistory(const char* pair, TIMESTAMP duration, T
 			}
 		}
 	}
+
+	// for testing about restart event only
+	//pushLog("sending testing reconnect signal...\n");
+	//_restartEvents.sendSignal(true);
 }
 
 extern "C" {

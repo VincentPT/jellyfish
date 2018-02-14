@@ -12,7 +12,7 @@ using namespace web;
 using namespace web::websockets::client;
 
 
-BinanceTradingPlatform::BinanceTradingPlatform() : _timeDiff(0), _stopPingTask(true)
+BinanceTradingPlatform::BinanceTradingPlatform() : _timeDiff(0), _stopLoopTask(true)
 {
 	resetClient();
 }
@@ -132,7 +132,7 @@ bool BinanceTradingPlatform::connectImpl() {
 bool BinanceTradingPlatform::disconnectImpl() {
 	_client->close().wait();
 
-	_stopPingTask.sendSignal(false);
+	_stopLoopTask.sendSignal(true);
 	_pingServerTask.wait();
 	return true;
 }
@@ -381,7 +381,6 @@ void BinanceTradingPlatform::getAllPairs(StringList& pairs) {
 }
 
 void BinanceTradingPlatform::getBaseCurrencies(StringList& currencies) {
-
 }
 
 void BinanceTradingPlatform::pingServerLoop() {
@@ -412,13 +411,21 @@ void BinanceTradingPlatform::pingServerLoop() {
 
 	_restClient = make_shared<http_client>(U("https://api.binance.com/api/v1/time"), config);
 	
+	TIMESTAMP timeDiffTotal = 0;
+	int pingCount = 0;
+
 	do
 	{
 		t1 = getCurrentTimeStamp();
+		if (pingCount >= 300) {
+			// take 300 ping is enough to have a corrected time diff
+			break;
+		}
+
 		bonusTime = 0;
 		sent = false;
 		try {
-			auto task = _restClient->request(httpRequest).then([&t1, &t2, &bonusTime, this](http_response response) {
+			auto task = _restClient->request(httpRequest).then([&t1, &t2, &bonusTime, &timeDiffTotal, &pingCount, this](http_response& response) {
 				t2 = getCurrentTimeStamp();
 
 				//asume that sending time from client to server equal to
@@ -429,10 +436,12 @@ void BinanceTradingPlatform::pingServerLoop() {
 				if (response.status_code() == 200) {
 					auto js = response.extract_json().get();
 					if (js.has_field(U("serverTime")) && js[U("serverTime")].is_integer()) {
+						pingCount++;
 
 						auto serverTime = js[U("serverTime")].as_number().to_int64();
+						timeDiffTotal += serverTime - localTime;
+						_timeDiff = (TIMESTAMP)(timeDiffTotal * 1.0 / pingCount);
 
-						_timeDiff = serverTime - localTime;
 						_serverTimeIsReady = true;
 					}
 					else {
@@ -440,7 +449,7 @@ void BinanceTradingPlatform::pingServerLoop() {
 					}
 				}
 				else if (response.status_code() == 429) {
-					pushLog("The API has reach the limit, pause to the next minutes\n");
+					pushLog("The API has reached the limit, pause to the next minutes\n");
 					bonusTime = 60000;
 				}
 				else if (response.status_code() == 418) {
@@ -467,7 +476,7 @@ void BinanceTradingPlatform::pingServerLoop() {
 		if (processTime < interval) {
 			sleepTime = (unsigned int)(interval - processTime);
 		}
-	} while (_stopPingTask.waitSignal(temp, sleepTime + bonusTime) == false);
+	} while (_stopLoopTask.waitSignal(temp, sleepTime + bonusTime) == false);
 }
 
 void BinanceTradingPlatform::startServerTimeQuery(TIMESTAMP updateInterval) {
@@ -475,8 +484,214 @@ void BinanceTradingPlatform::startServerTimeQuery(TIMESTAMP updateInterval) {
 	_pingServerTask = std::async(std::launch::async, [this]() { pingServerLoop(); });
 }
 
-void BinanceTradingPlatform::getTradeHistory(const char* pair, TIMESTAMP duration, TIMESTAMP endTime, TradingList& tradeItems) {
+void BinanceTradingPlatform::safeRequest(web::http::client::http_client& client, const std::function<void(web::http::http_response&)>& f) {
+	client.request(methods::GET).then([&f, this](http_response& response) {
+		if (response.status_code() == 200) {
+			f(response);
+		}
+		else if (response.status_code() == 429) {
+			pushLog("The API has reached the limit, pause to the next minutes\n");
+		}
+		else if (response.status_code() == 418) {
+			pushLog("The client's IP has been banned by Binance\n");
+		}
+		else {
+			pushLog("request failed\n");
+		}
+	});
+}
 
+void BinanceTradingPlatform::getTradeHistory(const char* pair, TIMESTAMP duration, TIMESTAMP endTime, TradingList& tradeItems) {
+	auto tEnd = endTime;
+	auto startTime = (endTime - duration);
+
+	bool stopSignal = false;
+	TIMESTAMP t1, t2;
+	TIMESTAMP processTime;
+	unsigned int bonusTime = 0, sleepTime = 0;
+
+	ORDER_ID lastTradeId = 0;
+	auto parseAggTrade = [this, &lastTradeId, &bonusTime](http_response& response) {
+		bonusTime = 0;
+		if (response.status_code() == 200) {
+			auto js = response.extract_json().get();
+			if (js.is_array() == false) {
+				pushLog("unexpected trade history format\n");
+			}
+			else {
+				auto& jsArray = js.as_array();
+				if (jsArray.size()) {
+					auto& firstElm = jsArray.at(0);
+					if (firstElm.is_object() == false || firstElm.has_field(U("l")) == false) {
+						pushLog("unexpected trade history format\n");
+					}
+					else {
+						lastTradeId = firstElm[U("l")].as_number().to_uint64();
+					}
+				}
+			}
+		}
+		else if (response.status_code() == 429) {
+			pushLog("The API has reached the limit, pause to the next minutes\n");
+			bonusTime = 60 * 1000;
+		}
+		else if (response.status_code() == 418) {
+			pushLog("The client's IP has been banned by Binance\n");
+		}
+		else {
+			pushLog("request failed\n");
+		}
+	};
+
+	utility::string_t baseURL = U("https://api.binance.com/api/v1/aggTrades");
+	utility::string_t parameters;
+
+	// check trade history for each 30 minutes
+	constexpr TIMESTAMP period = 30 * 60 * 1000;
+	decltype(tEnd) tStart;
+
+	do
+	{
+		tStart = tEnd - period;
+
+		parameters = U("?symbol=");
+		parameters += CPPREST_TO_STRING(pair);
+		parameters += U("&startTime=");
+		parameters += TO_STRING_T(tStart);
+		parameters += U("&endTime=");
+		parameters += TO_STRING_T(tEnd);
+		parameters += U("&limit=1");
+
+		bonusTime = 0;
+
+		try {
+			http_client client(baseURL + parameters);
+			client.request(methods::GET).then(parseAggTrade);
+		}
+		catch (const std::exception&e) {
+			pushLogV("get trade history failed: %s\n", e.what());
+		}
+		catch (...) {
+			pushLog("get trade history failed: unknown error\n");
+		}
+
+		tEnd = tStart;
+	} while (lastTradeId > 0 && tEnd > startTime  && _stopLoopTask.waitSignal(stopSignal, 100 + bonusTime));
+
+	if (stopSignal == true) {
+		return;
+	}
+
+	if (lastTradeId == 0) {
+		pushLog("get trade history failed: no trade history found\n");
+		return;
+	}
+
+	constexpr int requestLimit = 1200;
+	constexpr int weight = 5;
+	constexpr int numberOfRequestPerMinMax = requestLimit / weight;
+
+	baseURL = U("https://api.binance.com/api/v1/historicalTrades");
+
+	auto toId = lastTradeId;
+	auto limit = 500;
+	bool isEnough = false;
+
+	auto parseTrade = [this, &tradeItems, startTime, &isEnough](http_response& response) {
+		if (response.status_code() == 200) {
+			auto js = response.extract_json().get();
+			if (js.is_array() == false) {
+				pushLog("unexpected trade history format\n");
+			}
+			else {
+				auto& jsArray = js.as_array();
+				for (auto it = jsArray.rbegin(); it != jsArray.rend(); it++) {
+					auto& firstElm = *it;
+					if (firstElm.is_object() == false) {
+						pushLog("unexpected trade history format\n");
+					}
+					else {
+						/*
+						[
+							{
+								"id": 28457,
+								"price": "4.00000100",
+								"qty": "12.00000000",
+								"time": 1499865549590,
+								"isBuyerMaker": true,
+								"isBestMatch": true
+							}
+						]
+						*/
+						TradeItem tradeItem;
+						tradeItem.oderId = firstElm[U("id")].as_number().to_uint64();
+						tradeItem.price = _ttod(firstElm[U("price")].as_string().c_str());
+						tradeItem.amount = _ttod(firstElm[U("qty")].as_string().c_str());
+						tradeItem.timestamp = firstElm[U("time")].as_number().to_int64();
+
+						// only get trade item from start time to end time
+						if (tradeItem.timestamp < startTime) {
+							isEnough = true;
+							break;
+						}
+
+						bool isBuyMaker = firstElm[U("isBuyerMaker")].as_bool();
+						if (!isBuyMaker) {
+							tradeItem.amount = -tradeItem.amount;
+						}
+
+						tradeItems.push_back(tradeItem);
+					}
+				}
+			}
+		}
+		else if (response.status_code() == 429) {
+			pushLog("The API has reached the limit, pause to the next minutes\n");
+		}
+		else if (response.status_code() == 418) {
+			pushLog("The client's IP has been banned by Binance\n");
+		}
+		else {
+			pushLog("request failed\n");
+		}
+	};
+
+	TIMESTAMP interval = 60 * 1000 / (numberOfRequestPerMinMax / 2);
+
+	do
+	{
+		t1 = getCurrentTimeStamp();
+
+		auto fromId = toId - limit - 1;
+
+		parameters = U("?symbol=");
+		parameters += CPPREST_TO_STRING(pair);
+		parameters += U("&fromId=");
+		parameters += TO_STRING_T(fromId);
+		parameters += U("&limit=");
+		parameters += TO_STRING_T(limit);
+
+		try {
+			http_client client(baseURL + parameters);
+			client.request(methods::GET).then(parseTrade);
+		}
+		catch (const std::exception&e) {
+			pushLogV("get trade history failed: %s\n", e.what());
+		}
+		catch (...) {
+			pushLog("get trade history failed: unknown error\n");
+		}
+
+		toId = fromId - 1;
+		t2 = getCurrentTimeStamp();
+
+		sleepTime = 0;
+		processTime = t2 - t1;
+		if (processTime < interval) {
+			sleepTime = (unsigned int)(interval - processTime);
+		}
+
+	} while (isEnough == false && _stopLoopTask.waitSignal(stopSignal, sleepTime + bonusTime) == false);
 }
 
 TIMESTAMP BinanceTradingPlatform::getSyncTime(TIMESTAMP localTime) {

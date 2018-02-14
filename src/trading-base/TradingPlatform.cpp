@@ -178,6 +178,13 @@ void TradingPlatform::subcribeEventForHandler(MarketEventHandler* handler) {
 	if (handler->useCandles()) subscribeCandle(handler->getPair());
 }
 
+void TradingPlatform::unsubcribeEventForHandler(MarketEventHandler* handler) {
+	if (handler->useTicker()) unsubscribeTicker(handler->getPair());
+	if (handler->useOrderBook()) unsubscribeBook(handler->getPair());
+	if (handler->useTrades()) unsubscribeTrade(handler->getPair());
+	if (handler->useCandles()) unsubscribeCandle(handler->getPair());
+}
+
 MarketEventHandler* TradingPlatform::getHandler(const char* pair) {
 	return _tradingPlatformImpl->getHandler(pair);
 }
