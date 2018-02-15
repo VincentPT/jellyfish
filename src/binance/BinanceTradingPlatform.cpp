@@ -96,7 +96,6 @@ bool BinanceTradingPlatform::connectImpl() {
 	vector<MarketEventHandler*> handlers(nHandler);
 	getHandlers(handlers.data(), nHandler);
 
-
 	utility::string_t streams;
 
 	for (auto it = handlers.begin(); it != handlers.end(); it++) {
@@ -125,6 +124,27 @@ bool BinanceTradingPlatform::connectImpl() {
 	if (streams.size()) {
 		streams.erase(streams.size() - 1);
 	}
+
+	auto settingFile = getConfigFilePath();
+	try {
+		ifstream in;
+		in.open(settingFile);
+		if (in.is_open()) {
+			auto settings = web::json::value::parse(in);
+			_apiKey = CPPREST_FROM_STRING(settings[U("apiKey")].as_string());
+		}
+		else {
+			pushLogV("load setting file %s failed\n", settingFile);
+		}
+	}
+	catch (...) {
+		pushLogV("load setting file %s failed\n", settingFile);
+	}
+
+	if (_apiKey.empty()) {
+		pushLogV("trade history request won't work due to missing api key in setting file %s\n", settingFile);
+	}
+
 	_client->connect(U("wss://stream.binance.com:9443/stream?streams=") + streams).wait();
 	return true;
 }
@@ -367,6 +387,8 @@ void BinanceTradingPlatform::getAllPairs(StringList& pairs) {
 				char* uSymbol = (char*)malloc(symbol.size() + 1);
 				memcpy_s(uSymbol, symbol.size(), symbol.c_str(), symbol.size());
 				uSymbol[symbol.size()] = 0;
+
+				pairs.push_back(uSymbol);
 			}
 			return;
 		}
@@ -550,6 +572,10 @@ void BinanceTradingPlatform::getTradeHistory(const char* pair, TIMESTAMP duratio
 	constexpr TIMESTAMP period = 30 * 60 * 1000;
 	decltype(tEnd) tStart;
 
+	http_request marketDataRequest(methods::GET);
+	auto& headers = marketDataRequest.headers();
+	headers.add(U("X-MBX-APIKEY"), _apiKey.c_str());
+
 	do
 	{
 		tStart = tEnd - period;
@@ -566,7 +592,7 @@ void BinanceTradingPlatform::getTradeHistory(const char* pair, TIMESTAMP duratio
 
 		try {
 			http_client client(baseURL + parameters);
-			client.request(methods::GET).then(parseAggTrade);
+			client.request(marketDataRequest).then(parseAggTrade).wait();
 		}
 		catch (const std::exception&e) {
 			pushLogV("get trade history failed: %s\n", e.what());
@@ -595,9 +621,9 @@ void BinanceTradingPlatform::getTradeHistory(const char* pair, TIMESTAMP duratio
 
 	auto toId = lastTradeId;
 	auto limit = 500;
-	bool isEnough = false;
+	bool shouldStop = false;
 
-	auto parseTrade = [this, &tradeItems, startTime, &isEnough](http_response& response) {
+	auto parseTrade = [this, &tradeItems, startTime, &shouldStop](http_response& response) {
 		if (response.status_code() == 200) {
 			auto js = response.extract_json().get();
 			if (js.is_array() == false) {
@@ -631,7 +657,7 @@ void BinanceTradingPlatform::getTradeHistory(const char* pair, TIMESTAMP duratio
 
 						// only get trade item from start time to end time
 						if (tradeItem.timestamp < startTime) {
-							isEnough = true;
+							shouldStop = true;
 							break;
 						}
 
@@ -642,6 +668,9 @@ void BinanceTradingPlatform::getTradeHistory(const char* pair, TIMESTAMP duratio
 
 						tradeItems.push_back(tradeItem);
 					}
+				}
+				if (jsArray.size() == 0) {
+					shouldStop = true;
 				}
 			}
 		}
@@ -673,7 +702,7 @@ void BinanceTradingPlatform::getTradeHistory(const char* pair, TIMESTAMP duratio
 
 		try {
 			http_client client(baseURL + parameters);
-			client.request(methods::GET).then(parseTrade);
+			client.request(marketDataRequest).then(parseTrade).wait();
 		}
 		catch (const std::exception&e) {
 			pushLogV("get trade history failed: %s\n", e.what());
@@ -691,7 +720,7 @@ void BinanceTradingPlatform::getTradeHistory(const char* pair, TIMESTAMP duratio
 			sleepTime = (unsigned int)(interval - processTime);
 		}
 
-	} while (isEnough == false && _stopLoopTask.waitSignal(stopSignal, sleepTime + bonusTime) == false);
+	} while (shouldStop == false && _stopLoopTask.waitSignal(stopSignal, sleepTime + bonusTime) == false);
 }
 
 TIMESTAMP BinanceTradingPlatform::getSyncTime(TIMESTAMP localTime) {

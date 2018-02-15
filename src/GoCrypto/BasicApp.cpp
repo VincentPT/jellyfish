@@ -235,7 +235,7 @@ void BasicApp::setup()
 		auto eventListener = std::bind(&BasicApp::onSelectedTradeEvent, this, _1, _2, _3, _4);
 		_lastEventId = _lastSelectedHandler->addTradeEventListener(eventListener);
 	});
-
+	
 	//_liveGraphWorker = std::thread([this, graphLine]() {
 	//	using namespace std::chrono_literals;
 	//	time_t t;
@@ -308,13 +308,14 @@ void BasicApp::setup()
 			fs.open(fileName, std::ios::out);
 			if (fs.is_open()) {
 
-				fs << "time,buy,sell" << std::endl;
+				fs << "time,buy,sell,average price" << std::endl;
 				for (auto it = tickers.begin(); it != tickers.end(); it++) {
 					auto& ticker = *it;
 
 					fs << Utility::time2str(ticker.firstPrice.at) << ",";
 					fs << ticker.boughtVolume << ",";
-					fs << ticker.soldVolume << std::endl;
+					fs << ticker.soldVolume << ",";
+					fs << ticker.averagePrice << std::endl;
 				}
 			}
 		}
@@ -343,7 +344,7 @@ void BasicApp::startServices() {
 		return;
 	}
 
-	_platformRunner = new PlatformEngine("bitfinex");
+	_platformRunner = new PlatformEngine("binance");
 	_platformRunner->getPlatform()->setLogger(_logAdapter);
 	_platformRunner->setSymbolStatisticUpdatedHandler([this](int i) {
 		_cryptoBoard->refreshCached(i);
@@ -379,6 +380,10 @@ void BasicApp::stopServices() {
 	});
 	
 	_platformRunner->getPlatform()->setLogger(nullptr);
+	_graph->acessSharedData([](Widget* sender) {
+		((WxLineGraph*)sender)->clearPoints();
+	});
+
 	delete _platformRunner;
 	_platformRunner = nullptr;
 }

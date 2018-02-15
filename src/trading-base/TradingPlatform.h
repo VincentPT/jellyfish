@@ -81,6 +81,8 @@ public:
 	/////////////////////////////////////////////////////////////////////////////////
 	virtual int getHandlers(MarketEventHandler** handlersBuffer, int maxCount) const;
 	virtual MarketEventHandler* getHandler(const char* pair);
+	virtual void setConfigFilePath(const char* path);
+	virtual const char* getConfigFilePath() const;
 	//////////////////////////////////////////////////////////////////////////////////////////
 	///
 	/// remove unused data

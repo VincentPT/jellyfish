@@ -99,6 +99,9 @@ PlatformEngine::PlatformEngine(const char* platformName) : _runFlag(false), _hLi
 		CreatePlatformInstanceF createFunc = (CreatePlatformInstanceF)GetProcAddress(_hLib, "createPlatformInstance");
 		if (createFunc != nullptr) {
 			_platform = createFunc();
+			if (_platform) {
+				_platform->setConfigFilePath(settingFile.c_str());
+			}
 		}
 	}
 
@@ -168,7 +171,7 @@ void PlatformEngine::sheduleQueryHistory() {
 			if (hander) {
 				TradingList tradeItems;
 
-				pushLog("requesting trade snapshot for %s\n", symbol);
+				pushLog("requesting trade history for %s\n", symbol);
 				_platform->getTradeHistory(symbol, message.duration, message.endTime, tradeItems);
 				vector<TradeItem> tradeRawItems(tradeItems.size());
 				TradeItem* pItem = tradeRawItems.data();
@@ -176,7 +179,7 @@ void PlatformEngine::sheduleQueryHistory() {
 					*pItem++ = iter->value;
 				}
 
-				pushLog("received trade snapshot for %s\n", symbol);
+				pushLog("received trade history for %s\n", symbol);
 				hander->onTradesUpdate(tradeRawItems.data(), (int)tradeRawItems.size(), true);
 			}
 		}
@@ -248,16 +251,16 @@ void buildFromEmptyTickers(Iter begin, Iter end, const NextIterFunc& nextIter, l
 			ticker.averagePrice = cost / (ticker.boughtVolume + ticker.soldVolume);
 		}
 		else {
-			ticker.averagePrice = pLastTicker->lastPrice.price;
+			ticker.averagePrice = -1;
 			ticker.processLevel = -1;
 			ticker.boughtVolume = 0;
 			ticker.soldVolume = 0;
 
 			ticker.firstPrice.at = baseTime;
-			ticker.firstPrice.price = ticker.averagePrice;
+			ticker.firstPrice.price = pLastTicker->lastPrice.price;
 
 			ticker.lastPrice.at = ticker.firstPrice.at + TICKER_DURATION - 1;
-			ticker.lastPrice.price = ticker.averagePrice;
+			ticker.lastPrice.price = ticker.firstPrice.price;
 
 			ticker.high = ticker.firstPrice;
 			ticker.low = ticker.firstPrice;
@@ -729,8 +732,8 @@ void PlatformEngine::analyzeTickerForNotification(NAPMarketEventHandler* handler
 			}
 
 			if (!detectedAnotherBestPrice) {
-				auto priceChangePerMin = priceChanged * 60 * 1000 / duration;
 				priceChanged /= bestPricePoint->price;
+				auto priceChangePerMin = priceChanged * 60 * 1000 / duration;
 				if (abs(priceChangePerMin) >= trigger.priceChangePerMin) {
 					((TickerUI*)theTicker)->processLevel = level;
 					formatPriceChanged(buffer, sizeof(buffer), handler->getPair(), lastPrice, *bestPricePoint);

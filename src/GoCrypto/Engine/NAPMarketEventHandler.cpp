@@ -274,7 +274,7 @@ void NAPMarketEventHandler::onTradesUpdate(TradeItem* trades, int count, bool sn
 				_tradeHistory.push_back(*trades);
 			}
 
-			pushLog("update trade event 1\n");
+			//pushLog("update trade event 1\n");
 		}
 		else if (trades->timestamp == _tradeHistory.front().timestamp) {
 			auto it = _tradeHistory.begin();

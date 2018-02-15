@@ -30,6 +30,7 @@ class TradingPlatformImpl {
 	std::map<std::string, SubcribeStatus> _subscriptionMap;
 	list<shared_ptr<MarketEventHandler>> _container;
 	ILogger* _logger = nullptr;
+	string _configFilePath;
 public:
 	bool addEventHandler(MarketEventHandler* handler, bool allowDelete) {
 		auto pair = handler->getPair();
@@ -153,6 +154,13 @@ public:
 	}
 	void pushLogVA(const char* fmt, va_list args) {
 		if (_logger) _logger->logVA(fmt, args);
+	}
+
+	void setConfigFilePath(const char* path) {
+		_configFilePath = path;
+	}
+	const char* getConfigFilePath() const {
+		return _configFilePath.c_str();
 	}
 };
 
@@ -296,6 +304,14 @@ void TradingPlatform::setQueryTimeInterval(TIMESTAMP t) {
 
 TIMESTAMP TradingPlatform::getQueryTimeInterval() const {
 	return _updateInterval;
+}
+
+void TradingPlatform::setConfigFilePath(const char* path) {
+	_tradingPlatformImpl->setConfigFilePath(path);
+}
+
+const char* TradingPlatform::getConfigFilePath() const {
+	return _tradingPlatformImpl->getConfigFilePath();
 }
 
 void TradingPlatform::pushLog(const char* message) {

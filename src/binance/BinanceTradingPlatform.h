@@ -19,6 +19,7 @@ private:
 	Signal<bool> _stopLoopTask;
 	TIMESTAMP _timeDiff;
 	bool _serverTimeIsReady;
+	std::string _apiKey;
 
 private:
 	void messageHandlerImpl(const web::websockets::client::websocket_incoming_message& msg);

@@ -37,7 +37,7 @@ bool Notifier::pushNotification(const Notification& notification) {
 	//cout << "push message {" << title << "," << message << "}" << endl;
 	pushLog("[%s] %s %s\n", str.c_str(), title.c_str(), message.c_str());
 
-	bool res = false;
+	bool res = true;
 	//ofstream out;
 	//try {
 	//	string fileName(platformName);
@@ -77,6 +77,5 @@ bool Notifier::pushNotification(const Notification& notification) {
 	//	}
 	//});
 	//task.wait();
-	res = true;
 	return res;
 }
