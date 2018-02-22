@@ -7,6 +7,8 @@ WxLineGraph::WxLineGraph() : _displayArea(0,0,0,0), _scale(1,1), _translate(0,0)
 	setLineColor(ColorA8u(0,0,0,255));
 	setGraphRegionColor(ColorA8u(255, 255, 255, 255));
 	//_transform = glm::translate(vec3(0, 0, 0));
+
+	//_pointsData = gl::Vbo::create()
 }
 
 WxLineGraph::~WxLineGraph() {

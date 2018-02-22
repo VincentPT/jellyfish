@@ -344,7 +344,7 @@ void BasicApp::startServices() {
 		return;
 	}
 
-	_platformRunner = new PlatformEngine("binance");
+	_platformRunner = new PlatformEngine(_controlBoard->getCurrentPlatform());
 	_platformRunner->getPlatform()->setLogger(_logAdapter);
 	_platformRunner->setSymbolStatisticUpdatedHandler([this](int i) {
 		_cryptoBoard->refreshCached(i);

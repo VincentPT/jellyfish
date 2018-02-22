@@ -16,6 +16,8 @@ protected:
 	ci::gl::FboRef _drawingFBO;
 	//glm::mat4x4 _transform;
 
+	//ci::gl::VboRef _pointsData;
+
 public:
 	WxLineGraph();
 	virtual ~WxLineGraph();

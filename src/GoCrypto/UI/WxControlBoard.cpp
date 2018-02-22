@@ -1,6 +1,8 @@
 #include "WxControlBoard.h"
 
-WxControlBoard::WxControlBoard() : _checkedButton(-1)
+const char* platforms[] = { "bitfinex", "binance" };
+
+WxControlBoard::WxControlBoard() : _checkedButton(-1), _currentPlatform(platforms[0])
 {
 	_window_flags |= ImGuiWindowFlags_NoTitleBar;
 	_window_flags |= ImGuiWindowFlags_NoMove;
@@ -23,6 +25,20 @@ void WxControlBoard::update() {
 		ImGui::End();
 		return;
 	}
+
+	if (ImGui::BeginCombo("Platform", _currentPlatform))
+	{
+		for (int n = 0; n < IM_ARRAYSIZE(platforms); n++)
+		{
+			bool is_selected = (_currentPlatform == platforms[n]);
+			if (ImGui::Selectable(platforms[n], is_selected))
+				_currentPlatform = platforms[n];
+			if (is_selected)
+				ImGui::SetItemDefaultFocus();   // Set the initial focus when opening the combo (scrolling + for keyboard navigation support in the upcoming navigation branch)
+		}
+		ImGui::EndCombo();
+	}
+	ImGui::Separator();
 
 	if (ImGui::Button("start", ImVec2(120, 35))) {
 		if (_startButtonClickHandler) {
@@ -90,4 +106,8 @@ void WxControlBoard::setBaseCurrencies(const std::vector<std::string>& currencie
 
 const std::string& WxControlBoard::getCurrentCurrency() const {
 	return _currencies[_checkedButton];
+}
+
+const char* WxControlBoard::getCurrentPlatform() const {
+	return _currentPlatform;
 }
