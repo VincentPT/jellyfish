@@ -72,7 +72,7 @@ private:
 	std::list<UserListenerInfoRaw> _userRawListeners;
 	std::list<UserListenerInfo> _userListeners;
 	std::map<std::string, std::shared_ptr<std::list<UserListenerInfo*>>> _pairListenerMap;
-	std::vector<CryptoBoardElmInfo> _symbolsStatistics;
+	std::vector<CryptoBoardElmInfo*> _symbolsStatistics;
 	std::vector<std::list<TickerUI>> _symbolsTickers;
 	std::vector<std::string> _currencies;
 
@@ -93,7 +93,7 @@ public:
 
 	void run();
 	void stop();
-	const std::vector<CryptoBoardElmInfo>& getSymbolsStatistics() const;
+	const std::vector<CryptoBoardElmInfo*>& getSymbolsStatistics() const;
 	const std::vector<std::list<TickerUI>>& getSymbolsTickers();
 	TradingPlatform* getPlatform();
 	const std::vector<std::string>& getCurrencies() const;

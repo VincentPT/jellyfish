@@ -14,7 +14,6 @@ using namespace std::chrono;
 using namespace std;
 typedef  TradingPlatform* (*CreatePlatformInstanceF)();
 
-
 PlatformEngine::PlatformEngine(const char* platformName) : _runFlag(false), _hLib(nullptr), _platformName(platformName) {
 
 	_platform = nullptr;
@@ -124,6 +123,8 @@ PlatformEngine::~PlatformEngine() {
 	if (_hLib) {
 		FreeLibrary(_hLib);
 	}
+
+	destroy(_symbolsStatistics);
 }
 
 void PlatformEngine::pushMessageLoop() {
@@ -272,13 +273,6 @@ void buildFromEmptyTickers(Iter begin, Iter end, const NextIterFunc& nextIter, l
 }
 
 void PlatformEngine::updateSymbolStatistics(CryptoBoardElmInfo* info, const std::list<TickerUI>& tickers) {
-	static TIMESTAMP pricePeriods[] = {
-		1 * 60 * 60 * 1000,
-		2 * 60 * 60 * 1000,
-		3 * 60 * 60 * 1000,
-		4 * 60 * 60 * 1000,
-	};
-
 	static TIMESTAMP volPeriods[] = {
 		1 * 60 * 1000,
 		1 * 60 * 60 * 1000,
@@ -289,12 +283,14 @@ void PlatformEngine::updateSymbolStatistics(CryptoBoardElmInfo* info, const std:
 
 	double amount, amountABS;
 	double cost;
-	double* pValue = info->pricePeriods;
-
 	TIMESTAMP serverTimeNow = _platform->getSyncTime(getCurrentTimeStamp());
 
+	auto pVolumePeriod = info->periods;
+
 	auto it = tickers.begin();
-	for (auto& period : pricePeriods) {
+	for (auto& period : volPeriods) {
+		pVolumePeriod->bought = 0;
+		pVolumePeriod->sold = 0;
 		amount = 0;
 		cost = 0;
 		for (; it != tickers.end(); it++) {
@@ -302,30 +298,15 @@ void PlatformEngine::updateSymbolStatistics(CryptoBoardElmInfo* info, const std:
 			if (duration > period) {
 				break;
 			}
+			pVolumePeriod->bought += it->boughtVolume;
+			pVolumePeriod->sold += it->soldVolume;
+
 			amountABS = (it->boughtVolume + it->soldVolume);
 			cost += it->averagePrice * amountABS;
 			amount += amountABS;
 		}
-
 		if (amount) {
-			*pValue = cost / amount;
-		}
-		pValue++;
-	}
-
-	auto pVolumePeriod = info->volPeriods;
-
-	it = tickers.begin();
-	for (auto& period : volPeriods) {
-		pVolumePeriod->bought = 0;
-		pVolumePeriod->sold = 0;
-		for (; it != tickers.end(); it++) {
-			auto duration = serverTimeNow - it->firstPrice.at;
-			if (duration > period) {
-				break;
-			}
-			pVolumePeriod->bought += it->boughtVolume;
-			pVolumePeriod->sold += it->soldVolume;
+			pVolumePeriod->averagePrice = cost / amount;
 		}
 		pVolumePeriod++;
 	}
@@ -468,7 +449,7 @@ void PlatformEngine::onTrade(int i, NAPMarketEventHandler* sender, TradeItem* in
 		}
 	}
 
-	CryptoBoardElmInfo* info = &_symbolsStatistics[i];
+	CryptoBoardElmInfo* info = _symbolsStatistics[i];
 	info->price = trades.front().price;
 	info->volume = fabs(trades.front().amount);
 	// only request snapshot for trade when first trade history return
@@ -568,13 +549,14 @@ void PlatformEngine::run() {
 		}
 	}
 
-	_symbolsStatistics.clear();
+	destroy(_symbolsStatistics);
 	_symbolsTickers.clear();
 
 	_symbolsStatistics.resize(_pairListenerMap.size());
 	_symbolsTickers.resize(_symbolsStatistics.size());
 	int i = 0;
-	CryptoBoardElmInfo* pSymbolStatisticsinfo = _symbolsStatistics.data();
+	constexpr int nPeriod = 5;
+
 	for (auto it = _pairListenerMap.begin(); it != _pairListenerMap.end(); it++, i++) {
 		NAPMarketEventHandler* eventHandler = new NAPMarketEventHandler(it->first.c_str());
 		eventHandler->useTicker(false);
@@ -583,7 +565,10 @@ void PlatformEngine::run() {
 		eventHandler->useCandles(false);
 		_platform->addEventHandler(eventHandler, true);
 
-		_symbolsStatistics[i].symbol = it->first;
+		CryptoBoardElmInfo* elmInfo = createCrytpElm(nPeriod);
+		elmInfo->symbol = it->first.c_str();
+
+		_symbolsStatistics[i] = elmInfo;
 
 		auto eventListener = 
 			std::bind(&PlatformEngine::onTrade, this, i, _1 , _2, _3, _4);
@@ -750,7 +735,7 @@ void PlatformEngine::analyzeTickerForNotification(NAPMarketEventHandler* handler
 	}
 }
 
-const std::vector<CryptoBoardElmInfo>& PlatformEngine::getSymbolsStatistics() const {
+const std::vector<CryptoBoardElmInfo*>& PlatformEngine::getSymbolsStatistics() const {
 	return _symbolsStatistics;
 }
 

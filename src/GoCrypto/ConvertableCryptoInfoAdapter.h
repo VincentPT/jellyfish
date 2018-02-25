@@ -7,14 +7,14 @@
 class ConvertableCryptoInfoAdapter : public CryptoBoardInfoDefaultAdapter {
 	std::string _currentCurrency;
 	PlatformEngine* _engine;
-	std::vector<CryptoBoardElmInfo> _convertedItems;
+	std::vector<CryptoBoardElmInfo*> _convertedItems;
 	std::map<std::string, int> _symbolIndexMap;
 	std::list<std::pair<NAPMarketEventHandler*, int>> _registerEvents;
 private:
 	void onTradeEvent(NAPMarketEventHandler* sender, TradeItem* tradeItem, int, bool);
 	void updateElement(int elmIdx);
 protected:
-	virtual void setItems(const std::vector<CryptoBoardElmInfo>* fixedItems);
+	virtual void setItems(const std::vector<CryptoBoardElmInfo*>* fixedItems);
 public:
 	ConvertableCryptoInfoAdapter(const std::vector<int>& rawElmInfoOffsets);
 	virtual~ConvertableCryptoInfoAdapter();
@@ -37,5 +37,5 @@ public:
 	const std::string& getCurrency() const;
 	bool convertPrice(const std::string& symbol, const double& price, double& convertedPrice);
 	const std::string& getQuote(const std::string& symbol);
-	void intialize(const std::vector<CryptoBoardElmInfo>* fixedItems, PlatformEngine* engine);
+	void intialize(const std::vector<CryptoBoardElmInfo*>* fixedItems, PlatformEngine* engine);
 };

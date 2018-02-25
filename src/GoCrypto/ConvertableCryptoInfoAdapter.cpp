@@ -9,36 +9,37 @@ ConvertableCryptoInfoAdapter::~ConvertableCryptoInfoAdapter() {
 		int eventId = it->second;
 		it->first->removeTradeEventListener(eventId);
 	}
+	destroy(_convertedItems);
 }
 
 bool ConvertableCryptoInfoAdapter::comparePrice(int i1, int i2) {
 	auto& item1 = _convertedItems.at(i1);
 	auto& item2 = _convertedItems.at(i2);
 
-	return item1.price < item2.price;
+	return item1->price < item2->price;
 }
 bool ConvertableCryptoInfoAdapter::compareVol(int i1, int i2) {
 	auto& item1 = _convertedItems.at(i1);
 	auto& item2 = _convertedItems.at(i2);
 
-	return std::abs(item1.volume) < std::abs(item2.volume);
+	return std::abs(item1->volume) < std::abs(item2->volume);
 }
 bool ConvertableCryptoInfoAdapter::comparePricePeriod(int i1, int i2, int iOffset) {
-	auto pValue1 = (double*)((char*)&_convertedItems.at(i1) + _rawElmInfoOffsets[iOffset]);
-	auto pValue2 = (double*)((char*)&_convertedItems.at(i2) + _rawElmInfoOffsets[iOffset]);
+	auto pValue1 = (double*)((char*)_convertedItems.at(i1) + _rawElmInfoOffsets[iOffset]);
+	auto pValue2 = (double*)((char*)_convertedItems.at(i2) + _rawElmInfoOffsets[iOffset]);
 
 	return *pValue1 < *pValue2;
 }
 
 bool ConvertableCryptoInfoAdapter::compareVolPeriod(int i1, int i2, int iOffset) {
-	auto pValue1 = (VolumePeriod*)((char*)&_convertedItems.at(i1) + _rawElmInfoOffsets[iOffset]);
-	auto pValue2 = (VolumePeriod*)((char*)&_convertedItems.at(i2) + _rawElmInfoOffsets[iOffset]);
+	auto pValue1 = (PeriodInfo*)((char*)_convertedItems.at(i1) + _rawElmInfoOffsets[iOffset]);
+	auto pValue2 = (PeriodInfo*)((char*)_convertedItems.at(i2) + _rawElmInfoOffsets[iOffset]);
 
 	return (pValue1->bought + pValue1->sold) < (pValue2->bought + pValue2->sold);
 }
 
 void ConvertableCryptoInfoAdapter::updateCellBufferForPrice(char* buffer, size_t bufferSize, int i) {
-	auto price = _convertedItems.at(i).price;
+	auto price = _convertedItems.at(i)->price;
 	if (IS_INVALID_PRICE(price)) {
 		strcpy_s(buffer, bufferSize, "N/A");
 	}
@@ -47,7 +48,7 @@ void ConvertableCryptoInfoAdapter::updateCellBufferForPrice(char* buffer, size_t
 	}
 }
 void ConvertableCryptoInfoAdapter::updateCellBufferForVol(char* buffer, size_t bufferSize, int i) {
-	auto vol = std::abs(_convertedItems.at(i).volume);
+	auto vol = std::abs(_convertedItems.at(i)->volume);
 	if (IS_INVALID_VOL(vol)) {
 		strcpy_s(buffer, bufferSize, "N/A");
 	}
@@ -56,7 +57,7 @@ void ConvertableCryptoInfoAdapter::updateCellBufferForVol(char* buffer, size_t b
 	}
 }
 void ConvertableCryptoInfoAdapter::updateCellBufferForPricePeriod(char* buffer, size_t bufferSize, int i, int iOffset) {
-	auto pValue = (double*)((char*)&_convertedItems.at(i) + _rawElmInfoOffsets[iOffset]);
+	auto pValue = (double*)((char*)_convertedItems.at(i) + _rawElmInfoOffsets[iOffset]);
 	auto price = *pValue;
 	if (IS_INVALID_PRICE(price)) {
 		strcpy_s(buffer, bufferSize, "N/A");
@@ -66,7 +67,7 @@ void ConvertableCryptoInfoAdapter::updateCellBufferForPricePeriod(char* buffer, 
 	}
 }
 void ConvertableCryptoInfoAdapter::updateCellBufferForVolPeriod(char* buffer, size_t bufferSize, int i, int iOffset) {
-	auto pValue = (VolumePeriod*)((char*)&_convertedItems.at(i) + _rawElmInfoOffsets[iOffset]);
+	auto pValue = (PeriodInfo*)((char*)_convertedItems.at(i) + _rawElmInfoOffsets[iOffset]);
 	auto vol = pValue->bought + pValue->sold;
 	if (IS_INVALID_VOL(vol)) {
 		strcpy_s(buffer, bufferSize, "N/A");
@@ -78,18 +79,18 @@ void ConvertableCryptoInfoAdapter::updateCellBufferForVolPeriod(char* buffer, si
 
 bool ConvertableCryptoInfoAdapter::checkValidPrice(int i) {
 	auto& item = _convertedItems.at(i);
-	return !IS_INVALID_PRICE(item.price);
+	return !IS_INVALID_PRICE(item->price);
 }
 bool ConvertableCryptoInfoAdapter::checkValidVol(int i) {
 	auto& item = _convertedItems.at(i);
-	return !IS_INVALID_VOL(item.volume);
+	return !IS_INVALID_VOL(item->volume);
 }
 bool ConvertableCryptoInfoAdapter::checkValidPricePeriod(int i, int iOffset) {
-	auto pValue = (double*)((char*)&_convertedItems.at(i) + _rawElmInfoOffsets[iOffset]);
+	auto pValue = (double*)((char*)_convertedItems.at(i) + _rawElmInfoOffsets[iOffset]);
 	return !IS_INVALID_PRICE(*pValue);
 }
 bool ConvertableCryptoInfoAdapter::checkValidVolPeriod(int i, int iOffset) {
-	auto pValue = (VolumePeriod*)((char*)&_convertedItems.at(i) + _rawElmInfoOffsets[iOffset]);
+	auto pValue = (PeriodInfo*)((char*)_convertedItems.at(i) + _rawElmInfoOffsets[iOffset]);
 	return !IS_INVALID_VOL(pValue->bought + pValue->sold);
 }
 
@@ -99,47 +100,40 @@ void ConvertableCryptoInfoAdapter::updateElement(int elmIdx) {
 
 	auto& crytoInfo = _convertedItems[i];
 	auto& originCrytoInfo = _fixedItems->at(i);
-	auto& symbol = originCrytoInfo.symbol;
+	auto& symbol = originCrytoInfo->symbol;
 
-	if (!IS_INVALID_PRICE(originCrytoInfo.price) && convertPrice(symbol, originCrytoInfo.price, crytoInfo.price)) {
-		priceFactor = crytoInfo.price / originCrytoInfo.price;
-		crytoInfo.pricePeriods[0] = originCrytoInfo.pricePeriods[0] * priceFactor;
-		crytoInfo.pricePeriods[1] = originCrytoInfo.pricePeriods[1] * priceFactor;
-		crytoInfo.pricePeriods[2] = originCrytoInfo.pricePeriods[2] * priceFactor;
-		crytoInfo.pricePeriods[3] = originCrytoInfo.pricePeriods[3] * priceFactor;
+	if (!IS_INVALID_PRICE(originCrytoInfo->price) && convertPrice(symbol, originCrytoInfo->price, crytoInfo->price)) {
+
+		PeriodInfo* pVol = crytoInfo->periods;
+		PeriodInfo* pEnd = (PeriodInfo*)((char*)pVol + crytoInfo->nPeriod * sizeof(crytoInfo->periods[0]));
+
+		priceFactor = crytoInfo->price / originCrytoInfo->price;
 
 		auto& quoteCurency = getQuote(symbol);
 		if (quoteCurency.empty()) {
-			crytoInfo.volume = 0;
-			VolumePeriod* pVol = crytoInfo.volPeriods;
-			VolumePeriod* pEnd = (VolumePeriod*)((char*)pVol + sizeof(crytoInfo.volPeriods));
+			crytoInfo->volume = 0;
+			
 			for (; pVol < pEnd; pVol++) {
-				*pVol = VolumePeriod();
+				*pVol = PeriodInfo();
 			}
 		}
 		else {
-			crytoInfo.volume = originCrytoInfo.volume * crytoInfo.price;
-
-			VolumePeriod* pVol = crytoInfo.volPeriods;
-			const VolumePeriod* pVolOriginal = originCrytoInfo.volPeriods;
-			VolumePeriod* pEnd = (VolumePeriod*)((char*)pVol + sizeof(crytoInfo.volPeriods));
+			crytoInfo->volume = originCrytoInfo->volume * crytoInfo->price;
+			const PeriodInfo* pVolOriginal = originCrytoInfo->periods;
 			for (; pVol < pEnd; pVol++, pVolOriginal++) {
-				pVol->bought = pVolOriginal->bought * crytoInfo.price;
-				pVol->sold = pVolOriginal->sold * crytoInfo.price;
+				pVol->bought = pVolOriginal->bought * crytoInfo->price;
+				pVol->sold = pVolOriginal->sold * crytoInfo->price;
+				pVol->averagePrice = pVolOriginal->averagePrice * priceFactor;
 			}
 		}
 	}
 	else {
-		crytoInfo.price = -1;
-		crytoInfo.volume = 0;
-		crytoInfo.pricePeriods[0] = -1;
-		crytoInfo.pricePeriods[1] = -1;
-		crytoInfo.pricePeriods[2] = -1;
-		crytoInfo.pricePeriods[3] = -1;
-		VolumePeriod* pVol = crytoInfo.volPeriods;
-		VolumePeriod* pEnd = (VolumePeriod*)((char*)pVol + sizeof(crytoInfo.volPeriods));
+		crytoInfo->price = -1;
+		crytoInfo->volume = 0;
+		PeriodInfo* pVol = crytoInfo->periods;
+		PeriodInfo* pEnd = (PeriodInfo*)((char*)pVol + crytoInfo->nPeriod * sizeof(crytoInfo->periods[0]));
 		for (; pVol < pEnd; pVol++) {
-			*pVol = VolumePeriod();
+			*pVol = PeriodInfo();
 		}
 	}
 }
@@ -155,25 +149,25 @@ void ConvertableCryptoInfoAdapter::onTradeEvent(NAPMarketEventHandler* sender, T
 	updateElement(it->second);
 }
 
-void ConvertableCryptoInfoAdapter::setItems(const std::vector<CryptoBoardElmInfo>* fixedItems) {
+void ConvertableCryptoInfoAdapter::setItems(const std::vector<CryptoBoardElmInfo*>* fixedItems) {
 	CryptoBoardInfoDefaultAdapter::setItems(fixedItems);
 
 	// reset map from symbol to index
 	_symbolIndexMap.clear();
 
-	if (fixedItems == nullptr) {
-		_convertedItems.clear();
-	}
-	else {
+	destroy(_convertedItems);
+	if (fixedItems) {
 		_convertedItems.resize(fixedItems->size());
 
 		// initialize the map
 		for (int i = 0; i < (int)_fixedItems->size(); i++) {
 			auto& cryptoInfo = _fixedItems->at(i);
-			_symbolIndexMap[cryptoInfo.symbol] = i;
+			_symbolIndexMap[cryptoInfo->symbol] = i;
 		}
 		// convert all element at the first time
 		for (int i = 0; i < (int)_convertedItems.size(); i++) {
+			_convertedItems[i] = createCrytpElm(_fixedItems->at(i)->nPeriod);
+			_convertedItems[i]->nPeriod = _fixedItems->at(i)->nPeriod;
 			updateElement(i);
 		}
 	}
@@ -223,7 +217,7 @@ bool ConvertableCryptoInfoAdapter::convertPrice(const std::string& symbol, const
 
 	int i = it->second;
 	auto& originCrytoInfo = _fixedItems->at(i);
-	auto& newPrice = originCrytoInfo.price;
+	auto& newPrice = originCrytoInfo->price;
 	if (reverse) {
 		convertedPrice = price / newPrice;
 	}
@@ -234,7 +228,7 @@ bool ConvertableCryptoInfoAdapter::convertPrice(const std::string& symbol, const
 	return true;
 }
 
-void ConvertableCryptoInfoAdapter::intialize(const std::vector<CryptoBoardElmInfo>* fixedItems, PlatformEngine* engine) {
+void ConvertableCryptoInfoAdapter::intialize(const std::vector<CryptoBoardElmInfo*>* fixedItems, PlatformEngine* engine) {
 	using namespace std::placeholders;
 	_engine = engine;
 	setItems(fixedItems);

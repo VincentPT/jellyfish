@@ -9,26 +9,26 @@ CryptoBoardInfoDefaultAdapter::~CryptoBoardInfoDefaultAdapter() {}
 bool CryptoBoardInfoDefaultAdapter::checkValidSymbol(int i) {
 	auto& item = _fixedItems->at(i);
 	static std::string NA = "NA";
-	return item.symbol.length() > 0 && item.symbol != NA;
+	return item->symbol && item->symbol != NA;
 }
 bool CryptoBoardInfoDefaultAdapter::checkValidPrice(int i) {
 	auto& item = _fixedItems->at(i);
-	return !IS_INVALID_PRICE(item.price);
+	return !IS_INVALID_PRICE(item->price);
 }
 bool CryptoBoardInfoDefaultAdapter::checkValidVol(int i) {
 	auto& item = _fixedItems->at(i);
-	return !IS_INVALID_VOL(item.volume);
+	return !IS_INVALID_VOL(item->volume);
 }
 bool CryptoBoardInfoDefaultAdapter::checkValidPricePeriod(int i, int iOffset) {
-	auto pValue = (double*)((char*)&_fixedItems->at(i) + _rawElmInfoOffsets[iOffset]);
+	auto pValue = (double*)((char*)_fixedItems->at(i) + _rawElmInfoOffsets[iOffset]);
 	return !IS_INVALID_PRICE(*pValue);
 }
 bool CryptoBoardInfoDefaultAdapter::checkValidVolPeriod(int i, int iOffset) {
-	auto pValue = (VolumePeriod*)((char*)&_fixedItems->at(i) + _rawElmInfoOffsets[iOffset]);
+	auto pValue = (PeriodInfo*)((char*)_fixedItems->at(i) + _rawElmInfoOffsets[iOffset]);
 	return !IS_INVALID_VOL(pValue->bought + pValue->sold);
 }
 bool CryptoBoardInfoDefaultAdapter::checkValidBPSh(int i, int iOffset) {
-	auto pValue = (VolumePeriod*)((char*)&_fixedItems->at(i) + _rawElmInfoOffsets[iOffset]);
+	auto pValue = (PeriodInfo*)((char*)_fixedItems->at(i) + _rawElmInfoOffsets[iOffset]);
 	return !IS_INVALID_VOL(pValue->bought + pValue->sold);
 }
 
@@ -37,7 +37,7 @@ bool CryptoBoardInfoDefaultAdapter::compareSymbol(int i1, int i2) {
 	auto& item1 = _fixedItems->at(i1);
 	auto& item2 = _fixedItems->at(i2);
 
-	return item1.symbol < item2.symbol;
+	return item1->symbol < item2->symbol;
 }
 
 bool CryptoBoardInfoDefaultAdapter::comparePrice(int i1, int i2) {
@@ -45,39 +45,39 @@ bool CryptoBoardInfoDefaultAdapter::comparePrice(int i1, int i2) {
 	auto& item1 = _fixedItems->at(i1);
 	auto& item2 = _fixedItems->at(i2);
 
-	return item1.price < item2.price;
+	return item1->price < item2->price;
 }
 bool CryptoBoardInfoDefaultAdapter::compareVol(int i1, int i2) {
 
 	auto& item1 = _fixedItems->at(i1);
 	auto& item2 = _fixedItems->at(i2);
 
-	return std::abs(item1.volume) < std::abs(item2.volume);
+	return std::abs(item1->volume) < std::abs(item2->volume);
 }
 bool CryptoBoardInfoDefaultAdapter::comparePricePeriod(int i1, int i2, int iOffset) {
 
-	auto pValue1 = (double*)((char*)&_fixedItems->at(i1) + _rawElmInfoOffsets[iOffset]);
-	auto pValue2 = (double*)((char*)&_fixedItems->at(i2) + _rawElmInfoOffsets[iOffset]);
+	auto pValue1 = (double*)((char*)_fixedItems->at(i1) + _rawElmInfoOffsets[iOffset]);
+	auto pValue2 = (double*)((char*)_fixedItems->at(i2) + _rawElmInfoOffsets[iOffset]);
 
 	return *pValue1 < *pValue2;
 }
 bool CryptoBoardInfoDefaultAdapter::compareVolPeriod(int i1, int i2, int iOffset) {
 
-	auto pValue1 = (VolumePeriod*)((char*)&_fixedItems->at(i1) + _rawElmInfoOffsets[iOffset]);
-	auto pValue2 = (VolumePeriod*)((char*)&_fixedItems->at(i2) + _rawElmInfoOffsets[iOffset]);
+	auto pValue1 = (PeriodInfo*)((char*)_fixedItems->at(i1) + _rawElmInfoOffsets[iOffset]);
+	auto pValue2 = (PeriodInfo*)((char*)_fixedItems->at(i2) + _rawElmInfoOffsets[iOffset]);
 
 	return (pValue1->bought + pValue1->sold) < (pValue2->bought + pValue2->sold);
 }
 
 bool CryptoBoardInfoDefaultAdapter::compareVolBPSh(int i1, int i2, int iOffset) {
-	auto pValue1 = (VolumePeriod*)((char*)&_fixedItems->at(i1) + _rawElmInfoOffsets[iOffset]);
-	auto pValue2 = (VolumePeriod*)((char*)&_fixedItems->at(i2) + _rawElmInfoOffsets[iOffset]);
+	auto pValue1 = (PeriodInfo*)((char*)_fixedItems->at(i1) + _rawElmInfoOffsets[iOffset]);
+	auto pValue2 = (PeriodInfo*)((char*)_fixedItems->at(i2) + _rawElmInfoOffsets[iOffset]);
 
 	return computeBuy(*pValue1) < computeBuy(*pValue2);
 }
 
 void CryptoBoardInfoDefaultAdapter::updateCellBufferForPrice(char* buffer, size_t bufferSize, int i) {
-	auto price = _fixedItems->at(i).price;
+	auto price = _fixedItems->at(i)->price;
 	if (IS_INVALID_PRICE(price)) {
 		strcpy_s(buffer, bufferSize, "N/A");
 	}
@@ -86,7 +86,7 @@ void CryptoBoardInfoDefaultAdapter::updateCellBufferForPrice(char* buffer, size_
 	}
 }
 void CryptoBoardInfoDefaultAdapter::updateCellBufferForPricePeriod(char* buffer, size_t bufferSize, int i, int iOffset) {
-	auto pValue = (double*)((char*)&_fixedItems->at(i) + _rawElmInfoOffsets[iOffset]);
+	auto pValue = (double*)((char*)_fixedItems->at(i) + _rawElmInfoOffsets[iOffset]);
 	auto price = *pValue;
 	if (IS_INVALID_PRICE(price)) {
 		strcpy_s(buffer, bufferSize, "N/A");
@@ -96,7 +96,7 @@ void CryptoBoardInfoDefaultAdapter::updateCellBufferForPricePeriod(char* buffer,
 	}
 }
 void CryptoBoardInfoDefaultAdapter::updateCellBufferForVol(char* buffer, size_t bufferSize, int i) {
-	auto vol = std::abs(_fixedItems->at(i).volume);
+	auto vol = std::abs(_fixedItems->at(i)->volume);
 	if (IS_INVALID_VOL(vol)) {
 		strcpy_s(buffer, bufferSize, "N/A");
 	}
@@ -105,7 +105,7 @@ void CryptoBoardInfoDefaultAdapter::updateCellBufferForVol(char* buffer, size_t 
 	}
 }
 void CryptoBoardInfoDefaultAdapter::updateCellBufferForVolPeriod(char* buffer, size_t bufferSize, int i, int iOffset) {
-	auto pValue = (VolumePeriod*)((char*)&_fixedItems->at(i) + _rawElmInfoOffsets[iOffset]);
+	auto pValue = (PeriodInfo*)((char*)_fixedItems->at(i) + _rawElmInfoOffsets[iOffset]);
 	auto vol = pValue->bought + pValue->sold;
 	if (IS_INVALID_VOL(vol)) {
 		strcpy_s(buffer, bufferSize, "N/A");
@@ -115,7 +115,7 @@ void CryptoBoardInfoDefaultAdapter::updateCellBufferForVolPeriod(char* buffer, s
 	}
 }
 void CryptoBoardInfoDefaultAdapter::updateCellBufferForBPSh(char* buffer, size_t bufferSize, int i, int iOffset) {
-	auto pValue = (VolumePeriod*)((char*)&_fixedItems->at(i) + _rawElmInfoOffsets[iOffset]);
+	auto pValue = (PeriodInfo*)((char*)_fixedItems->at(i) + _rawElmInfoOffsets[iOffset]);
 	if (IS_INVALID_VOL(pValue->bought + pValue->sold)) {
 		strcpy_s(buffer, bufferSize, "N/A");
 	}
@@ -126,6 +126,14 @@ void CryptoBoardInfoDefaultAdapter::updateCellBufferForBPSh(char* buffer, size_t
 void CryptoBoardInfoDefaultAdapter::updateData() {}
 
 ////////////////////////////////////////////////////////////////////////
+
+inline RowBuffer* createRowBuffer(int nCell) {
+	auto res = (RowBuffer*)malloc(sizeof(RowBuffer) - sizeof(RowBuffer::rowData) + nCell * sizeof(RowBuffer::rowData[0]));
+	res->nCell = nCell;
+	res->cached = false;
+	return res;
+}
+
 
 bool WxCryptoBoardInfo::checkValidSymbol(int i) {
 	return _cryptoBoardInfoAdapter->checkValidSymbol(i);
@@ -189,45 +197,44 @@ WxCryptoBoardInfo::WxCryptoBoardInfo() : _selected(-1), _fixedItems(nullptr)
 	_window_flags |= ImGuiWindowFlags_NoMove;
 	_window_flags |= ImGuiWindowFlags_NoResize;
 	_window_flags |= ImGuiWindowFlags_NoCollapse;
-	_window_flags |= ImGuiWindowFlags_NoScrollbar;
+	//_window_flags |= ImGuiWindowFlags_NoScrollbar;
+
+	constexpr int nPeriod = 5;
+	std::string periodName[nPeriod] = {"1m", "1h","2h", "3h", "4h"};
 
 	_columns = {
 		{ "symbol", 50, 0 },
 		{ "price", 80, 1 },
-		{ "vol", 70, 2 },
-		{ "p 1h", 80, 3 },
-		{ "p 2h", 80, 4 },
-		{ "p 3h", 80, 5 },
-		{ "p 4h", 80, 6 },
-		{ "vol 1m", 70, 7 },
-		{ "vol 1h", 70, 8 },
-		{ "vol 2h", 70, 9 },
-		{ "vol 3h", 70, 10 },
-		{ "vol 4h", 70, 11 },
-		{ "BPV 1m", 70, 12 },
-		{ "BPV 1h", 70, 13 },
-		{ "BPV 2h", 70, 14 },
-		{ "BPV 3h", 70, 15 },
-		{ "BPV 4h", 70, 16 },
+		{ "vol", 70, 2 }
 	};
+	for (int i = 0; i < nPeriod; i++) {
+		ColumnHeader header = {"p " + periodName[i], 80, 3 + i };
+		_columns.push_back(header);
+	}
+	for (int i = 0; i < nPeriod; i++) {
+		ColumnHeader header = { "vol " + periodName[i], 70,  3 + nPeriod + i };
+		_columns.push_back(header);
+	}
+	for (int i = 0; i < nPeriod; i++) {
+		ColumnHeader header = { "BPV " + periodName[i], 70, 3 + 2 * nPeriod + i };
+		_columns.push_back(header);
+	}
 
-	constexpr auto pricePeriodsOffset = offsetof(CryptoBoardElmInfo, pricePeriods);
-	constexpr auto volPeriodsOffset = offsetof(CryptoBoardElmInfo, volPeriods);
+	constexpr auto volPeriodsOffset = offsetof(CryptoBoardElmInfo, periods);
+	constexpr auto pricePeriodsOffset = offsetof(PeriodInfo, averagePrice);
 
 	_rawElmInfoOffsets = {
 		offsetof(CryptoBoardElmInfo, symbol),
 		offsetof(CryptoBoardElmInfo, price),
 		offsetof(CryptoBoardElmInfo, volume),
-		pricePeriodsOffset + 0 * sizeof(double),
-		pricePeriodsOffset + 1 * sizeof(double),
-		pricePeriodsOffset + 2 * sizeof(double),
-		pricePeriodsOffset + 3 * sizeof(double),
-		volPeriodsOffset + 0 * sizeof(VolumePeriod),
-		volPeriodsOffset + 1 * sizeof(VolumePeriod),
-		volPeriodsOffset + 2 * sizeof(VolumePeriod),
-		volPeriodsOffset + 3 * sizeof(VolumePeriod),
-		volPeriodsOffset + 4 * sizeof(VolumePeriod),
 	};
+	for (int i = 0; i < nPeriod; i++) {
+		_rawElmInfoOffsets.push_back(volPeriodsOffset + sizeof(PeriodInfo) * i + pricePeriodsOffset);
+	}
+	for (int i = 0; i < nPeriod; i++) {
+		_rawElmInfoOffsets.push_back(volPeriodsOffset + sizeof(PeriodInfo) * i);
+	}
+
 	using namespace std::placeholders;
 	_columnAdditionalInfo = {
 		{
@@ -248,91 +255,38 @@ WxCryptoBoardInfo::WxCryptoBoardInfo() : _selected(-1), _fixedItems(nullptr)
 			bind(&WxCryptoBoardInfo::checkValidVol, this, _1),
 			SortType::NotSort,
 		},
-		{
-			bind(&WxCryptoBoardInfo::comparePricePeriod, this, _1, _2, 3),
-			bind(&WxCryptoBoardInfo::updateCellBufferForPricePeriod, this, _1, _2, _3, 3),
-			bind(&WxCryptoBoardInfo::checkValidPricePeriod, this, _1, 3),
-			SortType::NotSort,
-		},
-		{
-			bind(&WxCryptoBoardInfo::comparePricePeriod, this, _1, _2, 4),
-			bind(&WxCryptoBoardInfo::updateCellBufferForPricePeriod, this, _1, _2, _3, 4),
-			bind(&WxCryptoBoardInfo::checkValidPricePeriod, this, _1, 4),
-			SortType::NotSort,
-		},
-		{
-			bind(&WxCryptoBoardInfo::comparePricePeriod, this, _1, _2, 5),
-			bind(&WxCryptoBoardInfo::updateCellBufferForPricePeriod, this, _1, _2, _3, 5),
-			bind(&WxCryptoBoardInfo::checkValidPricePeriod, this, _1, 5),
-			SortType::NotSort,
-		},
-		{
-			bind(&WxCryptoBoardInfo::comparePricePeriod, this, _1, _2, 6),
-			bind(&WxCryptoBoardInfo::updateCellBufferForPricePeriod, this, _1, _2, _3, 6),
-			bind(&WxCryptoBoardInfo::checkValidPricePeriod, this, _1, 6),
-			SortType::NotSort,
-		},
-		{
-			bind(&WxCryptoBoardInfo::compareVolPeriod, this, _1, _2, 7),
-			bind(&WxCryptoBoardInfo::updateCellBufferForVolPeriod, this, _1, _2, _3, 7),
-			bind(&WxCryptoBoardInfo::checkValidVolPeriod, this, _1, 7),
-			SortType::NotSort,
-		},
-		{
-			bind(&WxCryptoBoardInfo::compareVolPeriod, this, _1, _2, 8),
-			bind(&WxCryptoBoardInfo::updateCellBufferForVolPeriod, this, _1, _2, _3, 8),
-			bind(&WxCryptoBoardInfo::checkValidVolPeriod, this, _1, 8),
-			SortType::NotSort,
-		},
-		{
-			bind(&WxCryptoBoardInfo::compareVolPeriod, this, _1, _2, 9),
-			bind(&WxCryptoBoardInfo::updateCellBufferForVolPeriod, this, _1, _2, _3, 9),
-			bind(&WxCryptoBoardInfo::checkValidVolPeriod, this, _1, 9),
-			SortType::NotSort,
-		},
-		{
-			bind(&WxCryptoBoardInfo::compareVolPeriod, this, _1, _2, 10),
-			bind(&WxCryptoBoardInfo::updateCellBufferForVolPeriod, this, _1, _2, _3, 10),
-			bind(&WxCryptoBoardInfo::checkValidVolPeriod, this, _1, 10),
-			SortType::NotSort,
-		},
-		{
-			bind(&WxCryptoBoardInfo::compareVolPeriod, this, _1, _2, 11),
-			bind(&WxCryptoBoardInfo::updateCellBufferForVolPeriod, this, _1, _2, _3, 11),
-			bind(&WxCryptoBoardInfo::checkValidVolPeriod, this, _1, 11),
-			SortType::NotSort,
-		},
-		{
-			bind(&WxCryptoBoardInfo::compareVolBPSh, this, _1, _2, 7),
-			bind(&WxCryptoBoardInfo::updateCellBufferForBPSh, this, _1, _2, _3, 7),
-			bind(&WxCryptoBoardInfo::checkValidBPSh, this, _1, 7),
-			SortType::NotSort,
-		},
-		{
-			bind(&WxCryptoBoardInfo::compareVolBPSh, this, _1, _2, 8),
-			bind(&WxCryptoBoardInfo::updateCellBufferForBPSh, this, _1, _2, _3, 8),
-			bind(&WxCryptoBoardInfo::checkValidBPSh, this, _1, 8),
-			SortType::NotSort,
-		},
-		{
-			bind(&WxCryptoBoardInfo::compareVolBPSh, this, _1, _2, 9),
-			bind(&WxCryptoBoardInfo::updateCellBufferForBPSh, this, _1, _2, _3, 9),
-			bind(&WxCryptoBoardInfo::checkValidBPSh, this, _1, 9),
-			SortType::NotSort,
-		},
-		{
-			bind(&WxCryptoBoardInfo::compareVolBPSh, this, _1, _2, 10),
-			bind(&WxCryptoBoardInfo::updateCellBufferForBPSh, this, _1, _2, _3, 10),
-			bind(&WxCryptoBoardInfo::checkValidBPSh, this, _1, 10),
-			SortType::NotSort,
-		},
-		{
-			bind(&WxCryptoBoardInfo::compareVolBPSh, this, _1, _2, 11),
-			bind(&WxCryptoBoardInfo::updateCellBufferForBPSh, this, _1, _2, _3, 11),
-			bind(&WxCryptoBoardInfo::checkValidBPSh, this, _1, 11),
-			SortType::NotSort,
-		}
 	};
+
+	for (int i = 0; i < nPeriod; i++) {
+		ColumnInfoExt columnInfo = {
+			bind(&WxCryptoBoardInfo::comparePricePeriod, this, _1, _2, 3 + i),
+			bind(&WxCryptoBoardInfo::updateCellBufferForPricePeriod, this, _1, _2, _3, 3 + i),
+			bind(&WxCryptoBoardInfo::checkValidPricePeriod, this, _1, 3 + i),
+			SortType::NotSort,
+		};
+
+		_columnAdditionalInfo.push_back(columnInfo);
+	}
+	for (int i = 0; i < nPeriod; i++) {
+		ColumnInfoExt columnInfo = {
+			bind(&WxCryptoBoardInfo::compareVolPeriod, this, _1, _2, 3 + nPeriod + i),
+			bind(&WxCryptoBoardInfo::updateCellBufferForVolPeriod, this, _1, _2, _3, 3 + nPeriod + i),
+			bind(&WxCryptoBoardInfo::checkValidVolPeriod, this, _1, 3 + nPeriod + i),
+			SortType::NotSort,
+		};
+
+		_columnAdditionalInfo.push_back(columnInfo);
+	}
+	for (int i = 0; i < nPeriod; i++) {
+		ColumnInfoExt columnInfo = {
+			bind(&WxCryptoBoardInfo::compareVolBPSh, this, _1, _2, 3 + nPeriod + i),
+			bind(&WxCryptoBoardInfo::updateCellBufferForBPSh, this, _1, _2, _3, 3 + nPeriod + i),
+			bind(&WxCryptoBoardInfo::checkValidBPSh, this, _1, 3 + nPeriod + i),
+			SortType::NotSort,
+		};
+
+		_columnAdditionalInfo.push_back(columnInfo);
+	}
 
 	float totalSize = 0;
 	for (auto& column : _columns) {
@@ -389,6 +343,7 @@ void WxCryptoBoardInfo::onSort(int columnIdx) {
 
 WxCryptoBoardInfo::~WxCryptoBoardInfo()
 {
+	destroy(_cellBuffers);
 }
 
 void WxCryptoBoardInfo::update() {
@@ -418,7 +373,7 @@ void WxCryptoBoardInfo::update() {
 	{
 		auto& column = _columns[i];
 		//ImGui::Text(column.label);
-		if (ImGui::Button(column.label, ImVec2(column.size, 0))) {
+		if (ImGui::Button(column.label.c_str(), ImVec2(column.size, 0))) {
 			onSort(column.additionalIdx);
 		}
 		ImGui::SetColumnOffset(-1, offset);
@@ -449,7 +404,7 @@ void WxCryptoBoardInfo::update() {
 				auto& elmInfo = _fixedItems->at(itemIdx);
 				
 				// symbol id
-				if (ImGui::Selectable(elmInfo.symbol.c_str(), itemIdx == _selected, ImGuiSelectableFlags_SpanAllColumns))
+				if (ImGui::Selectable(elmInfo->symbol, itemIdx == _selected, ImGuiSelectableFlags_SpanAllColumns))
 					_selected = itemIdx;
 				
 				ImGui::SetColumnOffset(j, offset);
@@ -458,18 +413,18 @@ void WxCryptoBoardInfo::update() {
 
 				auto& rowBuffer = _cellBuffers[itemIdx];
 
-				if (rowBuffer.cached == false) {
-					for (col = 0; col < sizeof(rowBuffer.rowData)/sizeof(rowBuffer.rowData[0]); col++) {
+				if (rowBuffer->cached == false) {
+					for (col = 0; col < rowBuffer->nCell; col++) {
 						auto& columnInfo = _columnAdditionalInfo[_columns[col + 1].additionalIdx];
-						(columnInfo.updateBuffer)(rowBuffer.rowData[col].data, sizeof(rowBuffer.rowData[col].data), itemIdx);
+						(columnInfo.updateBuffer)(rowBuffer->rowData[col].data, sizeof(rowBuffer->rowData[col].data), itemIdx);
 					}
 
-					rowBuffer.cached = true;
+					rowBuffer->cached = true;
 				}
 
 				for (j++, col = 0; j < (int)_columns.size(); j++, col++) {
 					auto& columnInfo = _columnAdditionalInfo[_columns[j].additionalIdx];
-					ImGui::Text("%s", rowBuffer.rowData[col].data);
+					ImGui::Text("%s", rowBuffer->rowData[col].data);
 					ImGui::SetColumnOffset(j, offset);
 					offset += _columns[j].size;
 					ImGui::NextColumn();
@@ -496,7 +451,9 @@ void WxCryptoBoardInfo::accessSharedData(const AccessSharedDataFunc& f) {
 	f(this);
 }
 
-void WxCryptoBoardInfo::setItems(const std::vector<CryptoBoardElmInfo>* fixedItems) {
+void WxCryptoBoardInfo::setItems(const std::vector<CryptoBoardElmInfo*>* fixedItems) {
+	destroy(_cellBuffers);
+
 	if (fixedItems == nullptr) {
 		_fixedItems = nullptr;
 		_dataIndexcies.resize(0);
@@ -509,13 +466,13 @@ void WxCryptoBoardInfo::setItems(const std::vector<CryptoBoardElmInfo>* fixedIte
 
 		for (int i = 0; i < (int)_dataIndexcies.size(); i++) {
 			_dataIndexcies[i] = i;
-			_cellBuffers[i].cached = false;
+			_cellBuffers[i] = createRowBuffer(17);
 		}
 	}
 	_cryptoBoardInfoAdapter->setItems(_fixedItems);
 }
 
-const std::vector<CryptoBoardElmInfo>* WxCryptoBoardInfo::getItems() const {
+const std::vector<CryptoBoardElmInfo*>* WxCryptoBoardInfo::getItems() const {
 	return _fixedItems;
 }
 
@@ -527,7 +484,7 @@ const char* WxCryptoBoardInfo::getSelectedSymbol() const {
 	if (_selected < 0 || _fixedItems == nullptr || _selected >= _fixedItems->size()) {
 		return nullptr;
 	}
-	return _fixedItems->at(_selected).symbol.c_str();
+	return _fixedItems->at(_selected)->symbol;
 }
 
 int WxCryptoBoardInfo::getSelectedSymbolIndex() const {
@@ -552,12 +509,12 @@ void WxCryptoBoardInfo::refreshCached(int symbolIndex) {
 	if (symbolIndex < (int)_cellBuffers.size()) {
 		if (symbolIndex < 0) {
 			for (auto& rowBuffer : _cellBuffers) {
-				rowBuffer.cached = false;
+				rowBuffer->cached = false;
 			}
 		}
 		else {
 			auto& rowBuffer = _cellBuffers[symbolIndex];
-			rowBuffer.cached = false;
+			rowBuffer->cached = false;
 		}
 	}
 }

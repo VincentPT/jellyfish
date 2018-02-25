@@ -3,10 +3,11 @@
 #include "GoCrypto.h"
 #include <functional>
 #include <mutex>
+#include <string>
 
 struct ColumnHeader
 {
-	const char* label;
+	std::string label;
 	float size;
 	int additionalIdx;
 }; 
@@ -31,7 +32,7 @@ struct ColumnInfoExt {
 
 class CryptoBoardInfoModeAdapterBase {
 protected:
-	const std::vector<CryptoBoardElmInfo>* _fixedItems;
+	const std::vector<CryptoBoardElmInfo*>* _fixedItems;
 public:
 	virtual bool compareSymbol(int i1, int i2) = 0;
 	virtual bool comparePrice(int i1, int i2) = 0;
@@ -53,7 +54,7 @@ public:
 	virtual bool checkValidVolPeriod(int i, int iOffset) = 0;
 	virtual bool checkValidBPSh(int i, int iOffset) = 0;
 	virtual void updateData() = 0;
-	virtual void setItems(const std::vector<CryptoBoardElmInfo>* fixedItems) {
+	virtual void setItems(const std::vector<CryptoBoardElmInfo*>* fixedItems) {
 		_fixedItems = fixedItems;
 	}
 };
@@ -96,7 +97,7 @@ inline bool IS_INVALID_VOL(const double& vol) {
 	return vol == 0;
 }
 
-inline double computeBuy(const VolumePeriod& vol) {
+inline double computeBuy(const PeriodInfo& vol) {
 	return vol.bought / (vol.bought + vol.sold);
 }
 
@@ -142,23 +143,24 @@ inline int compareVol(const double& vol1, const double& vol2) {
 	return -1;
 }
 
+struct CellBuffer {
+	char data[32];
+};
+
+struct RowBuffer {
+	int nCell;
+	bool cached;
+	CellBuffer rowData[1];
+};
+
 class WxCryptoBoardInfo :
 	public ImWidget
 {
-	struct CellBuffer {
-		char data[32];
-	};
-
-	struct RowBuffer {
-		CellBuffer rowData[16];
-		bool cached;
-	};
-
 	std::vector<ColumnHeader> _columns;
 	std::vector<ColumnInfoExt> _columnAdditionalInfo;
-	const std::vector<CryptoBoardElmInfo>* _fixedItems;
+	const std::vector<CryptoBoardElmInfo*>* _fixedItems;
 	std::vector<int> _dataIndexcies;
-	std::vector<RowBuffer> _cellBuffers;
+	std::vector<RowBuffer*> _cellBuffers;
 	int _selected;
 
 	std::shared_ptr<CryptoBoardInfoModeAdapterBase> _cryptoBoardInfoAdapter;
@@ -196,8 +198,8 @@ public:
 	virtual void update();
 
 	void accessSharedData(const AccessSharedDataFunc&);
-	virtual void setItems(const std::vector<CryptoBoardElmInfo>* fixedItems);
-	virtual const std::vector<CryptoBoardElmInfo>* getItems() const;
+	virtual void setItems(const std::vector<CryptoBoardElmInfo*>* fixedItems);
+	virtual const std::vector<CryptoBoardElmInfo*>* getItems() const;
 	virtual void setItemSelectionChangedHandler(ItemSelecionChangedHandler&& handler);
 	const char* getSelectedSymbol() const;
 	int getSelectedSymbolIndex() const;
