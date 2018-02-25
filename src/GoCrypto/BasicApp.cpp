@@ -351,6 +351,8 @@ void BasicApp::startServices() {
 	}
 	);
 
+	_cryptoBoard->setPeriod(_platformRunner->getPeriods());
+
 	_platformRunner->run();
 
 	_cryptoBoard->accessSharedData([this](Widget*) {

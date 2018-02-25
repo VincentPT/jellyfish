@@ -75,6 +75,7 @@ private:
 	std::vector<CryptoBoardElmInfo*> _symbolsStatistics;
 	std::vector<std::list<TickerUI>> _symbolsTickers;
 	std::vector<std::string> _currencies;
+	std::vector<Period> _periods;
 
 	typedef std::map<TRADE_ID, char> TradeLevelMap;
 	std::map<std::string, std::shared_ptr<TradeLevelMap>> _processLevelMap;
@@ -96,6 +97,7 @@ public:
 	const std::vector<CryptoBoardElmInfo*>& getSymbolsStatistics() const;
 	const std::vector<std::list<TickerUI>>& getSymbolsTickers();
 	TradingPlatform* getPlatform();
+	const std::vector<Period>& getPeriods() const;
 	const std::vector<std::string>& getCurrencies() const;
 	void setSymbolStatisticUpdatedHandler(SymbolStatisticUpdatedHandler&& handler);
 };

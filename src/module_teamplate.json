@@ -1,7 +1,5 @@
 {
 	"module": "<module>.dll",
-	"tickerInterval": 6,
-    "notifyTimeDistance": 900,
 	"triggers": [
         {
 			"startTime": 1800,
@@ -21,11 +19,30 @@
 			"changedPerMin": 0.0625
 		}
 	],
+    "periods": [
+        {
+            "name":"1m",
+            "duration":60
+        },{
+            "name":"1h",
+            "duration":3600
+        },{
+            "name":"2h",
+            "duration":3600
+        },{
+            "name":"3h",
+            "duration":3600
+        },{
+            "name":"4h",
+            "duration":3600
+        }
+    ],
 	"users": [
         {
 			"userKey": "<Pushover's userKey>",
 			"applicationKey": "<Pushover's applicationKey>",
 			"interest": "all"
 		}
-	]
+	],
+    "currencies":["USD","BTC","ETH","EUR"]
 }

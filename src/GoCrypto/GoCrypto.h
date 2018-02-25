@@ -1,5 +1,12 @@
 #pragma once
 #include <vector>
+#include <string>
+
+struct Period
+{
+	std::string name;
+	int durationInSecs;
+};
 
 struct PeriodInfo
 {

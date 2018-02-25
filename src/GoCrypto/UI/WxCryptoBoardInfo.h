@@ -161,6 +161,7 @@ class WxCryptoBoardInfo :
 	const std::vector<CryptoBoardElmInfo*>* _fixedItems;
 	std::vector<int> _dataIndexcies;
 	std::vector<RowBuffer*> _cellBuffers;
+	std::vector<Period> _periods;
 	int _selected;
 
 	std::shared_ptr<CryptoBoardInfoModeAdapterBase> _cryptoBoardInfoAdapter;
@@ -198,6 +199,7 @@ public:
 	virtual void update();
 
 	void accessSharedData(const AccessSharedDataFunc&);
+	void setPeriod(const std::vector<Period>& periods);
 	virtual void setItems(const std::vector<CryptoBoardElmInfo*>* fixedItems);
 	virtual const std::vector<CryptoBoardElmInfo*>* getItems() const;
 	virtual void setItemSelectionChangedHandler(ItemSelecionChangedHandler&& handler);

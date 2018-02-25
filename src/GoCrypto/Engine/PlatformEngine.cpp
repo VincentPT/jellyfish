@@ -40,7 +40,7 @@ PlatformEngine::PlatformEngine(const char* platformName) : _runFlag(false), _hLi
 
 			moduleName = CPPREST_FROM_STRING(settings[U("module")].as_string());
 
-			auto triggers = settings[U("triggers")].as_array();
+			auto& triggers = settings[U("triggers")].as_array();
 			for (auto it = triggers.begin(); it != triggers.end(); it++) {
 				_triggers.push_back( parseTrigger(it->as_object()));
 			}
@@ -51,7 +51,7 @@ PlatformEngine::PlatformEngine(const char* platformName) : _runFlag(false), _hLi
 
 			loadedTriggers = true;
 
-			auto users = settings[U("users")].as_array();
+			auto& users = settings[U("users")].as_array();
 			for (auto it = users.begin(); it != users.end(); it++) {
 				UserListenerInfo userLitenserInfo;
 				userLitenserInfo.applicationKey = CPPREST_FROM_STRING(it->at(U("applicationKey")).as_string());
@@ -75,6 +75,16 @@ PlatformEngine::PlatformEngine(const char* platformName) : _runFlag(false), _hLi
 
 				_userRawListeners.push_back(raw);
 			}
+
+			auto& periods = settings[U("periods")].as_array();
+			for (auto it = periods.begin(); it != periods.end(); it++) {
+				Period period;
+				period.name = CPPREST_FROM_STRING(it->at(U("name")).as_string());
+				period.durationInSecs = it->at(U("duration")).as_integer();
+
+				_periods.push_back(period);
+			}
+
 			if (settings.has_field(U("currencies"))) {
 				auto currenciesVal = settings[U("currencies")];
 				if (currenciesVal.is_array()) {
@@ -84,6 +94,7 @@ PlatformEngine::PlatformEngine(const char* platformName) : _runFlag(false), _hLi
 					}
 				}
 			}
+			
 		}
 	}
 	catch(...) {
@@ -273,29 +284,24 @@ void buildFromEmptyTickers(Iter begin, Iter end, const NextIterFunc& nextIter, l
 }
 
 void PlatformEngine::updateSymbolStatistics(CryptoBoardElmInfo* info, const std::list<TickerUI>& tickers) {
-	static TIMESTAMP volPeriods[] = {
-		1 * 60 * 1000,
-		1 * 60 * 60 * 1000,
-		2 * 60 * 60 * 1000,
-		3 * 60 * 60 * 1000,
-		4 * 60 * 60 * 1000,
-	};
-
 	double amount, amountABS;
 	double cost;
 	TIMESTAMP serverTimeNow = _platform->getSyncTime(getCurrentTimeStamp());
 
 	auto pVolumePeriod = info->periods;
 
+	TIMESTAMP periodDuration = 0;
+
 	auto it = tickers.begin();
-	for (auto& period : volPeriods) {
+	for (auto pit = _periods.begin(); pit != _periods.end(); pit++) {
 		pVolumePeriod->bought = 0;
 		pVolumePeriod->sold = 0;
 		amount = 0;
 		cost = 0;
+		periodDuration += pit->durationInSecs * 1000;
 		for (; it != tickers.end(); it++) {
 			auto duration = serverTimeNow - it->firstPrice.at;
-			if (duration > period) {
+			if (duration > periodDuration) {
 				break;
 			}
 			pVolumePeriod->bought += it->boughtVolume;
@@ -456,7 +462,11 @@ void PlatformEngine::onTrade(int i, NAPMarketEventHandler* sender, TradeItem* in
 	// to ensure the trade historys in local is fully and continous
 	if (_sentTradeSnapshotRequest.find(sender->getPair()) == _sentTradeSnapshotRequest.end()) {
 		TIMESTAMP tEnd = 0;
-		TIMESTAMP duration = 4 * 3600 * 1000;
+		TIMESTAMP duration = 0;
+
+		for (auto it = _periods.begin(); it != _periods.end(); it++) {
+			duration += it->durationInSecs * 1000;
+		}
 		if (trades.size()) {
 			tEnd = trades.back().timestamp;
 			duration -= trades.front().timestamp - tEnd;
@@ -555,7 +565,7 @@ void PlatformEngine::run() {
 	_symbolsStatistics.resize(_pairListenerMap.size());
 	_symbolsTickers.resize(_symbolsStatistics.size());
 	int i = 0;
-	constexpr int nPeriod = 5;
+	int nPeriod = (int)_periods.size();
 
 	for (auto it = _pairListenerMap.begin(); it != _pairListenerMap.end(); it++, i++) {
 		NAPMarketEventHandler* eventHandler = new NAPMarketEventHandler(it->first.c_str());
@@ -749,6 +759,10 @@ TradingPlatform* PlatformEngine::getPlatform() {
 
 const std::vector<string>& PlatformEngine::getCurrencies() const {
 	return _currencies;
+}
+
+const std::vector<Period>& PlatformEngine::getPeriods() const {
+	return _periods;
 }
 
 void PlatformEngine::setSymbolStatisticUpdatedHandler(SymbolStatisticUpdatedHandler&& handler) {
