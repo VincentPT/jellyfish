@@ -86,7 +86,7 @@ void BFXTradingPlatform::messageHandlerImpl(const websocket_incoming_message& ms
 	}
 	if (value.is_object())
 	{
-		pushLogV("response message: %s \n", bodyText.c_str());
+		//pushLogV("response message: %s \n", bodyText.c_str());
 
 		if (value.has_field(U("event"))) {
 			auto eventValue = value[U("event")].as_string();
@@ -217,6 +217,7 @@ bool BFXTradingPlatform::connectImpl() {
 	using namespace std::chrono_literals;
 
 	_client->set_message_handler(std::bind(&BFXTradingPlatform::messageHandlerImpl, this, std::placeholders::_1));
+
 	_client->connect(U("wss://api.bitfinex.com/ws/2")).wait();
 
 	bool needSet = true;
@@ -251,7 +252,7 @@ bool BFXTradingPlatform::disconnectImpl() {
 	_pingServerTask.wait();
 	pushLog("ping server task stopped\n");
 
-	_client->close().wait();
+	_client->close();
 	return true;
 }
 

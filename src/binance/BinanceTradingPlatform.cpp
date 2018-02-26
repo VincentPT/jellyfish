@@ -150,7 +150,7 @@ bool BinanceTradingPlatform::connectImpl() {
 }
 
 bool BinanceTradingPlatform::disconnectImpl() {
-	_client->close().wait();
+	_client->close();
 
 	_stopLoopTask.sendSignal(true);
 	_pingServerTask.wait();

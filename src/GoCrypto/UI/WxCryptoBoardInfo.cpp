@@ -37,7 +37,7 @@ bool CryptoBoardInfoDefaultAdapter::compareSymbol(int i1, int i2) {
 	auto& item1 = _fixedItems->at(i1);
 	auto& item2 = _fixedItems->at(i2);
 
-	return item1->symbol < item2->symbol;
+	return strcmp(item1->symbol, item2->symbol) == -1;
 }
 
 bool CryptoBoardInfoDefaultAdapter::comparePrice(int i1, int i2) {

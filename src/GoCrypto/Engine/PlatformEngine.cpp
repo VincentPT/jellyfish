@@ -174,6 +174,7 @@ void PlatformEngine::pushMessageLoop() {
 }
 
 void PlatformEngine::sheduleQueryHistory() {
+	LOG_SCOPE_ACCESS(_platform->getLogger(), __FUNCTION__);
 	RequestTradeHistoryMessage message;
 	while (_runFlag)
 	{
