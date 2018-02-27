@@ -157,8 +157,23 @@ void BasicApp::setup()
 	getWindow()->getSignalClose().connect([this]() {
 		_runFlag = false;
 	});
-
+	
 	_graph = graphLine;
+	_graph->setPointToTextTranslateFunction([this](const glm::vec2& point) -> std::tuple<std::string, std::string> {
+		TIMESTAMP t = _baseTime + (TIMESTAMP)(((double)point.x) / _pixelPerTime);
+		char buffer[32];
+		time_t tst = (time_t)(t / 1000);
+		struct tm * timeinfo;
+		timeinfo = localtime(&tst);
+		strftime(buffer, sizeof(buffer), "%b %d %T", timeinfo);
+
+		std::tuple<std::string, std::string> pointStr(buffer, std::to_string(point.y));
+		return pointStr;
+	});
+
+	getWindow()->getSignalMouseMove().connect([this](MouseEvent& me) {
+		_graph->setCursorLocation(glm::vec2(me.getX() - _graph->getX(), me.getY() - _graph->getY()));
+	});
 
 	_baseTime = getCurrentTimeStamp();
 	_graph->baseTime();

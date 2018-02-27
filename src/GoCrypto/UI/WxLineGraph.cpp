@@ -41,6 +41,26 @@ void WxLineGraph::draw() {
 		}
 		gl::end();
 	}
+	if(_translateFunction)
+	{
+		if (_cursorLocation.x >= _displayArea.x1 && _cursorLocation.x < _displayArea.x2 &&
+			_cursorLocation.y >= _displayArea.y1 && _cursorLocation.y < _displayArea.y2) {
+			auto point = localToPoint(_cursorLocation.x, _cursorLocation.y);
+			auto pointStr = _translateFunction(point);
+			
+			glm::vec2 windowCursorLocation(_cursorLocation.x + tl_x, _cursorLocation.y + tl_y);
+			
+			ColorAf color(1, 1, 1);
+			ci::Font font("Arial", 20);
+
+			gl::drawStringCentered(std::get<1>(pointStr), glm::vec2(graphRect.x2 - 20, windowCursorLocation.y), color, font);
+			gl::drawStringCentered(std::get<0>(pointStr), glm::vec2(windowCursorLocation.x - 20, graphRect.y2), color, font);
+
+			gl::ScopedColor scopeColor(color);
+			gl::drawLine(windowCursorLocation, glm::vec2(graphRect.x2, windowCursorLocation.y));
+			gl::drawLine(windowCursorLocation, glm::vec2(windowCursorLocation.x, graphRect.y2));
+		}
+	}
 }
 
 void WxLineGraph::addPoint(const glm::vec2& point) {
@@ -168,8 +188,18 @@ ci::vec2 WxLineGraph::windowToPoint(float x, float y) {
 }
 
 ci::vec2 WxLineGraph::localToPoint(float x, float y) {
-	x += getX();
 	y += getY();
-	y += _displayArea.getHeight();
-	return ci::vec2(x / _scale.x - _translate.x, y / _scale.y - _translate.y);
+	y = _displayArea.getHeight() - y;
+	y -= _translate.y;
+	y /= _scale.y;
+	x += getX();
+	return ci::vec2(x / _scale.x - _translate.x, y);
+}
+
+void WxLineGraph::setCursorLocation(const ci::vec2& location) {
+	_cursorLocation = location;
+}
+
+void WxLineGraph::setPointToTextTranslateFunction(const TranslateFunction& f) {
+	_translateFunction = f;
 }

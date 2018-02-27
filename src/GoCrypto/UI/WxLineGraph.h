@@ -2,6 +2,9 @@
 #include "CiWidget.h"
 #include "cinder/gl/Fbo.h"
 #include <list>
+#include <functional>
+
+typedef std::function<std::tuple<std::string, std::string>(const glm::vec2& point)> TranslateFunction;
 
 class WxLineGraph :
 	public CiWidget
@@ -13,6 +16,8 @@ protected:
 	ci::ColorA8u _graphRegionColor;
 	ci::vec2 _scale;
 	ci::vec2 _translate;
+	ci::vec2 _cursorLocation;
+	TranslateFunction _translateFunction;
 	ci::gl::FboRef _drawingFBO;
 	//glm::mat4x4 _transform;
 
@@ -42,5 +47,7 @@ public:
 	virtual ci::vec2 pointToLocal(float x, float y);
 	virtual ci::vec2 windowToPoint(float x, float y);
 	virtual ci::vec2 localToPoint(float x, float y);
+	virtual void setCursorLocation(const ci::vec2& location);
+	virtual void setPointToTextTranslateFunction(const TranslateFunction& f);
 };
 
