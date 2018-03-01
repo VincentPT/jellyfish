@@ -12,6 +12,7 @@ class WxControlBoard :
 	ButtonClickEventHandler _stopButtonClickHandler;
 	ButtonClickEventHandler _exportButtonClickHandler;
 	ButtonClickEventHandler _selectedCurrencyChangedHandler;
+	ButtonClickEventHandler _candleButtonClickHandler;
 	int _checkedButton;
 	const char* _currentPlatform;
 	std::vector<std::string> _currencies;
@@ -26,6 +27,7 @@ public:
 	void setOnStopButtonClickHandler(ButtonClickEventHandler&& handler);
 	void setOnExportButtonClickHandler(ButtonClickEventHandler&& handler);
 	void setOnSelectedCurrencyChangedHandler(ButtonClickEventHandler&& handler);
+	void setOnCandleButtonClickHandler(ButtonClickEventHandler&& handler);
 
 	void accessSharedData(const AccessSharedDataFunc&);
 	void setBaseCurrencies(const std::vector<std::string>& currencies);

@@ -15,6 +15,7 @@
 #include "LogAdapter.h"
 #include "../common/Utility.h"
 #include <ConvertableCryptoInfoAdapter.h>
+#include "UI/CiWndCandle.h"
 
 using namespace ci;
 using namespace ci::app;
@@ -341,6 +342,10 @@ void BasicApp::setup()
 		applySelectedCurrency(_controlBoard->getCurrentCurrency());
 	});
 
+	_controlBoard->setOnCandleButtonClickHandler([](Widget*) {
+		CiWndCandle::createWindow();
+	});
+
 	_asynTasksWorkder = std::thread([this]() {
 		while (_runFlag)
 		{
@@ -466,14 +471,14 @@ void BasicApp::update()
 
 void BasicApp::draw()
 {
-	//static float gray = 0.65f;
-	gl::clear( ColorA::black() );
-	
-	// any widget added without a window will be added
-	// in the default "debug" window
-	//ui::DragFloat( "Gray", &gray, 0.01f, 0.0f, 1.0f );
-
-	_spliter.draw();
+	auto wndCandle = getWindow()->getUserData<CiWndCandle>();
+	if (wndCandle) {
+		wndCandle->draw();
+	}
+	else {
+		gl::clear(ColorA::black());
+		_spliter.draw();
+	}
 }
 
 CINDER_APP(BasicApp, RendererGl( RendererGl::Options().msaa( 8 ) ), BasicApp::intializeApp)

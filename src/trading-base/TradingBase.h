@@ -40,6 +40,7 @@ struct Ticker
 	double high; // Highest trade price of the last 24 hours;
 	double volume; // Trading volume of the last 24 hours
 	TIMESTAMP timestamp; //The timestamp at which this information was valid
+	int duration; // ticker duration
 };
 
 struct TradeItem {

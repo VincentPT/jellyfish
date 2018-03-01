@@ -57,6 +57,11 @@ void WxControlBoard::update() {
 			_exportButtonClickHandler(this);
 		}
 	}
+	if (ImGui::Button("candle", ImVec2(120, 35))) {
+		if (_candleButtonClickHandler) {
+			_candleButtonClickHandler(this);
+		}
+	}
 
 	ImGui::Separator();
 	if (ImGui::CollapsingHeader("Currencies", ImGuiTreeNodeFlags_DefaultOpen)) {
@@ -91,6 +96,10 @@ void WxControlBoard::setOnExportButtonClickHandler(ButtonClickEventHandler&& han
 
 void WxControlBoard::setOnSelectedCurrencyChangedHandler(ButtonClickEventHandler&& handler) {
 	_selectedCurrencyChangedHandler = handler;
+}
+
+void WxControlBoard::setOnCandleButtonClickHandler(ButtonClickEventHandler&& handler) {
+	_candleButtonClickHandler = handler;
 }
 
 void WxControlBoard::accessSharedData(const AccessSharedDataFunc& f) {

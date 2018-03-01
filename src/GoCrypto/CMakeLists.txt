@@ -37,6 +37,8 @@ SET (UI_SRC
     UI/WxLineGraphLive.h
     UI/WxControlBoard.cpp
     UI/WxControlBoard.h
+    UI/CiWndCandle.h
+    UI/CiWndCandle.cpp
 )
 
 SET (MAIN_SOURCES
