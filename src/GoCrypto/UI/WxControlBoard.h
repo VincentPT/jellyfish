@@ -5,6 +5,11 @@
 #include <vector>
 #include <mutex>
 
+enum class GraphMode : int {
+	Price = 0,
+	Volume
+};
+
 class WxControlBoard :
 	public ImWidget
 {
@@ -12,8 +17,9 @@ class WxControlBoard :
 	ButtonClickEventHandler _stopButtonClickHandler;
 	ButtonClickEventHandler _exportButtonClickHandler;
 	ButtonClickEventHandler _selectedCurrencyChangedHandler;
-	ButtonClickEventHandler _candleButtonClickHandler;
+	ButtonClickEventHandler _selectedGraphModeChangedHandler;
 	int _checkedButton;
+	GraphMode _graphMode;
 	const char* _currentPlatform;
 	std::vector<std::string> _currencies;
 	mutable std::mutex _mutex;
@@ -27,11 +33,12 @@ public:
 	void setOnStopButtonClickHandler(ButtonClickEventHandler&& handler);
 	void setOnExportButtonClickHandler(ButtonClickEventHandler&& handler);
 	void setOnSelectedCurrencyChangedHandler(ButtonClickEventHandler&& handler);
-	void setOnCandleButtonClickHandler(ButtonClickEventHandler&& handler);
+	void setOnSelectedGraphModeChangedHandler(ButtonClickEventHandler&& handler);
 
 	void accessSharedData(const AccessSharedDataFunc&);
 	void setBaseCurrencies(const std::vector<std::string>& currencies);
 	const std::string& getCurrentCurrency() const;
 	const char* getCurrentPlatform() const;
+	GraphMode getCurrentGraphMode() const;
 };
 

@@ -15,5 +15,5 @@ public:
 
 	void    addLog(const char* fmt, ...) IM_FMTARGS(2);
 	void    addLogV(const char* fmt, va_list args);
-	void    update();
+	void    draw();
 };

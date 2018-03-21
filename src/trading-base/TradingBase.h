@@ -40,7 +40,7 @@ struct Ticker
 	double high; // Highest trade price of the last 24 hours;
 	double volume; // Trading volume of the last 24 hours
 	TIMESTAMP timestamp; //The timestamp at which this information was valid
-	int duration; // ticker duration
+	int duration; // ticker duration in seconds
 };
 
 struct TradeItem {
@@ -57,6 +57,7 @@ struct CandleItem {
 	double high;
 	double low;
 	double volume;
+	int duration; // candle duration in seconds
 };
 
 #include "SingleList.h"
@@ -65,3 +66,4 @@ TEMPLATE_EXTERN template class TRADING_PLATFORM_API SingleList<TradeItem>;
 TEMPLATE_EXTERN template class TRADING_PLATFORM_API SingleList<char*>;
 typedef SingleList<TradeItem> TradingList;
 typedef SingleList<char*> StringList;
+typedef SingleList<CandleItem> CandleList;

@@ -568,6 +568,8 @@ void BFXTradingPlatform::invokeCandleEvent(MarketEventHandler* handler, web::jso
 		item.high = itemElm[3].as_double();
 		item.low = itemElm[4].as_double();
 		item.volume = itemElm[5].as_double();
+		// candle duration was set on subscribe's request
+		item.duration = 60;
 		handler->onCandlesUpdate(&item, 1, false);
 
 		return;
@@ -592,6 +594,8 @@ void BFXTradingPlatform::invokeCandleEvent(MarketEventHandler* handler, web::jso
 		item.high = itemElm[3].as_double();
 		item.low = itemElm[4].as_double();
 		item.volume = itemElm[5].as_double();
+		// candle duration was set on subscribe's request
+		item.duration = 60;
 		candles.push_back(item);
 	}
 
@@ -817,8 +821,8 @@ void BFXTradingPlatform::getTradeHistory(const char* pair, TIMESTAMP duration, T
 	bool shouldStop = false;
 
 	std::map<TRADE_ID, bool> existingTrades;
-
-	auto parseTrades = [this, &tradeItems, &duration, &existingTrades, &shouldStop, &additionalTime](http_response& response) {
+	bool tryAgain = false;
+	auto parseTrades = [this, &tryAgain, &tradeItems, &duration, &existingTrades, &shouldStop, &additionalTime](http_response& response) {
 		additionalTime = 0;
 		if (response.status_code() == 200) {
 			auto js = response.extract_json().get();
@@ -870,6 +874,7 @@ void BFXTradingPlatform::getTradeHistory(const char* pair, TIMESTAMP duration, T
 		else {
 			pushLog("query trade history failed, try again in one minute\n");
 			additionalTime = 60 * 1000;
+			tryAgain = true;
 		}
 	};
 
@@ -889,6 +894,9 @@ void BFXTradingPlatform::getTradeHistory(const char* pair, TIMESTAMP duration, T
 	while(durationLeft > 0)
 	{
 		t1 = getCurrentTimeStamp();
+		additionalTime = 0;
+		tryAgain = false;
+
 		try {
 			http_client client(baseURL + parameters);
 			auto task = client.request(methods::GET).then(parseTrades);
@@ -901,22 +909,23 @@ void BFXTradingPlatform::getTradeHistory(const char* pair, TIMESTAMP duration, T
 			pushLog("get trade history failed: unknown error\n");
 		}
 		
-		if (tradeItems.size() == 0 || shouldStop) {
+		if (shouldStop) {
 			break;
 		}
 
-		tStart = tradeItems.back().timestamp;
-		tEnd = tradeItems.front().timestamp;
-		durationLeft = duration - (tEnd - tStart);
+		if (tradeItems.size() && tryAgain == false) {
+			tStart = tradeItems.back().timestamp;
+			tEnd = tradeItems.front().timestamp;
+			durationLeft = duration - (tEnd - tStart);
 
-		tEnd = tStart;
-		tStart = tEnd - durationLeft;
+			tEnd = tStart;
+			tStart = tEnd - durationLeft;
 
-		parameters = U("&start=");
-		parameters += TO_STRING_T(tStart);
-		parameters += U("&end=");
-		parameters += TO_STRING_T(tEnd);
-
+			parameters = U("&start=");
+			parameters += TO_STRING_T(tStart);
+			parameters += U("&end=");
+			parameters += TO_STRING_T(tEnd);
+		}
 		//pushLogV("request trade from %s to %s\n", Utility::time2str(tStart).c_str(), Utility::time2str(tEnd).c_str());
 
 		t2 = getCurrentTimeStamp();
@@ -930,11 +939,13 @@ void BFXTradingPlatform::getTradeHistory(const char* pair, TIMESTAMP duration, T
 			break;
 		}
 
-		existingTrades.clear();
-		t2 = tradeItems.back().timestamp;
-		for (auto it = tradeItems.head(); it; it = it->nextNode) {
-			if (it->value.timestamp == t2) {
-				existingTrades[it->value.oderId] = true;
+		if (tradeItems.size() && tryAgain == false) {
+			existingTrades.clear();
+			t2 = tradeItems.back().timestamp;
+			for (auto it = tradeItems.head(); it; it = it->nextNode) {
+				if (it->value.timestamp == t2) {
+					existingTrades[it->value.oderId] = true;
+				}
 			}
 		}
 	}
@@ -942,6 +953,120 @@ void BFXTradingPlatform::getTradeHistory(const char* pair, TIMESTAMP duration, T
 	// for testing about restart event only
 	//pushLog("sending testing reconnect signal...\n");
 	//_restartEvents.sendSignal(true);
+}
+
+void BFXTradingPlatform::getCandleHistory(const char* pair, TIMESTAMP duration, TIMESTAMP endTime, CandleList& candleItems) {
+	if (duration <= 0) {
+		pushLog("no need to request candle history\n");
+		return;
+	}
+	bool temp;
+
+	TIMESTAMP t1, t2, additionalTime;
+	TIMESTAMP processTime;
+	TIMESTAMP interval = 4 * 1000;
+	unsigned int sleepTime = 0;
+	bool shouldStop = false;
+
+	constexpr int candleDuration = 60;
+
+	std::map<TRADE_ID, bool> existingTrades;
+	bool tryAgain = false;
+	auto parseTrades = [this, &tryAgain, &candleItems, &duration, &existingTrades, &shouldStop, &additionalTime, candleDuration](http_response& response) {
+		additionalTime = 0;
+		if (response.status_code() == 200) {
+			auto js = response.extract_json().get();
+			if (js.is_array()) {
+				auto& items = js.as_array();
+
+				if (!isMaitenanceMode(items)) {
+					if (items.size()) {
+						for (auto it = items.begin(); it != items.end(); it++) {
+							auto& itemElm = it->as_array();
+							/*
+							// response with Section = "hist"
+							[
+							[ MTS, OPEN, CLOSE, HIGH, LOW, VOLUME ],
+							...
+							]
+							*/
+							CandleItem item;
+							item.timestamp = itemElm[0].as_number().to_uint64();
+							item.open = itemElm[1].as_double();
+							item.close = itemElm[2].as_double();
+							item.high = itemElm[3].as_double();
+							item.low = itemElm[4].as_double();
+							item.volume = itemElm[5].as_double();
+							// candle duration was set on request
+							item.duration = candleDuration;
+
+							candleItems.push_back(item);
+						}
+					}
+					else {
+						shouldStop = true;
+					}
+				}
+			}
+			else {
+				pushLogV("unknow response format %s\n", CPPREST_FROM_STRING(js.as_string()).c_str());
+			}
+		}
+		else {
+			pushLog("query candle history failed, try again in one minute\n");
+			additionalTime = 60 * 1000;
+			tryAgain = true;
+		}
+	};
+
+	TIMESTAMP tStart, tEnd;
+	utility::string_t parameters;
+
+	utility::string_t baseURL = U("https://api.bitfinex.com/v2/candles/trade:1m:t");
+	baseURL.append(CPPREST_TO_STRING(pair));
+	baseURL.append(U("/hist"));
+
+	tEnd = endTime;
+	tStart = (endTime - duration) / (candleDuration * 1000) * (candleDuration * 1000);
+
+	do
+	{
+		t1 = getCurrentTimeStamp();
+
+		parameters = U("?start=");
+		parameters += TO_STRING_T(tStart);
+		parameters += U("&end=");
+		parameters += TO_STRING_T(tEnd);
+
+		additionalTime = 0;
+		tryAgain = false;
+
+		try {
+			http_client client(baseURL + parameters);
+			auto task = client.request(methods::GET).then(parseTrades);
+			task.wait();
+		}
+		catch (const std::exception&e) {
+			pushLogV("get candle history failed: %s\n", e.what());
+		}
+		catch (...) {
+			pushLog("get candle history failed: unknown error\n");
+		}
+
+		if (shouldStop) {
+			break;
+		}
+		if (candleItems.size() && tryAgain == false) {
+			tEnd = candleItems.back().timestamp - (candleDuration * 1000);
+		}
+		t2 = getCurrentTimeStamp();
+
+		sleepTime = 0;
+		processTime = t2 - t1;
+		if (processTime < interval) {
+			sleepTime = (unsigned int)(interval - processTime);
+		}
+	} while ( tStart < tEnd && _stopLoopTask.waitSignal(temp, sleepTime + (unsigned int)additionalTime) == false);
 }
 
 extern "C" {

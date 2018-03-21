@@ -47,6 +47,11 @@ public:
 
 		return res;
 	}
+
+	void clear() {
+		std::unique_lock<std::mutex> lk(_messageQueueMutex);
+		_messageQueue.clear();
+	}
 };
 
 template <class T>

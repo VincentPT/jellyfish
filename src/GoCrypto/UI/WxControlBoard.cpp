@@ -2,7 +2,7 @@
 
 const char* platforms[] = { "bitfinex", "binance" };
 
-WxControlBoard::WxControlBoard() : _checkedButton(-1), _currentPlatform(platforms[0])
+WxControlBoard::WxControlBoard() : _checkedButton(-1), _currentPlatform(platforms[0]), _graphMode(GraphMode::Price)
 {
 	_window_flags |= ImGuiWindowFlags_NoTitleBar;
 	_window_flags |= ImGuiWindowFlags_NoMove;
@@ -57,10 +57,19 @@ void WxControlBoard::update() {
 			_exportButtonClickHandler(this);
 		}
 	}
-	if (ImGui::Button("candle", ImVec2(120, 35))) {
-		if (_candleButtonClickHandler) {
-			_candleButtonClickHandler(this);
-		}
+
+	int* graphMode = (int*)&_graphMode;
+	int oldSelected = *graphMode;
+	ImGui::BeginGroup();
+	ImGui::RadioButton("price", graphMode, 0);
+	ImGui::RadioButton("volume", graphMode, 1);
+	ImGui::EndGroup();
+
+	// disable change graph mode
+	_graphMode = GraphMode::Volume;
+
+	if (oldSelected != *graphMode && _selectedGraphModeChangedHandler) {
+		_selectedGraphModeChangedHandler(this);
 	}
 
 	ImGui::Separator();
@@ -98,8 +107,8 @@ void WxControlBoard::setOnSelectedCurrencyChangedHandler(ButtonClickEventHandler
 	_selectedCurrencyChangedHandler = handler;
 }
 
-void WxControlBoard::setOnCandleButtonClickHandler(ButtonClickEventHandler&& handler) {
-	_candleButtonClickHandler = handler;
+void WxControlBoard::setOnSelectedGraphModeChangedHandler(ButtonClickEventHandler&& handler) {
+	_selectedGraphModeChangedHandler = handler;
 }
 
 void WxControlBoard::accessSharedData(const AccessSharedDataFunc& f) {
@@ -119,4 +128,8 @@ const std::string& WxControlBoard::getCurrentCurrency() const {
 
 const char* WxControlBoard::getCurrentPlatform() const {
 	return _currentPlatform;
+}
+
+GraphMode WxControlBoard::getCurrentGraphMode() const {
+	return _graphMode;
 }

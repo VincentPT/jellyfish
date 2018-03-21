@@ -55,6 +55,7 @@ public:
 	virtual TIMESTAMP getSyncTime(TIMESTAMP localTime) = 0;
 	virtual bool isServerTimeReady() = 0;
 	virtual void getTradeHistory(const char* pair, TIMESTAMP duration, TIMESTAMP endTime, TradingList& tradeItems) = 0;
+	virtual void getCandleHistory(const char* pair, TIMESTAMP duration, TIMESTAMP endTime, CandleList& candleItems) = 0;
 	// return pairs seperate by ';', caller must using free to free the string buffer after use
 	virtual void getAllPairs(StringList& pairs) = 0;
 	virtual void getBaseCurrencies(StringList& currencies) = 0;

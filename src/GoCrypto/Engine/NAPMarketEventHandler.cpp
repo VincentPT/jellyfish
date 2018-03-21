@@ -18,11 +18,48 @@ NAPMarketEventHandler::~NAPMarketEventHandler()
 {
 }
 
-void NAPMarketEventHandler::onTickerUpdate(Ticker& ticker) {}
+void NAPMarketEventHandler::onTickerUpdate(Ticker& ticker) {
+	pushLog("%s's ticker: {%lf, %lf, %lf, %lf, %lf, %lf, %s}\n", _pair, ticker.bid, ticker.ask, ticker.lastPrice, ticker.volume, ticker.high, ticker.low, Utility::time2str(ticker.timestamp).c_str());
+}
 
 void NAPMarketEventHandler::onBooksUpdate(BookItemEventArgs* books, bool snapShot) {}
 
-void NAPMarketEventHandler::onCandlesUpdate(CandleItem* candles, int count, bool snapShot) {}
+void NAPMarketEventHandler::onCandlesUpdate(CandleItem* candles, int count, bool snapShot) {
+	if (candles == nullptr) return;
+
+	std::unique_lock<std::mutex> lk(_m);
+	CandleItem* pItemEnd = candles + count;
+	if (count > 1) {
+		//pushLog("%s's candles \n", _pair);
+		for (CandleItem* pItem = candles; pItem < pItemEnd; pItem++) {
+			CandleItem& item = *pItem;
+			//pushLog("{%s, %lf, %lf, %lf, %lf, %lf}\n", Utility::time2str(item.timestamp).c_str(), item.open, item.close, item.high, item.low, item.volume);
+
+			_candleHistory.push_back(item);
+		}
+		//pushLog("%s's candles end \n", _pair);
+	}
+	else if (count == 1) {
+		CandleItem& item = *candles;
+		//pushLog("{%s, %lf, %lf, %lf, %lf, %lf}\n", Utility::time2str(item.timestamp).c_str(), item.open, item.close, item.high, item.low, item.volume);
+
+		if (_candleHistory.size()) {
+			if (_candleHistory.front().timestamp == item.timestamp) {
+				_candleHistory.front() = item;
+			}
+			else if (_candleHistory.front().timestamp < item.timestamp) {
+				_candleHistory.push_front(item);
+			}
+		}
+		else {
+			_candleHistory.push_front(item);
+		}
+	}
+
+	for (auto it = _candleEventListeners.begin(); it != _candleEventListeners.end(); it++) {
+		(it->second) (this, candles, count, snapShot);
+	}
+}
 
 void NAPMarketEventHandler::onTradesUpdate(TradeItem* trades, int count, bool snapShot) {
 #if 0
@@ -321,6 +358,10 @@ std::list<TradeItem>& NAPMarketEventHandler::getTradeHistoriesNonSync() {
 	return _tradeHistory;
 }
 
+const std::list<CandleItem>& NAPMarketEventHandler::getCandleHistoriesNonSync() {
+	return _candleHistory;
+}
+
 //void NAPMarketEventHandler::addEmptyTicker(TIMESTAMP t) {
 //	double lastPrice = -1;
 //	if (_tradeHistory.size()) {
@@ -383,11 +424,28 @@ int NAPMarketEventHandler::addTradeEventListener(TradeEventListener&& eventListe
 	it.first->second = eventListener;
 
 	_autoId++;
-
 	return emptyPair.first;
 }
 
 void NAPMarketEventHandler::removeTradeEventListener(int id) {
 	std::unique_lock<std::mutex> lk(_m);
 	_tradeEventListeners.erase(id);
+}
+
+int NAPMarketEventHandler::addCandleEventListener(CandleEventListener&& eventListener) {
+	std::unique_lock<std::mutex> lk(_m);
+
+	CandleEventListener emptyFunc;
+	auto emptyPair = std::make_pair(_autoId, emptyFunc);
+	auto it = _candleEventListeners.insert(emptyPair);
+	it.first->second = eventListener;
+
+	_autoId++;
+
+	return emptyPair.first;
+}
+
+void NAPMarketEventHandler::removeCandleEventListener(int id) {
+	std::unique_lock<std::mutex> lk(_m);
+	_candleEventListeners.erase(id);
 }

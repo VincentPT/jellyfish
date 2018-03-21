@@ -4,7 +4,7 @@
 using namespace ci;
 using namespace std;
 
-WxLineGraphLive::WxLineGraphLive() : _pixelPerMicroSeconds(0.001f), _generatedIdx(-2), _xAtZero(0), _lastestX(0){
+WxLineGraphLive::WxLineGraphLive() : _lastestX(0) {
 }
 
 WxLineGraphLive::~WxLineGraphLive() {
@@ -12,29 +12,25 @@ WxLineGraphLive::~WxLineGraphLive() {
 }
 
 void WxLineGraphLive::adjustTransform() {
-	if (_lines.size() == 0) {
+	if (_points.size() == 0) {
 		return;
 	}
-	const glm::vec2& point = _lines.back();
+	const glm::vec2& point = _points.back();
 
 	adjustHorizontalTransform(point);
 	adjustVerticalTransform(point);
 }
 
 void WxLineGraphLive::adjustVerticalTransform(const glm::vec2& point) {
-	if (_lines.size() == 0) {
+	if (_points.size() == 0) {
 		return;
 	}
-
-	auto top = _displayArea.y1;
-	auto bottom = _displayArea.y2;
-
 	float translateY = 0;
 
-	auto leftPoint = localToPoint(_displayArea.x1, 0);
+	auto leftPoint = localToPoint(0, 0);
 	float minY = FLT_MAX;
 	float maxY = FLT_MIN;
-	for (auto it = _lines.rbegin(); it != _lines.rend(); it++) {
+	for (auto it = _points.rbegin(); it != _points.rend(); it++) {
 		if (it->x < leftPoint.x) {
 			break;
 		}
@@ -46,43 +42,23 @@ void WxLineGraphLive::adjustVerticalTransform(const glm::vec2& point) {
 			maxY = it->y;
 		}
 	}
-	auto yBellow = pointToLocal(0, minY);
 	auto yTop = pointToLocal(0, maxY);
-	if (yTop.y > yBellow.y) {
-		std::swap(yBellow, yTop);
-	}
+	auto yBellow = pointToLocal(0, minY);
+	auto currHeight = std::abs(yBellow.y - yTop.y);
 
-	if ((yBellow.y - yTop.y) > _displayArea.getHeight()) {
-		auto scaleY = _displayArea.getHeight() / (yBellow.y - yTop.y) - 0.1f;
+	if (currHeight > _displayArea.getHeight()) {
+		auto scaleY = _displayArea.getHeight() / currHeight;
 		scale(1.0f, scaleY);
 
-		auto newLocalPoint = pointToLocal(point.x, point.y);
-		if (newLocalPoint.y < top) {
-			translateY = newLocalPoint.y - top;
-		}
-		else if (newLocalPoint.y > bottom) {
-			translateY = newLocalPoint.y - bottom;
-		}
+		yTop = pointToLocal(0, maxY);
+		yBellow = pointToLocal(0, minY);
 	}
-	else if ((yBellow.y - yTop.y) < _displayArea.getHeight() * 4.0f / 5) {
-		auto scaleY = _displayArea.getHeight() / (yBellow.y - yTop.y) - 0.1f;
-		scale(1.0f, scaleY);
-
-		auto yBellow = pointToLocal(0, minY);
-		auto yTop = pointToLocal(0, maxY);
-		auto yMiddle = (yBellow.y + yTop.y) / 2;
-
-		translateY = yMiddle - _displayArea.getHeight() / 2.0f;
+	
+	if (yTop.y < 0) {
+		translate(0, -yTop.y);
 	}
-	else if (yTop.y < top) {
-		translateY = yTop.y - top;
-	}
-	else if (yBellow.y > bottom) {
-		translateY = yBellow.y - bottom;
-	}
-
-	if (translateY) {
-		translate(0, translateY);
+	else if (yBellow.y > _displayArea.getHeight()) {
+		translate(0, _displayArea.getHeight() - yBellow.y);
 	}
 }
 
@@ -94,22 +70,10 @@ inline auto getCurrentExternalTime(const double& baseTime) {
 void WxLineGraphLive::adjustHorizontalTransform(const glm::vec2& point) {
 	auto localPoint = pointToLocal(point.x, point.y);
 
-	auto actualXForPoint = localPoint.x;
-	auto expectedX = _xAtZero;
-	auto translateX = expectedX - actualXForPoint;
-
-	if (translateX >= 0) {
-		auto lastestPoint = point;
-
-		auto currentExternalTime = getCurrentExternalTime(_baseTime);
-		auto actualExternalTime = _lastestX / _pixelPerMicroSeconds;
-		auto paddingTime = currentExternalTime - actualExternalTime;
-		
-		auto expectXForPoint = expectedX - paddingTime * _pixelPerMicroSeconds;
-		translateX = expectXForPoint - actualXForPoint;
+	if (localPoint.x > _displayArea.getWidth()) {
+		auto translateX = _displayArea.getWidth() - localPoint.x;
+		translate(translateX, 0);
 	}
-
-	translate(translateX, 0);
 }
 
 void WxLineGraphLive::addPoint(const glm::vec2& point) {
@@ -124,11 +88,11 @@ void WxLineGraphLive::acessSharedData(const AccessSharedDataFunc& f) {
 }
 
 void WxLineGraphLive::addPointAndConstruct(const glm::vec2& point) {
-	if (_lines.size() == 0) {
+	if (_points.size() == 0) {
 		WxLineGraph::addPoint(point);
 	}
 	else {
-		auto constructPoint = _lines.back();
+		auto constructPoint = _points.back();
 		constructPoint.x = point.x;
 		WxLineGraph::addPoint(constructPoint);
 		WxLineGraph::addPoint(point);
@@ -152,19 +116,11 @@ void WxLineGraphLive::draw() {
 	std::unique_lock<std::mutex> lk(_mutex);
 
 	gl::ScopedColor color(_lineColor);
-	if (_lines.size()) {
-		auto points = _lines;
-		//auto lastestPoint = points.back();
-
-		auto currentExternalTime = getCurrentExternalTime(_baseTime);
-		auto actualExternalTime = _lastestX / _pixelPerMicroSeconds;
-		auto paddingTime = currentExternalTime - actualExternalTime;
-
-		_lastestX +=(float)(paddingTime * _pixelPerMicroSeconds);
-		adjustHorizontalTransform(vec2(_lastestX,0));
+	if (_points.size()) {
+		auto points = _points;
 
 		auto localPoint = pointToWindow(points.back().x, points.back().y);
-		vec2 constructPoint(_xAtZero, localPoint.y);
+		vec2 constructPoint = pointToWindow(_lastestX, points.back().y);
 
 		WxLineGraph::draw();
 		gl::drawLine(localPoint, constructPoint);
@@ -175,19 +131,7 @@ void WxLineGraphLive::draw() {
 	}
 }
 
-void WxLineGraphLive::setTimeScale(float scale) {
-	_pixelPerMicroSeconds = scale;
-}
-
-float WxLineGraphLive::getTimeScale() const {
-	return _pixelPerMicroSeconds;
-}
-
-void WxLineGraphLive::mapZeroTime(float x) {
-	_xAtZero = x;
-}
-
-
-void WxLineGraphLive::baseTime() {
-	_baseTime = ci::app::App::get()->getElapsedSeconds();
+void WxLineGraphLive::setLiveX(float x) {
+	_lastestX = x;
+	adjustHorizontalTransform(glm::vec2(_lastestX, 0));
 }

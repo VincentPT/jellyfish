@@ -92,6 +92,14 @@ void Spliter::setChild2(const std::shared_ptr<Widget>& child2) {
 	updateChildrenrGeometrics();
 }
 
+const std::shared_ptr<Widget>& Spliter::getChild1() const {
+	return _child1;
+}
+
+const std::shared_ptr<Widget>& Spliter::getChild2() const {
+	return _child2;
+}
+
 void Spliter::updateRelativeSize() {
 	_relativeSize = 0.5f;
 	if (_horizontal) {

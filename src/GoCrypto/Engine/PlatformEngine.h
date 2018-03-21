@@ -52,10 +52,16 @@ class PlatformEngine
 		std::string pair;
 	};
 
-	struct RequestTradeHistoryMessage {
+	enum class EventHistoryType {
+		TradeHistory,
+		CandleHistory
+	};
+
+	struct RequestEventHistoryMessage {
 		std::string pair;
 		TIMESTAMP endTime;
 		TIMESTAMP duration;
+		EventHistoryType eventType;
 	};
 	
 private:
@@ -67,7 +73,7 @@ private:
 	AccessEventDataFunc _tickerAnalyzer;
 	std::vector<TriggerTimeBase> _triggers;
 	SyncMessageQueue<InternalNotificationData> _messageQueue;
-	SyncMessageQueue<RequestTradeHistoryMessage> _symbolQueue;
+	SyncMessageQueue<RequestEventHistoryMessage> _symbolQueue;
 	std::string _platformName;
 	std::list<UserListenerInfoRaw> _userRawListeners;
 	std::list<UserListenerInfo> _userListeners;
@@ -80,6 +86,7 @@ private:
 	typedef std::map<TRADE_ID, char> TradeLevelMap;
 	std::map<std::string, std::shared_ptr<TradeLevelMap>> _processLevelMap;
 	std::map<std::string, bool> _sentTradeSnapshotRequest;
+	std::map<std::string, bool> _sentCandleSnapshotRequest;
 	std::future<void> _sendTradeHistoryRequestLoop;
 	SymbolStatisticUpdatedHandler _onSymbolStatisticUpdated;
 private:
@@ -88,6 +95,7 @@ private:
 	void updateSymbolStatistics(CryptoBoardElmInfo* info, const std::list<TickerUI>&);
 	void analyzeTickerForNotification(NAPMarketEventHandler* handler, const std::list<TickerUI>&);
 	void onTrade(int i, NAPMarketEventHandler* sender, TradeItem* tradeItem, int, bool);
+	void onCandle(int i, NAPMarketEventHandler* sender, CandleItem* candleItems, int, bool);
 public:
 	PlatformEngine(const char* platformName);
 	virtual ~PlatformEngine();

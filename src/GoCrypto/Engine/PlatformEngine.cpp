@@ -175,25 +175,44 @@ void PlatformEngine::pushMessageLoop() {
 
 void PlatformEngine::sheduleQueryHistory() {
 	LOG_SCOPE_ACCESS(_platform->getLogger(), __FUNCTION__);
-	RequestTradeHistoryMessage message;
+	RequestEventHistoryMessage message;
 	while (_runFlag)
 	{
 		if (_symbolQueue.popMessage(message, 1000) && _runFlag) {
-			auto symbol = message.pair.c_str();
-			auto hander = _platform->getHandler(symbol);
-			if (hander) {
-				TradingList tradeItems;
+			if (message.eventType == EventHistoryType::TradeHistory) {
+				auto symbol = message.pair.c_str();
+				auto hander = _platform->getHandler(symbol);
+				if (hander) {
+					TradingList tradeItems;
 
-				pushLog("requesting trade history for %s\n", symbol);
-				_platform->getTradeHistory(symbol, message.duration, message.endTime, tradeItems);
-				vector<TradeItem> tradeRawItems(tradeItems.size());
-				TradeItem* pItem = tradeRawItems.data();
-				for (auto iter = tradeItems.head(); iter; iter = iter->nextNode) {
-					*pItem++ = iter->value;
+					pushLog("requesting trade history for %s\n", symbol);
+					_platform->getTradeHistory(symbol, message.duration, message.endTime, tradeItems);
+					vector<TradeItem> tradeRawItems(tradeItems.size());
+					TradeItem* pItem = tradeRawItems.data();
+					for (auto iter = tradeItems.head(); iter; iter = iter->nextNode) {
+						*pItem++ = iter->value;
+					}
+
+					pushLog("received trade history for %s\n", symbol);
+					hander->onTradesUpdate(tradeRawItems.data(), (int)tradeRawItems.size(), true);
 				}
+			}
+			else if (message.eventType == EventHistoryType::CandleHistory) {
+				auto symbol = message.pair.c_str();
+				auto hander = _platform->getHandler(symbol);
+				if (hander) {
+					CandleList candleItems;
+					pushLog("requesting candle history for %s\n", symbol);
+					_platform->getCandleHistory(symbol, message.duration, message.endTime, candleItems);
+					vector<CandleItem> candleRawItems(candleItems.size());
+					CandleItem* pItem = candleRawItems.data();
+					for (auto iter = candleItems.head(); iter; iter = iter->nextNode) {
+						*pItem++ = iter->value;
+					}
 
-				pushLog("received trade history for %s\n", symbol);
-				hander->onTradesUpdate(tradeRawItems.data(), (int)tradeRawItems.size(), true);
+					pushLog("received candle history for %s\n", symbol);
+					hander->onCandlesUpdate(candleRawItems.data(), (int)candleRawItems.size(), true);
+				}
 			}
 		}
 	}
@@ -472,10 +491,11 @@ void PlatformEngine::onTrade(int i, NAPMarketEventHandler* sender, TradeItem* in
 			tEnd = trades.back().timestamp;
 			duration -= trades.front().timestamp - tEnd;
 		}
-		RequestTradeHistoryMessage message;
+		RequestEventHistoryMessage message;
 		message.pair = sender->getPair();
 		message.duration = duration;
 		message.endTime = tEnd;
+		message.eventType = EventHistoryType::TradeHistory;
 
 		_sentTradeSnapshotRequest[sender->getPair()] = true;
 		_symbolQueue.pushMessage(message);
@@ -488,6 +508,25 @@ void PlatformEngine::onTrade(int i, NAPMarketEventHandler* sender, TradeItem* in
 	updateSymbolStatistics(info, tickers);
 	if (_onSymbolStatisticUpdated) {
 		_onSymbolStatisticUpdated(i);
+	}
+}
+
+void PlatformEngine::onCandle(int i, NAPMarketEventHandler* sender, CandleItem* candleItems, int count, bool snapshot) {
+	if (_sentCandleSnapshotRequest.find(sender->getPair()) == _sentCandleSnapshotRequest.end()) {
+		auto& candleItems = sender->getCandleHistoriesNonSync();
+		if (candleItems.size()) {
+			TIMESTAMP tEnd = candleItems.back().timestamp - 1;
+			TIMESTAMP duration = 24 * 3600 * 1000 - (candleItems.front().timestamp - tEnd);
+
+			RequestEventHistoryMessage message;
+			message.pair = sender->getPair();
+			message.duration = duration;
+			message.endTime = tEnd;
+			message.eventType = EventHistoryType::CandleHistory;
+
+			_sentCandleSnapshotRequest[sender->getPair()] = true;
+			_symbolQueue.pushMessage(message);
+		}
 	}
 }
 
@@ -573,7 +612,7 @@ void PlatformEngine::run() {
 		eventHandler->useTicker(false);
 		eventHandler->useOrderBook(false);
 		eventHandler->useTrades(true);
-		eventHandler->useCandles(false);
+		eventHandler->useCandles(true);
 		_platform->addEventHandler(eventHandler, true);
 
 		CryptoBoardElmInfo* elmInfo = createCrytpElm(nPeriod);
@@ -581,9 +620,13 @@ void PlatformEngine::run() {
 
 		_symbolsStatistics[i] = elmInfo;
 
-		auto eventListener = 
+		auto tradeEventListener = 
 			std::bind(&PlatformEngine::onTrade, this, i, _1 , _2, _3, _4);
-		eventHandler->addTradeEventListener(eventListener);
+		eventHandler->addTradeEventListener(tradeEventListener);
+
+		auto candleEventListener =
+			std::bind(&PlatformEngine::onCandle, this, i, _1, _2, _3, _4);
+		eventHandler->addCandleEventListener(candleEventListener);
 	}
 
 	// start interval thread
@@ -594,12 +637,17 @@ void PlatformEngine::run() {
 	// starting query time from server
 	_platform->startServerTimeQuery(5000);
 
+	// reset requesting history message
+	_sentTradeSnapshotRequest.clear();
+	_sentCandleSnapshotRequest.clear();
+	_messageQueue.clear();
+
 	// connect to the platform
 	try {
 		_platform->connect();
 	}
 	catch (exception&e) {
-		cout << "error:" << e.what() << endl;
+		pushLog("error:%s\n", e.what());
 		return;
 	}
 }

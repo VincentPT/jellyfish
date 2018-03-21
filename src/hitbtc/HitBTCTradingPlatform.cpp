@@ -596,6 +596,10 @@ void HitBTCTradingPlatform::getTradeHistory(const char* pair, TIMESTAMP duration
 	throw runtime_error("not implemented");
 }
 
+void HitBTCTradingPlatform::getCandleHistory(const char* pair, TIMESTAMP duration, TIMESTAMP endTime, CandleList& candleItems) {
+	throw runtime_error("not implemented");
+}
+
 void HitBTCTradingPlatform::getBaseCurrencies(StringList& currencies) {
 	throw runtime_error("not implemented");
 }

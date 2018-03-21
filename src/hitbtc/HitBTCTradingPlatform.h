@@ -63,6 +63,7 @@ public:
 	virtual void getAllPairs(StringList& pairs);
 	virtual void getBaseCurrencies(StringList& currencies);
 	virtual void getTradeHistory(const char* pair, TIMESTAMP duration, TIMESTAMP endTime, TradingList& tradeItems);
+	virtual void getCandleHistory(const char* pair, TIMESTAMP duration, TIMESTAMP endTime, CandleList& candleItems);
 };
 
 

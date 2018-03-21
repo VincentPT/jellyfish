@@ -262,6 +262,7 @@ void WxCryptoBoardInfo::update() {
 		return;
 	}
 
+
 	//ImGui::SetNextWindowContentSize(ImVec2(0, 25));
 	float itemHeight = ImGui::GetTextLineHeightWithSpacing();
 	ImGui::BeginChild("##HeaderRegion", ImVec2(0, itemHeight), false, ImGuiWindowFlags_NoScrollbar);

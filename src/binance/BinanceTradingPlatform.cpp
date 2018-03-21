@@ -96,7 +96,18 @@ bool BinanceTradingPlatform::connectImpl() {
 	vector<MarketEventHandler*> handlers(nHandler);
 	getHandlers(handlers.data(), nHandler);
 
-	utility::string_t streams;
+	list<utility::string_t> streams;
+	int sc = 0;
+
+	auto addStream = [&streams, &sc](const utility::string_t& stream) {
+		if (sc % 200 == 0) {
+			streams.push_back(stream);
+		}
+		else {
+			streams.back() += stream;
+		}
+		sc++;
+	};
 
 	for (auto it = handlers.begin(); it != handlers.end(); it++) {
 		auto handler = *it;;
@@ -104,25 +115,17 @@ bool BinanceTradingPlatform::connectImpl() {
 		std::transform(tPair.begin(), tPair.end(), tPair.begin(),tolower);
 
 		if (handler->useTicker()) {
-			streams += tPair;
-			streams += U("@ticker/");
+			addStream(tPair + U("@ticker/"));
 		}
 		if (handler->useOrderBook()) {
-			streams += tPair;
-			streams += U("@depth/");
+			addStream(tPair + U("@depth/"));
 		}
 		if (handler->useTrades()) {
-			streams += tPair;
-			streams += U("@trade/");
+			addStream(tPair + U("@trade/"));
 		}
 		if (handler->useCandles()) {
-			streams += tPair;
-			streams += U("@kline_1m/");
+			addStream(tPair + U("@kline_1m/"));
 		}
-	}
-
-	if (streams.size()) {
-		streams.erase(streams.size() - 1);
 	}
 
 	auto settingFile = getConfigFilePath();
@@ -145,17 +148,42 @@ bool BinanceTradingPlatform::connectImpl() {
 		pushLogV("trade history request won't work due to missing api key in setting file %s\n", settingFile);
 	}
 
-	_client->connect(U("wss://stream.binance.com:9443/stream?streams=") + streams).wait();
+	auto sit = streams.begin();
+
+	_client->connect(U("wss://stream.binance.com:9443/stream?streams=") + *sit).wait();
+	
+	_additionalClients.clear();
+	for (sit++; sit != streams.end(); sit++) {
+		auto client = std::make_shared<websocket_callback_client>();
+		client->set_message_handler(std::bind(&BinanceTradingPlatform::messageHandler, this, std::placeholders::_1));
+		_additionalClients.push_back(client);
+
+		client->connect(U("wss://stream.binance.com:9443/stream?streams=") + *sit).wait();
+	}
 	return true;
 }
 
 bool BinanceTradingPlatform::disconnectImpl() {
 	_client->close();
 
+	for (auto it = _additionalClients.begin(); it != _additionalClients.end(); it++) {
+		auto client = *it;
+		client->close();
+	}
+
 	_stopLoopTask.sendSignal(true);
 	_pingServerTask.wait();
 	return true;
 }
+
+//void BinanceTradingPlatform::resetClientNonSync() {
+//	CPPRESTBaseTradingPlatformThreadSafe::resetClientNonSync();
+//}
+//
+//void BinanceTradingPlatform::resetClientMessageHandlerNonSync() {
+//	CPPRESTBaseTradingPlatformThreadSafe::resetClientMessageHandlerNonSync();
+//}
+
 
 bool BinanceTradingPlatform::addEventHandler(MarketEventHandler* handler, bool allowDelete) {
 	if (getConnectionStatus()) {
@@ -329,8 +357,10 @@ void BinanceTradingPlatform::invokeCandleEvent(MarketEventHandler* handler, web:
 	candleItem.high = _ttod(kLine[U("h")].as_string().c_str());
 	candleItem.low = _ttod(kLine[U("l")].as_string().c_str());
 	candleItem.open = _ttod(kLine[U("o")].as_string().c_str());
-	candleItem.volume = _ttod(kLine[U("q")].as_string().c_str());
+	candleItem.volume = _ttod(kLine[U("v")].as_string().c_str());
 	candleItem.timestamp = kLine[U("t")].as_number().to_uint64();
+	// candle duration was set on subscribe's request
+	candleItem.duration = 60;
 
 	handler->onCandlesUpdate(&candleItem, 1, false);
 }
@@ -623,7 +653,7 @@ void BinanceTradingPlatform::getTradeHistory(const char* pair, TIMESTAMP duratio
 	auto limit = 500;
 	bool shouldStop = false;
 
-	auto parseTrade = [this, &tradeItems, startTime, &shouldStop](http_response& response) {
+	auto parseTrade = [this, &tradeItems, startTime, &bonusTime, &shouldStop](http_response& response) {
 		if (response.status_code() == 200) {
 			auto js = response.extract_json().get();
 			if (js.is_array() == false) {
@@ -676,9 +706,11 @@ void BinanceTradingPlatform::getTradeHistory(const char* pair, TIMESTAMP duratio
 		}
 		else if (response.status_code() == 429) {
 			pushLog("The API has reached the limit, pause to the next minutes\n");
+			bonusTime = 60 * 1000;
 		}
 		else if (response.status_code() == 418) {
 			pushLog("The client's IP has been banned by Binance\n");
+			shouldStop = true;
 		}
 		else {
 			pushLog("request failed\n");
@@ -690,6 +722,7 @@ void BinanceTradingPlatform::getTradeHistory(const char* pair, TIMESTAMP duratio
 	do
 	{
 		t1 = getCurrentTimeStamp();
+		bonusTime = 0;
 
 		auto fromId = toId - limit - 1;
 
@@ -721,6 +754,152 @@ void BinanceTradingPlatform::getTradeHistory(const char* pair, TIMESTAMP duratio
 		}
 
 	} while (shouldStop == false && _stopLoopTask.waitSignal(stopSignal, sleepTime + bonusTime) == false);
+}
+
+void BinanceTradingPlatform::getCandleHistory(const char* pair, TIMESTAMP duration, TIMESTAMP endTime, CandleList& candleItems) {
+	if (duration <= 0) {
+		pushLog("no need to request candle history\n");
+		return;
+	}
+	auto tEnd = endTime;
+	auto startTime = (endTime - duration);
+
+	bool stopSignal = false;
+	TIMESTAMP t1, t2;
+	TIMESTAMP processTime;
+	unsigned int bonusTime = 0, sleepTime = 0;
+	decltype(tEnd) tStart;
+
+	http_request marketDataRequest(methods::GET);
+	auto& headers = marketDataRequest.headers();
+	headers.add(U("X-MBX-APIKEY"), _apiKey.c_str());
+
+	constexpr int requestLimit = 1200;
+	constexpr int weight = 1;
+	constexpr int numberOfRequestPerMinMax = requestLimit / weight;
+
+	utility::string_t baseURL = U("https://api.binance.com/api/v1/klines");
+
+	auto limit = 500;
+	bool shouldStop = false;
+	constexpr int candleDuration = 60;
+
+	auto parseCandle = [this, &candleItems, candleDuration, startTime, &shouldStop, &bonusTime](http_response& response) {
+		if (response.status_code() == 200) {
+			auto js = response.extract_json().get();
+			if (js.is_array() == false) {
+				pushLog("unexpected trade history format\n");
+			}
+			else {
+				auto& jsArray = js.as_array();
+				for (auto it = jsArray.rbegin(); it != jsArray.rend(); it++) {
+					auto& elm = *it;
+					if (elm.is_array() == false) {
+						pushLog("unexpected trade history format\n");
+					}
+					else {
+						/*
+						[
+						  [
+							1499040000000,      // Open time
+							"0.01634790",       // Open
+							"0.80000000",       // High
+							"0.01575800",       // Low
+							"0.01577100",       // Close
+							"148976.11427815",  // Volume
+							1499644799999,      // Close time
+							"2434.19055334",    // Quote asset volume
+							308,                // Number of trades
+							"1756.87402397",    // Taker buy base asset volume
+							"28.46694368",      // Taker buy quote asset volume
+							"17928899.62484339" // Ignore
+						  ]
+						]
+						*/
+
+					 	auto& candleProperties = elm.as_array();
+
+						CandleItem candleItem;
+						candleItem.timestamp = candleProperties[0].as_number().to_uint64();
+						candleItem.open = _ttod(candleProperties[1].as_string().c_str());
+						candleItem.high = _ttod(candleProperties[2].as_string().c_str());
+						candleItem.low = _ttod(candleProperties[3].as_string().c_str());
+						candleItem.close = _ttod(candleProperties[4].as_string().c_str());
+						candleItem.volume = _ttod(candleProperties[5].as_string().c_str());
+						// candle duration was set on request
+						candleItem.duration = candleDuration;
+
+						// only get trade item from start time to end time
+						if (candleItem.timestamp < startTime) {
+							shouldStop = true;
+							break;
+						}
+
+						candleItems.push_back(candleItem);
+					}
+				}
+				if (jsArray.size() == 0) {
+					shouldStop = true;
+				}
+			}
+		}
+		else if (response.status_code() == 429) {
+			pushLog("The API has reached the limit, pause to the next minutes\n");
+			bonusTime = 60 * 1000;
+		}
+		else if (response.status_code() == 418) {
+			pushLog("The client's IP has been banned by Binance\n");
+			shouldStop = true;
+		}
+		else {
+			pushLog("request failed\n");
+		}
+	};
+
+	TIMESTAMP interval = 60 * 1000 / (numberOfRequestPerMinMax / 2);
+	utility::string_t parameters;
+
+	TIMESTAMP endTimeTurn = endTime;
+	startTime = startTime / (candleDuration * 1000) * (candleDuration * 1000);
+
+	do
+	{
+		t1 = getCurrentTimeStamp();
+
+		parameters = U("?symbol=");
+		parameters += CPPREST_TO_STRING(pair);
+		parameters += U("&interval=1m");
+		parameters += U("&limit=");
+		parameters += TO_STRING_T(limit);
+		parameters += U("&startTime=");
+		parameters += TO_STRING_T(startTime);
+		parameters += U("&endTime=");
+		parameters += TO_STRING_T(endTimeTurn);
+
+		bonusTime = 0;
+
+		try {
+			http_client client(baseURL + parameters);
+			client.request(marketDataRequest).then(parseCandle).wait();
+		}
+		catch (const std::exception&e) {
+			pushLogV("get trade history failed: %s\n", e.what());
+		}
+		catch (...) {
+			pushLog("get trade history failed: unknown error\n");
+		}
+
+		endTimeTurn = candleItems.back().timestamp - candleDuration * 1000;
+
+		t2 = getCurrentTimeStamp();
+
+		sleepTime = 0;
+		processTime = t2 - t1;
+		if (processTime < interval) {
+			sleepTime = (unsigned int)(interval - processTime);
+		}
+
+	} while (shouldStop == false && endTimeTurn > startTime && _stopLoopTask.waitSignal(stopSignal, sleepTime + bonusTime) == false);
 }
 
 TIMESTAMP BinanceTradingPlatform::getSyncTime(TIMESTAMP localTime) {

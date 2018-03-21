@@ -73,5 +73,13 @@ public:
 
 #define LOG_SCOPE_ACCESS(logger, staticScopeName) AutoScope __theScope(std::bind(&Utility::logScopeAccess, logger, staticScopeName, std::placeholders::_1))
 
+template <typename T>
+inline T roundDown(const T& n, const T& base) {
+	return n / base * base;
+}
 
+template <typename T>
+inline T roundUp(const T& n, const T& base) {
+	return ((n + base - 1) / base)* base;
+}
 

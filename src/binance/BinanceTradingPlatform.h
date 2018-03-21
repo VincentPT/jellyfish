@@ -16,6 +16,7 @@ private:
 
 	std::future<void> _pingServerTask;
 	std::shared_ptr<web::http::client::http_client> _restClient;
+	std::list<std::shared_ptr<web::websockets::client::websocket_callback_client>> _additionalClients;
 	Signal<bool> _stopLoopTask;
 	TIMESTAMP _timeDiff;
 	bool _serverTimeIsReady;
@@ -43,6 +44,9 @@ protected:
 	bool connectImpl();
 	bool disconnectImpl();
 	void safeRequest(web::http::client::http_client& client, const std::function<void(web::http::http_response&)>& f);
+
+	//virtual void resetClientNonSync();
+	//virtual void resetClientMessageHandlerNonSync();
 public:
 	BinanceTradingPlatform();
 	virtual ~BinanceTradingPlatform();
@@ -55,6 +59,7 @@ public:
 	virtual void getAllPairs(StringList& pairs);
 	virtual void getBaseCurrencies(StringList& currencies);
 	virtual void getTradeHistory(const char* pair, TIMESTAMP duration, TIMESTAMP endTime, TradingList& tradeItems);
+	virtual void getCandleHistory(const char* pair, TIMESTAMP duration, TIMESTAMP endTime, CandleList& candleItems);
 };
 
 

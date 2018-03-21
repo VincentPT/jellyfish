@@ -33,6 +33,8 @@ public:
 
 	void setChild1(const std::shared_ptr<Widget>& child1);
 	void setChild2(const std::shared_ptr<Widget>& child2);
+	const std::shared_ptr<Widget>& getChild1() const;
+	const std::shared_ptr<Widget>& getChild2() const;
 
 	void setFixPanel(FixedPanel fixedPanel);
 	void setVertical(bool);

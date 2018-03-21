@@ -29,7 +29,7 @@ void WxAppLog::addLogV(const char* fmt, va_list args) {
 	ScrollToBottom = true;
 }
 
-void WxAppLog::update()
+void WxAppLog::draw()
 {	
     ImGui::SetNextWindowSize(_window_size, ImGuiCond_Always);
 	ImGui::SetNextWindowPos(_window_pos);
