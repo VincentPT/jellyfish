@@ -1,4 +1,10 @@
 #pragma once
+//#include <Windows.h>
+//#define FUNCTON_LOG() OutputDebugStringA(__FUNCTION__ " begin\n"); std::unique_ptr<char, std::function<void(char*)>> logger(__FUNCTION__ " end\n", [](char* text) { OutputDebugStringA(text);})
+//#define SCOPE_LOG(scopeId) OutputDebugStringA(#scopeId " begin\n"); std::unique_ptr<char, std::function<void(char*)>> scopeId(#scopeId " end\n", [](char* text) { OutputDebugStringA(text);})
+
+#define FUNCTON_LOG()
+#define SCOPE_LOG(scopeId)
 
 class Widget
 {

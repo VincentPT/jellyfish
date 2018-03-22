@@ -68,6 +68,7 @@ void Spliter::update() {
 }
 
 void Spliter::draw() {
+	FUNCTON_LOG();
 	if (_child1) _child1->draw();
 	if (_child2) _child2->draw();
 }

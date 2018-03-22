@@ -2,8 +2,8 @@
 
 void Panel::updateChildrenrGeometrics() {
 	for (auto it = _children.begin(); it != _children.end(); it++) {
-		(*it)->setPos(getX(), getY());
 		(*it)->setSize(getWidth(), getHeight());
+		(*it)->setPos(getX(), getY());
 	}
 }
 
@@ -20,6 +20,7 @@ void Panel::update() {
 }
 
 void Panel::draw() {
+	FUNCTON_LOG();
 	for (auto it = _children.begin(); it != _children.end(); it++) {
 		(*it)->draw();
 	}

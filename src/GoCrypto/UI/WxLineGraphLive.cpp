@@ -113,6 +113,7 @@ void WxLineGraphLive::update() {
 }
 
 void WxLineGraphLive::draw() {
+	FUNCTON_LOG();
 	std::unique_lock<std::mutex> lk(_mutex);
 
 	gl::ScopedColor color(_lineColor);

@@ -31,6 +31,7 @@ void WxAppLog::addLogV(const char* fmt, va_list args) {
 
 void WxAppLog::draw()
 {	
+	FUNCTON_LOG();
     ImGui::SetNextWindowSize(_window_size, ImGuiCond_Always);
 	ImGui::SetNextWindowPos(_window_pos);
 

@@ -170,6 +170,8 @@ void WxPointBaseGraph::setPointToTextTranslateFunction(const TranslateFunction& 
 }
 
 void WxPointBaseGraph::drawPointAtCursor() {
+	FUNCTON_LOG();
+
 	auto tl_x = getX();
 	auto tl_y = getY();
 	ci::Rectf graphRect(_displayArea.x1 + tl_x, _displayArea.y1 + tl_y, _displayArea.x2 + tl_x, _displayArea.y2 + tl_y);
@@ -178,14 +180,19 @@ void WxPointBaseGraph::drawPointAtCursor() {
 		) {
 		if (_cursorLocation.x >= 0 && _cursorLocation.x < _displayArea.getWidth() &&
 			_cursorLocation.y + _displayArea.y1 >= 0 && _cursorLocation.y < _displayArea.getWidth()) {
+
+			SCOPE_LOG(scope1);
+
 			auto point = localToPoint(_cursorLocation.x, _cursorLocation.y);
 			auto pointStr = _translateFunction(point);
 
+			SCOPE_LOG(scope2);
 			glm::vec2 windowCursorLocation(_cursorLocation.x + graphRect.x1, _cursorLocation.y + graphRect.y1);
 
-			ColorAf color(1, 1, 1);
+			ColorAf color(1, 0, 0);
 			ci::Font font("Arial", 20);
 
+			SCOPE_LOG(scope3);
 			if (_horizontalIndicator == HorizontalIndicatorAlignment::Right) {
 				gl::drawStringCentered(std::get<1>(pointStr), glm::vec2(graphRect.x2 - 20, windowCursorLocation.y), color, font);
 			}
@@ -199,7 +206,7 @@ void WxPointBaseGraph::drawPointAtCursor() {
 				gl::drawStringCentered(std::get<0>(pointStr), glm::vec2(windowCursorLocation.x - 20, graphRect.y1), color, font);
 			}
 
-			gl::ScopedColor scopeColor(color);
+			gl::ScopedColor scopeColor(1.0f, 1.0f, 1.0f);
 			if (_horizontalIndicator == HorizontalIndicatorAlignment::Right) {
 				gl::drawLine(windowCursorLocation, glm::vec2(graphRect.x2, windowCursorLocation.y));
 			}

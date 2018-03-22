@@ -43,6 +43,8 @@ void WxBarCharLive::update() {
 }
 
 void WxBarCharLive::draw() {
+	FUNCTON_LOG();
+
 	std::unique_lock<std::mutex> lk(_mutex);
 
 	if (_displayArea.getWidth() == 0 || _displayArea.getHeight() == 0) {

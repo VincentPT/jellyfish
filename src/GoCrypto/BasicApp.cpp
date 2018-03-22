@@ -23,8 +23,6 @@ using namespace ci;
 using namespace ci::app;
 using namespace std;
 
-const char* platformName = "dummy.txt";
-
 class BasicApp : public App {
 
 	typedef std::function<void()> Task;
@@ -99,7 +97,7 @@ void BasicApp::intializeApp(App::Settings* settings) {
 BasicApp::BasicApp() :
 	_runFlag(true), _platformRunner(nullptr),
 	_logAdapter(nullptr), _lastEventId(-1), _lastCandleEventId(-1),
-	_lastSelectedHandler(nullptr) {
+	_lastSelectedHandler(nullptr), _pixelPerTime(1000) {
 }
 
 BasicApp::~BasicApp() {
@@ -122,6 +120,7 @@ void BasicApp::cleanup() {
 
 void BasicApp::setup()
 {
+	FUNCTON_LOG();
 	using namespace std::placeholders;
 	ui::Options uiOptions;
 	ui::initialize(uiOptions);
@@ -130,6 +129,8 @@ void BasicApp::setup()
 		int w = getWindow()->getWidth();
 		int h = getWindow()->getHeight();
 		_spliter.setSize((float)w, (float)h);
+		_barChart->adjustTransform();
+		_graph->adjustTransform();
 	});
 
 	int w = getWindow()->getWidth();
@@ -211,49 +212,6 @@ void BasicApp::setup()
 	_baseTime = getCurrentTimeStamp();
 	_cryptoBoard->setItemSelectionChangedHandler( std::bind(&BasicApp::onSelectedSymbolChanged, this, _1) );
 
-	//_liveGraphWorker = std::thread([this, graphLine]() {
-	//	using namespace std::chrono_literals;
-	//	time_t t;
-	//	std::time(&t);
-	//	
-	//	Rand randomMan( (uint32_t) t);
-	//	vec2 randomPoint;
-
-	//	std::chrono::duration<float, std::milli> interval;
-
-	//	auto& area = graphLine->getGraphRegion();
-	//	auto w = area.getWidth();
-	//	auto h = area.getHeight();
-	//	randomPoint.x = randomMan.nextFloat(0, 100000);
-	//	randomPoint.y = h;
-
-	//	auto maxY = 1000000;
-	//	int count = 0;
-
-	//	//if (maxY / area.getHeight() < 20) {
-	//	//	graphLine->scale(1.0f, area.getHeight()/ maxY);
-	//	//}
-	//	bool firstTime = true;
-
-	//	while (_runFlag) {
-	//		randomPoint.y = randomMan.nextFloat(0, maxY);
-	//		if (firstTime) {
-	//			graphLine->scale(1.0f, area.getHeight() / 2 / randomPoint.y);
-	//			firstTime = false;
-	//		}
-
-	//		graphLine->addPoint(randomPoint);
-	//		interval = std::chrono::duration<float, std::milli>(randomMan.nextFloat(200.0f, 500.0f));
-	//		std::this_thread::sleep_for(interval);
-
-	//		randomPoint.x += interval.count()/20;
-	//		count++;
-	//		if (count % 6 == 0) {
-	//			maxY += maxY * 0.05f;
-	//		}
-	//	}
-	//});
-
 	getWindow()->getSignalKeyDown().connect([this](KeyEvent& event) {
 		if (event.getCode() == KeyEvent::KEY_ESCAPE) {
 			pushLog("pressed escaped\n");
@@ -322,10 +280,6 @@ void BasicApp::setup()
 	});
 
 	//_controlBoard->setOnSelectedGraphModeChangedHandler(std::bind(&BasicApp::onSelectedGraphModeChanged, this, _1));
-
-	//_controlBoard->setOnCandleButtonClickHandler([this](Widget*) {
-	//	createCandleWindow();
-	//});
 
 	_asynTasksWorkder = std::thread([this]() {
 		while (_runFlag)
@@ -708,6 +662,7 @@ void BasicApp::mouseDown( MouseEvent event )
 
 void BasicApp::update()
 {
+	FUNCTON_LOG();
 	_spliter.update();
 	if (_ciWndCandle) {
 		_ciWndCandle->update();
@@ -728,14 +683,15 @@ void BasicApp::update()
 
 void BasicApp::draw()
 {
-	auto wndCandle = getWindow()->getUserData<CiWndCandle>();
-	if (wndCandle) {
-		wndCandle->draw();
-	}
-	else {
+	FUNCTON_LOG();
+	//auto wndCandle = getWindow()->getUserData<CiWndCandle>();
+	//if (wndCandle) {
+	//	wndCandle->draw();
+	//}
+	//else {
 		gl::clear(ColorA::black());
 		_spliter.draw();
-	}
+	//}
 }
 
 CINDER_APP(BasicApp, RendererGl( RendererGl::Options().msaa( 8 ) ), BasicApp::intializeApp)

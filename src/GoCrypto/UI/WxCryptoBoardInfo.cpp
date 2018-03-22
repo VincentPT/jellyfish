@@ -250,6 +250,8 @@ WxCryptoBoardInfo::~WxCryptoBoardInfo()
 }
 
 void WxCryptoBoardInfo::update() {
+	FUNCTON_LOG();
+
 	std::unique_lock<std::mutex> lk(_mutex);
 
 	ImGui::SetNextWindowSize(_window_size, ImGuiCond_Always);

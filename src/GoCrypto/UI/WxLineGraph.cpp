@@ -12,6 +12,7 @@ WxLineGraph::~WxLineGraph() {
 }
 
 void WxLineGraph::draw() {
+	FUNCTON_LOG();
 	if (_displayArea.getWidth() == 0 || _displayArea.getHeight() == 0) {
 		return;
 	}
