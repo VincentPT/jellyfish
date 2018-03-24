@@ -12,6 +12,7 @@ protected:
 	mutable std::mutex _mutex;
 	ci::ColorA8u _barColor;
 	float _currentX;
+	float _barWidth;
 public:
 	WxBarCharLive();
 	virtual ~WxBarCharLive();
@@ -23,5 +24,6 @@ public:
 	virtual void setBarColor(const ci::ColorA8u& color);
 	virtual const ci::ColorA8u& getBarColor() const;
 	void setLiveX(float x);
+	void setBarWidth(float barWidth);
 };
 

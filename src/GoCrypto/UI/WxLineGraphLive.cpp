@@ -17,7 +17,7 @@ void WxLineGraphLive::adjustTransform() {
 	}
 	const glm::vec2& point = _points.back();
 
-	adjustHorizontalTransform(point);
+	//adjustHorizontalTransform(point);
 	adjustVerticalTransform(point);
 }
 
@@ -27,21 +27,28 @@ void WxLineGraphLive::adjustVerticalTransform(const glm::vec2& point) {
 	}
 	float translateY = 0;
 
-	auto leftPoint = localToPoint(0, 0);
-	float minY = FLT_MAX;
-	float maxY = FLT_MIN;
-	for (auto it = _points.rbegin(); it != _points.rend(); it++) {
-		if (it->x < leftPoint.x) {
+	auto left = localToPoint(0, 0);
+	auto right = localToPoint(_displayArea.getWidth(), 0);
+	auto it = _points.begin();
+	for (; it != _points.end(); it++) {
+		if (it->x >= left.x) {
 			break;
 		}
+	}
+	if (it == _points.end()) return;
 
-		if (minY > it->y) {
-			minY = it->y;
-		}
+	float minY = it->y;
+	float maxY = minY;
+
+	for (; it != _points.end() && it->x < right.x; it++) {
 		if (maxY < it->y) {
 			maxY = it->y;
 		}
+		if (minY > it->y) {
+			minY = it->y;
+		}
 	}
+
 	auto yTop = pointToLocal(0, maxY);
 	auto yBellow = pointToLocal(0, minY);
 	auto currHeight = std::abs(yBellow.y - yTop.y);
@@ -76,11 +83,11 @@ void WxLineGraphLive::adjustHorizontalTransform(const glm::vec2& point) {
 	}
 }
 
-void WxLineGraphLive::addPoint(const glm::vec2& point) {
-	WxLineGraph::addPoint(point);
-	_lastestX = point.x;
-	adjustTransform();
-}
+//void WxLineGraphLive::addPoint(const glm::vec2& point) {
+//	WxLineGraph::addPoint(point);
+//	_lastestX = point.x;
+//	adjustTransform();
+//}
 
 void WxLineGraphLive::acessSharedData(const AccessSharedDataFunc& f) {
 	std::unique_lock<std::mutex> lk(_mutex);
@@ -116,7 +123,6 @@ void WxLineGraphLive::draw() {
 	FUNCTON_LOG();
 	std::unique_lock<std::mutex> lk(_mutex);
 
-	gl::ScopedColor color(_lineColor);
 	if (_points.size()) {
 		auto points = _points;
 
@@ -124,7 +130,36 @@ void WxLineGraphLive::draw() {
 		vec2 constructPoint = pointToWindow(_lastestX, points.back().y);
 
 		WxLineGraph::draw();
+
+		gl::color(_lineColor);
 		gl::drawLine(localPoint, constructPoint);
+
+		ColorAf color(1, 1, 1);
+		gl::color(color);
+
+		if (_translateFunction) {
+			auto pointStr = _translateFunction(points.back());
+			
+			ci::Font font("Arial", 20);
+
+			float x1 = _displayArea.x1 + getX();
+			float x2  = _displayArea.x1 + getX();
+
+			if (_horizontalIndicator == HorizontalIndicatorAlignment::Right) {
+				gl::drawStringCentered(std::get<1>(pointStr), glm::vec2(x2 - 20, constructPoint.y), color, font);
+			}
+			else if (_horizontalIndicator == HorizontalIndicatorAlignment::Left) {
+				gl::drawStringCentered(std::get<1>(pointStr), glm::vec2(x1 + 30, constructPoint.y), color, font);
+			}
+			
+			if (_horizontalIndicator == HorizontalIndicatorAlignment::Right) {
+				gl::drawLine(constructPoint, glm::vec2(x2, constructPoint.y));
+			}
+			else if (_horizontalIndicator == HorizontalIndicatorAlignment::Left) {
+				gl::drawLine(constructPoint, glm::vec2(x1, constructPoint.y));
+			}
+		}
+
 		gl::drawSolidCircle(constructPoint, 3);
 	}
 	else {

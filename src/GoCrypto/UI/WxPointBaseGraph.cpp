@@ -191,6 +191,7 @@ void WxPointBaseGraph::drawPointAtCursor() {
 
 			ColorAf color(1, 0, 0);
 			ci::Font font("Arial", 20);
+			gl::color(color);
 
 			SCOPE_LOG(scope3);
 			if (_horizontalIndicator == HorizontalIndicatorAlignment::Right) {
@@ -206,7 +207,6 @@ void WxPointBaseGraph::drawPointAtCursor() {
 				gl::drawStringCentered(std::get<0>(pointStr), glm::vec2(windowCursorLocation.x - 20, graphRect.y1), color, font);
 			}
 
-			gl::ScopedColor scopeColor(1.0f, 1.0f, 1.0f);
 			if (_horizontalIndicator == HorizontalIndicatorAlignment::Right) {
 				gl::drawLine(windowCursorLocation, glm::vec2(graphRect.x2, windowCursorLocation.y));
 			}

@@ -1,3 +1,8 @@
+#ifdef WIN32
+#include <Windows.h>
+#endif // WIN32
+
+
 #include "Utility.h"
 #include <algorithm>
 #include <string>
@@ -43,4 +48,10 @@ void Utility::logScopeAccess(ILogger* logger, const char* functionName, bool acc
 			logger->logV("<<< %s\n", functionName);
 		}
 	}
+}
+
+unsigned int Utility::getDoubleClickTime() {
+#ifdef WIN32
+	return GetDoubleClickTime();
+#endif
 }

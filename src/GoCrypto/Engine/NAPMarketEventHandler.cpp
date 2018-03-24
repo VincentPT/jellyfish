@@ -29,20 +29,93 @@ void NAPMarketEventHandler::onCandlesUpdate(CandleItem* candles, int count, bool
 
 	std::unique_lock<std::mutex> lk(_m);
 	CandleItem* pItemEnd = candles + count;
-	if (count > 1) {
-		//pushLog("%s's candles \n", _pair);
+
+	if (_candleHistory.size() == 0) {
 		for (CandleItem* pItem = candles; pItem < pItemEnd; pItem++) {
 			CandleItem& item = *pItem;
-			//pushLog("{%s, %lf, %lf, %lf, %lf, %lf}\n", Utility::time2str(item.timestamp).c_str(), item.open, item.close, item.high, item.low, item.volume);
-
 			_candleHistory.push_back(item);
 		}
-		//pushLog("%s's candles end \n", _pair);
+	}
+	else if (count > 1) {
+		auto& oldestItem = _candleHistory.back();
+		auto& newestItem = _candleHistory.front();
+		auto& incomOldestItem = *(candles + count - 1);
+		auto& incomNewestItem = *candles;
+
+		Range<TIMESTAMP> currentRange{ oldestItem.timestamp, newestItem.timestamp };
+		Range<TIMESTAMP> newRange{ incomOldestItem.timestamp, incomNewestItem.timestamp };
+
+		Range<TIMESTAMP> overlapped;
+		mergeParts<TIMESTAMP>(currentRange, newRange, nullptr, &overlapped);
+
+		// check if two part are not overlap
+		if (overlapped.start > overlapped.end) {
+			// check if oldest existence trade item occurs later than newest trade item on the snapshot event
+			if (oldestItem.timestamp > incomNewestItem.timestamp) {
+				for (auto pItem = candles; pItem < pItemEnd; pItem++) {
+					_candleHistory.push_back(*pItem);
+				}
+				pushLog("added trade event back\n");
+			}
+			else {
+				auto pItemEnd = candles;
+				for (auto pItem = candles + count - 1; pItem >= pItemEnd; pItem--) {
+					_candleHistory.push_front(*pItem);
+				}
+				pushLog("added candle event front\n");
+			}
+		}
+		else if (overlapped.start == overlapped.end) {
+			// now, the two time ranges have start and the end are same
+			// check whether what range is newer
+			if (newestItem.timestamp > incomNewestItem.timestamp) {
+				// now the existance range is newer
+				// so we ingnore the item of incomming event that at the overlapped point (at the beginning)
+				auto pItem = candles;
+				for (pItem++; pItem < pItemEnd; pItem++) {
+					_candleHistory.push_back(*pItem);
+				}
+				pushLog("merge trade event at the common time back\n");
+			}
+			else {
+				// now the incoming range is newer
+				// so we ingnore the item of incomming event that at the overlapped point (at the end)
+				auto pItem = pItemEnd;
+				for (pItem--; pItem >= candles; pItem--) {
+					_candleHistory.push_front(*pItem);
+				}
+
+				pushLog("merge trade event at the common time front\n");
+			}
+		}
+		else {
+			// now two range is overlapped
+			// for simply implementation but decrease performance
+			// we using map to ignore candles that has timestamp exist in candle history
+			map<TIMESTAMP, bool> duplicatedCheckMap;
+
+			// add non duplicate trade id for the two lists
+			// first build trade id map for the first list
+			for (auto it = _candleHistory.begin(); it != _candleHistory.end(); it++) {
+				duplicatedCheckMap[it->timestamp] = true;
+			}
+			// copy item non duplicated from the second list to the first list.
+			for (auto pItem = candles; pItem < pItemEnd; pItem++) {
+				if (duplicatedCheckMap.find(pItem->timestamp) == duplicatedCheckMap.end()) {
+					_candleHistory.push_back(*pItem);
+				}
+			}
+
+			// sort by timestap
+			_candleHistory.sort([](CandleItem& item1, CandleItem& item2) {
+				return item1.timestamp > item2.timestamp;
+			});
+
+			pushLog("merge trade event using general method\n");
+		}
 	}
 	else if (count == 1) {
 		CandleItem& item = *candles;
-		//pushLog("{%s, %lf, %lf, %lf, %lf, %lf}\n", Utility::time2str(item.timestamp).c_str(), item.open, item.close, item.high, item.low, item.volume);
-
 		if (_candleHistory.size()) {
 			if (_candleHistory.front().timestamp == item.timestamp) {
 				_candleHistory.front() = item;
@@ -62,120 +135,7 @@ void NAPMarketEventHandler::onCandlesUpdate(CandleItem* candles, int count, bool
 }
 
 void NAPMarketEventHandler::onTradesUpdate(TradeItem* trades, int count, bool snapShot) {
-#if 0
-	//{
-	//	TradeItem* pItemEnd = trades + count;
-	//	for (TradeItem* pItem = trades; pItem < pItemEnd; pItem++) {
-	//		TradeItem& item = *pItem;
-	//		pushLog(getPair());
-	//		if (item.amount < 0) {
-	//			pushLog(":shell ");
-	//		}
-	//		else {
-	//			pushLog(":buy ");
-	//		}
-	//		pushLog("{ %lld , %s, %lf, %lf }\n", item.oderId, time2str(item.timestamp).c_str(), item.price, item.amount);
-	//	}
-	//}
-	std::unique_lock<std::mutex> lk(_m);
 
-	if (trades == nullptr) return;
-	if (_tradeHistory.size() == 0) {
-		addEmptyTicker((trades + count - 1)->timestamp);
-	}
-
-	SimpleTicker* currentTicker = &_tradeHistory.front();
-
-	TradeItem* pItemEnd = trades + count;
-	auto pItem = pItemEnd - 1;
-
-	if (currentTicker->firstPrice.at > pItem->timestamp) {
-		currentTicker->firstPrice.at = pItem->timestamp;
-		if (_tradeHistory.size() >= 2) {
-			// current ticker
-			auto it = _tradeHistory.begin();
-			// previous ticker
-			it++;
-			it->lastPrice.at = currentTicker->firstPrice.at - 1;
-		}
-	}
-
-	auto timeBase = currentTicker->firstPrice.at;
-
-	for (; pItem >= trades; pItem--) {
-		TradeItem& item = *pItem;
-		auto duration = item.timestamp - timeBase;
-		if (duration > _tickerDuration) {
-			addEmptyTicker(item.timestamp);
-			currentTicker = &_tradeHistory.front();
-			timeBase = item.timestamp;
-		}
-
-		auto& firstPrice = currentTicker->firstPrice;
-		auto& lastPrice = currentTicker->lastPrice;
-		auto& high = currentTicker->high;
-		auto& low = currentTicker->low;
-
-		if (item.amount > 0) {
-			currentTicker->boughtVolume += item.amount;
-		}
-		else {
-			currentTicker->soldVolume += abs(item.amount);
-		}
-
-		if (high.price < item.price) {
-			high.price = item.price;
-			high.at = item.timestamp;
-		}
-		if (low.price > item.price) {
-			low.price = item.price;
-			low.at = item.timestamp;
-		}
-
-		if (firstPrice.price <= 0) {
-			firstPrice.price = item.price;
-			firstPrice.at = item.timestamp;
-			currentTicker->averagePrice = firstPrice.price;
-
-			// update duration for previous ticker and also
-			// update average price the ticker
-			// this will not correct if the connection to server is delayed or interupted
-			if (_tradeHistory.size() >= 2) {
-				// current ticker
-				auto it = _tradeHistory.begin();
-				// previous ticker
-				it++;
-				auto& prevTicker = *it;
-				auto& prevFirstPrice = prevTicker.firstPrice;
-				auto& prevLastPrice = prevTicker.lastPrice;
-
-				auto sumPriceBeforeLastPrice = prevTicker.averagePrice * (prevLastPrice.at - prevFirstPrice.at);
-				auto lastPriceTolNow = prevLastPrice.price * (item.timestamp - prevLastPrice.at);
-
-				prevTicker.averagePrice = (sumPriceBeforeLastPrice + lastPriceTolNow) / (item.timestamp - prevFirstPrice.at);
-				// update time for last price last to current time before it change to current price
-				prevLastPrice.at = item.timestamp;
-			}
-		}
-		else {
-			// update average price for current ticker
-			if (item.timestamp > firstPrice.at) {
-				auto sumPriceBeforeLastPrice = currentTicker->averagePrice * (lastPrice.at - firstPrice.at);
-				auto lastPriceTolNow = lastPrice.price * (item.timestamp - lastPrice.at);
-
-				currentTicker->averagePrice = (sumPriceBeforeLastPrice + lastPriceTolNow) / (item.timestamp - firstPrice.at);
-			}
-			else {
-				currentTicker->averagePrice = firstPrice.price;
-			}
-
-			// leave the calculation average price for the current trade item for the next interval event
-		}
-
-		lastPrice.price = pItem->price;
-		lastPrice.at = pItem->timestamp;
-	}
-#else
 	std::unique_lock<std::mutex> lk(_m);
 	if (trades == nullptr) return;
 	if (_tradeHistory.size() == 0) {
@@ -337,7 +297,11 @@ void NAPMarketEventHandler::onTradesUpdate(TradeItem* trades, int count, bool sn
 			pushLog("no need to update trade event\n");
 		}
 	}
-#endif
+
+	if (_tradeHistory.size() > 100000) {
+		_tradeHistory.resize(100000);
+	}
+
 	for (auto it = _tradeEventListeners.begin(); it != _tradeEventListeners.end(); it++) {
 		(it->second) (this, trades, count, snapShot);
 	}

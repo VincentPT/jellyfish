@@ -18,7 +18,7 @@ public:
 
 	virtual void update();
 	virtual void draw();
-	virtual void addPoint(const glm::vec2& point);
+	//virtual void addPoint(const glm::vec2& point);
 	void setLiveX(float x);
 
 	virtual void acessSharedData(const AccessSharedDataFunc& f);

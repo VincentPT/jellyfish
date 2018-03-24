@@ -59,6 +59,8 @@ public:
 	static std::string toMultibytes(const std::wstring& str);
 	static std::string time2str(TIMESTAMP t);
 	static void logScopeAccess(ILogger* logger, const char* functionName, bool access);
+
+	static unsigned int getDoubleClickTime();
 };
 
 #ifdef _WIN32

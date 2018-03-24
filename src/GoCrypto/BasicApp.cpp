@@ -1,4 +1,4 @@
-#include <Windows.h>
+//#include <Windows.h>
 
 #include "cinder/app/App.h"
 #include "cinder/app/RendererGl.h"
@@ -28,6 +28,8 @@ class BasicApp : public App {
 	typedef std::function<void()> Task;
 
 	Spliter _spliter;
+	shared_ptr<Panel> _panel;
+	Widget* _topCotrol;
 	shared_ptr<WxAppLog> _applog;
 	shared_ptr<WxLineGraphLive> _graph;
 	shared_ptr<WxBarCharLive> _barChart;
@@ -47,6 +49,8 @@ class BasicApp : public App {
 	int _lastEventId;
 	int _lastCandleEventId;
 	NAPMarketEventHandler* _lastSelectedHandler;
+	int _barTimeLength = 15;
+	bool _liveMode = true;
 public:
 	BasicApp();
 	~BasicApp();
@@ -78,6 +82,7 @@ public:
 	void onSelectedSymbolChanged(Widget*);
 	void onSelectedGraphModeChanged(Widget*);
 	void initBarchart(const std::list<CandleItem>& candles);
+	void onWindowSizeChanged();
 };
 
 void pushLog(const char* fmt, ...) {
@@ -118,6 +123,34 @@ BasicApp::~BasicApp() {
 void BasicApp::cleanup() {
 }
 
+void BasicApp::onWindowSizeChanged() {
+	int w = getWindow()->getWidth();
+	int h = getWindow()->getHeight();
+	_topCotrol->setSize((float)w, (float)h);
+	_topCotrol->setPos(0, 0);
+
+	NAPMarketEventHandler* handler = nullptr;
+	auto selectedSymbol = _cryptoBoard->getSelectedSymbol();
+	if (selectedSymbol) {
+		auto platform = _platformRunner->getPlatform();
+		if (platform) {
+			handler = (NAPMarketEventHandler*)platform->getHandler(selectedSymbol);
+		}
+	}
+
+	_graph->setInitalGraphRegion(Area(20, 20, (int)_graph->getWidth() - 20, (int)_graph->getHeight() - 20));
+	_barChart->setInitalGraphRegion(Area(20, (int)_barChart->getHeight() - 20, (int)_barChart->getWidth() - 20, (int)_barChart->getHeight() / 2 - 10));
+
+	if (handler) {
+		auto& candles = handler->getCandleHistoriesNonSync();
+		initBarchart(candles);
+	}
+	else {
+		_barChart->adjustTransform();
+		_graph->adjustTransform();
+	}
+}
+
 void BasicApp::setup()
 {
 	FUNCTON_LOG();
@@ -125,18 +158,13 @@ void BasicApp::setup()
 	ui::Options uiOptions;
 	ui::initialize(uiOptions);
 
-	getWindow()->getSignalResize().connect([this]() {
-		int w = getWindow()->getWidth();
-		int h = getWindow()->getHeight();
-		_spliter.setSize((float)w, (float)h);
-		_barChart->adjustTransform();
-		_graph->adjustTransform();
-	});
+	getWindow()->getSignalResize().connect(std::bind(&BasicApp::onWindowSizeChanged, this));
 
 	int w = getWindow()->getWidth();
 	int h = getWindow()->getHeight();
 	_spliter.setSize((float)w, (float)h);
 	_spliter.setPos(0, 0);
+	_topCotrol = &_spliter;
 
 	_cryptoBoard = std::make_shared<WxCryptoBoardInfo>();
 	auto bottomSpliter = std::make_shared<Spliter>();
@@ -145,9 +173,9 @@ void BasicApp::setup()
 	auto graphLine = std::make_shared<WxLineGraphLive>();
 	_controlBoard = std::make_shared<WxControlBoard>();
 	_barChart = std::make_shared<WxBarCharLive>();
-	auto panel = std::make_shared<Panel>();
-	panel->addChild(_barChart);
-	panel->addChild(graphLine);
+	_panel = std::make_shared<Panel>();
+	_panel->addChild(_barChart);
+	_panel->addChild(graphLine);
 
 	_logAdapter = new LogAdapter(_applog.get());
 
@@ -160,7 +188,7 @@ void BasicApp::setup()
 	bottomSpliter->setVertical(true);
 	bottomSpliter->setFixedPanelSize(800);
 	bottomSpliter->setFixPanel(FixedPanel::Panel1);
-	bottomSpliter->setChild1(panel);
+	bottomSpliter->setChild1(_panel);
 	bottomSpliter->setChild2(_applog);
 
 	_spliter.setFixedPanelSize(300);
@@ -168,11 +196,8 @@ void BasicApp::setup()
 	_spliter.setChild1(topSpliter);
 	_spliter.setChild2(bottomSpliter);
 
-	graphLine->setInitalGraphRegion(Area(20, 20, (int)graphLine->getWidth() - 20, (int)graphLine->getHeight() - 20));
 	graphLine->setGraphRegionColor(ColorA8u(0, 0, 0, 255));
 	graphLine->setLineColor(ColorA8u(255, 255, 0, 255));
-
-	_barChart->setInitalGraphRegion(Area(20, 20, (int)_barChart->getWidth() - 20, (int)_barChart->getHeight() - 20));
 	_barChart->setGraphRegionColor(ColorA8u(0, 0, 0, 255));
 	_barChart->setLineColor(ColorA8u(255, 255, 0, 255));
 	_barChart->setBarColor(ColorA8u(69, 69, 69, 255));
@@ -185,7 +210,61 @@ void BasicApp::setup()
 	getWindow()->getSignalClose().connect([this]() {
 		_runFlag = false;
 	});
-	
+
+	// handle mouse up and mouse down to emit mouse double click
+	static double timeDown;
+	static double* pTimeDown = nullptr;
+	static int clickCount = 0;
+	static glm::ivec2 prePos;
+	getWindow()->getSignalMouseDown().connect([this](MouseEvent& me) {
+		auto& pos = me.getPos();
+		prePos = pos;
+		if (pos.x >= _graph->getX() && pos.x < _graph->getX() + _graph->getWidth() &&
+			pos.y >= _graph->getY() && pos.y < _graph->getY() + _graph->getHeight()) {
+			clickCount++;
+			if (pTimeDown == nullptr) {
+				pTimeDown = &timeDown;
+				timeDown = getElapsedSeconds();
+			}
+			else {
+				auto timeDown2 = getElapsedSeconds();
+				auto doubleClickTime = Utility::getDoubleClickTime();
+				auto clickTime = (unsigned int)(timeDown2 - timeDown) * 1000;
+				if (clickTime > doubleClickTime) {
+					clickCount = 1;
+					timeDown = timeDown2;
+				}
+			}
+		}
+		else {
+			clickCount = 0;
+			pTimeDown = nullptr;
+		}
+	});
+	getWindow()->getSignalMouseUp().connect([this](MouseEvent& me) {
+		auto timeUp = getElapsedSeconds();
+		auto doubleClickTime = Utility::getDoubleClickTime();
+		auto clickTime = (unsigned int)(timeUp - timeDown) * 1000;
+		if (clickCount == 2 && pTimeDown) {
+			clickCount = 0;
+			pTimeDown = nullptr;
+			if (clickTime <= doubleClickTime) {
+				if (_topCotrol == &_spliter) {
+					_topCotrol = _panel.get();	
+				}
+				else {
+					_topCotrol = &_spliter;
+				}
+				// reset chats by using method onWindowSizeChanged
+				onWindowSizeChanged();
+			}
+		}
+		if (clickTime > doubleClickTime) {
+			clickCount = 0;
+			pTimeDown = nullptr;
+		}
+	});
+
 	_graph = graphLine;
 
 	auto fTextTranslate = [this](const glm::vec2& point) -> std::tuple<std::string, std::string> {
@@ -194,7 +273,12 @@ void BasicApp::setup()
 		time_t tst = (time_t)(t / 1000);
 		struct tm * timeinfo;
 		timeinfo = localtime(&tst);
-		strftime(buffer, sizeof(buffer), "%b %d %T", timeinfo);
+		if (timeinfo == nullptr) {
+			buffer[0] = 0;
+		}
+		else {
+			strftime(buffer, sizeof(buffer), "%b %d %T", timeinfo);
+		}
 
 		std::tuple<std::string, std::string> pointStr(buffer, std::to_string(point.y));
 		return pointStr;
@@ -204,9 +288,18 @@ void BasicApp::setup()
 	_barChart->setPointToTextTranslateFunction(fTextTranslate);
 
 	getWindow()->getSignalMouseMove().connect([this](MouseEvent& me) {
-		auto graphMode = _controlBoard->getCurrentGraphMode();
 		_graph->setCursorLocation(glm::vec2(me.getX(), me.getY()));
 		_barChart->setCursorLocation(glm::vec2(me.getX(), me.getY()));
+	});
+
+	getWindow()->getSignalMouseDrag().connect([this](MouseEvent& me) {
+		auto translateX = me.getX() - prePos.x;
+		_graph->translate(translateX, 0);
+		_barChart->translate(translateX, 0);
+		_liveMode = false; 
+		prePos = me.getPos();
+		_graph->setCursorLocation(prePos);
+		_barChart->setCursorLocation(prePos);
 	});
 
 	_baseTime = getCurrentTimeStamp();
@@ -370,9 +463,9 @@ void BasicApp::onSelectedSymbolChanged(Widget*) {
 		}
 	});
 
-	//auto eventListener = std::bind(&BasicApp::onSelectedTradeEvent, this, _1, _2, _3, _4);
+	auto eventListener = std::bind(&BasicApp::onSelectedTradeEvent, this, _1, _2, _3, _4);
 	auto candleEventListener = std::bind(&BasicApp::onCandle, this, _1, _2, _3, _4);
-	//_lastEventId = _lastSelectedHandler->addTradeEventListener(eventListener);
+	_lastEventId = _lastSelectedHandler->addTradeEventListener(eventListener);
 	_lastCandleEventId = _lastSelectedHandler->addCandleEventListener(candleEventListener);
 }
 
@@ -454,6 +547,9 @@ void BasicApp::stopServices() {
 	_graph->acessSharedData([](Widget* sender) {
 		((WxLineGraph*)sender)->clearPoints();
 	});
+	_barChart->acessSharedData([](Widget* sender) {
+		((WxLineGraph*)sender)->clearPoints();
+	});
 
 	delete _platformRunner;
 	_platformRunner = nullptr;
@@ -480,33 +576,55 @@ void BasicApp::applySelectedCurrency(const std::string& currency) {
 	}
 }
 
-void BasicApp::onSelectedTradeEvent(NAPMarketEventHandler* handler, TradeItem* item, int count, bool) {
-	if (_controlBoard->getCurrentGraphMode() != GraphMode::Price) {
-		return;
+void BasicApp::onSelectedTradeEvent(NAPMarketEventHandler* handler, TradeItem* items, int count, bool snapShot) {
+	//if (_controlBoard->getCurrentGraphMode() != GraphMode::Price) {
+	//	return;
+	//}
+
+	//_graph->acessSharedData([this, item, count, handler](Widget* sender) {
+	//	WxLineGraphLive* graph = (WxLineGraphLive*)sender;
+	//	graph->clearPoints();
+
+	//	auto& tradeItems = handler->getTradeHistoriesNonSync();
+	//	auto platform = _platformRunner->getPlatform();
+	//	TIMESTAMP timeDiff = 0;
+	//	if (platform->isServerTimeReady()) {
+	//		auto localTime = getCurrentTimeStamp();
+	//		auto serverTime = platform->getSyncTime(localTime);
+	//		timeDiff = localTime - serverTime;
+	//	}
+
+	//	for (auto it = tradeItems.rbegin(); it != tradeItems.rend(); it++) {
+	//		float timeScale = convertRealTimeToDisplayTime(it->timestamp + timeDiff);
+
+	//		vec2 point(timeScale, (float)it->price);
+	//		graph->addPointAndConstruct(point);
+	//	}
+	//	
+	//	graph->adjustTransform();
+	//});
+
+	if(snapShot) {
 	}
-
-	_graph->acessSharedData([this, item, count, handler](Widget* sender) {
-		WxLineGraphLive* graph = (WxLineGraphLive*)sender;
-		graph->clearPoints();
-
-		auto& tradeItems = handler->getTradeHistoriesNonSync();
-		auto platform = _platformRunner->getPlatform();
-		TIMESTAMP timeDiff = 0;
-		if (platform->isServerTimeReady()) {
-			auto localTime = getCurrentTimeStamp();
-			auto serverTime = platform->getSyncTime(localTime);
-			timeDiff = localTime - serverTime;
-		}
-
-		for (auto it = tradeItems.rbegin(); it != tradeItems.rend(); it++) {
-			float timeScale = convertRealTimeToDisplayTime(it->timestamp + timeDiff);
-
-			vec2 point(timeScale, (float)it->price);
-			graph->addPointAndConstruct(point);
-		}
-		
-		graph->adjustTransform();
-	});
+	else {
+		_graph->acessSharedData([this, items](Widget*) {
+			if (items) {
+				auto& points = _graph->getPoints();
+				auto x = convertRealTimeToDisplayTime(items->timestamp);
+				auto y = items->price;
+				if (points.size()) {
+					if (points.back().y != y) {
+						_graph->addPointAndConstruct(glm::vec2(x, y));
+						_graph->adjustTransform();
+					}
+				}
+				else {
+					_graph->addPoint(glm::vec2(x, y));
+					_graph->adjustTransform();
+				}
+			}
+		});
+	}
 }
 
 void BasicApp::onCandle(NAPMarketEventHandler* sender, CandleItem* candleItems, int count, bool snapshot) {
@@ -520,8 +638,7 @@ void BasicApp::onCandle(NAPMarketEventHandler* sender, CandleItem* candleItems, 
 	}
 	else {
 		_barChart->acessSharedData([this, candleItems, sender](Widget*) {
-			constexpr int minLength = 15;
-			TIMESTAMP barTimeLength = minLength * 60 * 1000;
+			TIMESTAMP barTimeLength = _barTimeLength * 60 * 1000;
 			auto lastAlignedTime = roundDown(candleItems->timestamp, barTimeLength);
 			auto& candles = sender->getCandleHistoriesNonSync();
 			if (candles.size() == 0)
@@ -557,31 +674,31 @@ void BasicApp::onCandle(NAPMarketEventHandler* sender, CandleItem* candleItems, 
 			_barChart->adjustTransform();
 		});
 
-		_graph->acessSharedData([this, candleItems, sender](Widget*) {
-			if (candleItems) {
-				auto& points = _graph->getPoints();
-				auto x = convertRealTimeToDisplayTime(candleItems->timestamp);
-				auto y = (candleItems->high + candleItems->low) / 2;
-				if (points.size()) {
-					if (points.back().y != y) {
-						_graph->addPointAndConstruct(glm::vec2(x, y));
-						_graph->adjustTransform();
-					}
-				}
-				else {
-					_graph->addPoint(glm::vec2(x, y));
-					_graph->adjustTransform();
-				}
-			}
-		});
+		//_graph->acessSharedData([this, candleItems, sender](Widget*) {
+		//	if (candleItems) {
+		//		auto& points = _graph->getPoints();
+		//		auto x = convertRealTimeToDisplayTime(candleItems->timestamp);
+		//		auto y = (candleItems->high + candleItems->low) / 2;
+		//		if (points.size()) {
+		//			if (points.back().y != y) {
+		//				_graph->addPointAndConstruct(glm::vec2(x, y));
+		//				_graph->adjustTransform();
+		//			}
+		//		}
+		//		else {
+		//			_graph->addPoint(glm::vec2(x, y));
+		//			_graph->adjustTransform();
+		//		}
+		//	}
+		//});
 	}
 }
 
 void BasicApp::initBarchart(const std::list<CandleItem>& candles) {
-	constexpr int minLength = 15;
-	TIMESTAMP barTimeLength = minLength * 60 * 1000;
-	int barCount = 24 * 60 / minLength;
+	TIMESTAMP barTimeLength = _barTimeLength * 60 * 1000;
+	int barCount = 24 * 60 / _barTimeLength;
 	float barWith = _barChart->getGraphRegion().getWidth() / barCount;
+	_barChart->setBarWidth(barWith);
 	_pixelPerTime = (float)(barWith / barTimeLength);
 
 	float alignX;
@@ -634,16 +751,55 @@ void BasicApp::initBarchart(const std::list<CandleItem>& candles) {
 		auto& area = _graph->getGraphRegion();
 		_graph->setInitalGraphRegion(area);
 
+		float y;
 		for (auto it = candles.rbegin(); it != candles.rend(); it++) {
 			float x = convertRealTimeToDisplayTime(it->timestamp);
-			_graph->addPointAndConstruct(glm::vec2(x, (it->high + it->low)/2));
-		}
-		auto& points = _graph->getPoints();
-		if (points.size()) {
-			_graph->scale(1.0f, (float)(area.getHeight() / (points.back().y / 200)));
+			y = (float)((it->high + it->low) / 2);
+			_graph->addPointAndConstruct(glm::vec2(x, y));
 		}
 
-		_graph->translate(-alignX, 0);
+		auto& points = _graph->getPoints();
+		float translateY = 0;
+		if (points.size()) {
+			float yMin, yMax;
+			auto it = points.begin();
+			yMax = yMin = it->y;
+			for (; it != points.end(); it++) {
+				if (it->x >= alignX) {
+					break;
+				}
+			}
+			for (; it != points.end(); it++) {
+				if (yMax < it->y) {
+					yMax = it->y;
+				}
+				if (yMin > it->y) {
+					yMin = it->y;
+				}
+			}
+			constexpr int graphPart = 6;
+			constexpr int initArea = 3;
+			constexpr int topArea = 0;
+			float partHeight = area.getHeight() * 1.0f / graphPart;
+
+			float scaleY = (yMax == yMin) ?
+				(yMax == 0 ? 1.0f : area.getHeight() / yMax) :
+				(initArea * partHeight) / (yMax - yMin);
+
+			_graph->scale(1.0f, scaleY);
+			if (yMin != 0) {
+				auto bottom = _graph->pointToLocal(0, yMin);
+				auto overlapBottomPart = bottom.y - (topArea + initArea) * partHeight;
+				if (overlapBottomPart > 0) {
+					// yMin will display bellow the bottom area
+					// we don't need to do
+				}
+				else {
+					translateY = -overlapBottomPart;
+				}
+			}
+		}
+		_graph->translate(-alignX, translateY);
 		_graph->adjustTransform();
 	});
 }
@@ -663,22 +819,24 @@ void BasicApp::mouseDown( MouseEvent event )
 void BasicApp::update()
 {
 	FUNCTON_LOG();
-	_spliter.update();
+	_topCotrol->update();
 	if (_ciWndCandle) {
 		_ciWndCandle->update();
 	}
-	TIMESTAMP liveTime = 0;
-	//if (_platformRunner) {
-	//	if (_platformRunner->getPlatform()->isServerTimeReady()) {
-	//		liveTime = _platformRunner->getPlatform()->getSyncTime(getCurrentTimeStamp());
-	//	}
-	//}
-	if (liveTime == 0) {
-		liveTime = getCurrentTimeStamp();
+	if (_liveMode) {
+		TIMESTAMP liveTime = 0;
+		//if (_platformRunner) {
+		//	if (_platformRunner->getPlatform()->isServerTimeReady()) {
+		//		liveTime = _platformRunner->getPlatform()->getSyncTime(getCurrentTimeStamp());
+		//	}
+		//}
+		if (liveTime == 0) {
+			liveTime = getCurrentTimeStamp();
+		}
+		auto liveX = convertRealTimeToDisplayTime(liveTime);
+		_barChart->setLiveX(liveX);
+		_graph->setLiveX(liveX);
 	}
-	auto liveX = convertRealTimeToDisplayTime(liveTime);
-	_barChart->setLiveX(liveX);
-	_graph->setLiveX(liveX);
 }
 
 void BasicApp::draw()
@@ -690,7 +848,7 @@ void BasicApp::draw()
 	//}
 	//else {
 		gl::clear(ColorA::black());
-		_spliter.draw();
+		_topCotrol->draw();
 	//}
 }
 

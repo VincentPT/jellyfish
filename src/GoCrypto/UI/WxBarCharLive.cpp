@@ -4,7 +4,7 @@
 using namespace ci;
 using namespace std;
 
-WxBarCharLive::WxBarCharLive() : _currentX(0) {
+WxBarCharLive::WxBarCharLive() : _currentX(0), _barWidth(0) {
 }
 
 WxBarCharLive::~WxBarCharLive() {
@@ -13,6 +13,7 @@ WxBarCharLive::~WxBarCharLive() {
 
 void WxBarCharLive::adjustTransform() {
 	auto left = localToPoint(0, 0);
+	auto right = localToPoint(_displayArea.getWidth(), 0);
 	auto it = _points.begin();
 	for (; it != _points.end(); it++) {
 		if (it->x >= left.x) {
@@ -22,7 +23,7 @@ void WxBarCharLive::adjustTransform() {
 	if (it != _points.end()) {
 		float max_y = it->y;
 
-		for (; it != _points.end(); it++) {
+		for (; it != _points.end() && it->x < right.x; it++) {
 			if (max_y < it->y) {
 				max_y = it->y;
 			}
@@ -69,33 +70,29 @@ void WxBarCharLive::draw() {
 		}
 	}
 	if (it == _points.end()) return;
-	if (it != _points.begin()) {
-		it--;
-	}
 
-	auto basePoint = pointToWindow(0, 0);
+	auto basePoint = pointToWindow(it->x, 0);
+	auto lastBasePoint = pointToWindow(_currentX, 0);
+	auto baseX = localToPoint(0, 0);
+	auto firstExpectedX = localToPoint(_barWidth, 0);
+	auto batWidth = firstExpectedX.x - baseX.x;
 
-	glm::vec2 point1 = pointToWindow(it->x, it->y);
-	glm::vec2 point2;
+	for (it; it != _points.end(); it++) {
+		glm::vec2 point = pointToWindow(it->x, it->y);
 
-	for (it++; true ; it++) {
-		if (it == _points.end()) {
-			point2 = pointToWindow(_currentX, 0);
+		Rectf barRect(point.x, point.y, point.x + _barWidth, basePoint.y);
+		if (it->x + batWidth > _currentX) {
+			barRect.x2 = lastBasePoint.x;
 		}
-		else {
-			point2 = pointToWindow(it->x, it->y);
-		}
-		Rectf barRect(point1.x, point1.y, point2.x, basePoint.y);
 
 		gl::color(_barColor);
 		gl::drawSolidRect(barRect);
 
 		gl::color(_lineColor);
 		gl::drawStrokedRect(barRect);
-
-		point1 = point2;
-		if (it == _points.end()) break;
 	}
+	gl::color(_lineColor);
+	gl::drawLine(basePoint, lastBasePoint);
 
 	drawPointAtCursor();
 }
@@ -119,4 +116,8 @@ void WxBarCharLive::setLiveX(float x) {
 	if (rightMostPoint.x > _displayArea.x2) {
 		translate(rightMostPoint.x - _displayArea.x2, 0);
 	}
+}
+
+void WxBarCharLive::setBarWidth(float barWidth) {
+	_barWidth = barWidth;
 }
