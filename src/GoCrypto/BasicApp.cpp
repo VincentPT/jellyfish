@@ -216,6 +216,8 @@ void BasicApp::setup()
 	static double* pTimeDown = nullptr;
 	static int clickCount = 0;
 	static glm::ivec2 prePos;
+	static bool dragging = false;
+
 	getWindow()->getSignalMouseDown().connect([this](MouseEvent& me) {
 		auto& pos = me.getPos();
 		prePos = pos;
@@ -263,6 +265,11 @@ void BasicApp::setup()
 			clickCount = 0;
 			pTimeDown = nullptr;
 		}
+		if (dragging) {
+			dragging = false;
+			_graph->adjustTransform();
+			_barChart->adjustTransform();
+		}
 	});
 
 	_graph = graphLine;
@@ -293,13 +300,20 @@ void BasicApp::setup()
 	});
 
 	getWindow()->getSignalMouseDrag().connect([this](MouseEvent& me) {
-		auto translateX = me.getX() - prePos.x;
-		_graph->translate(translateX, 0);
-		_barChart->translate(translateX, 0);
-		_liveMode = false; 
-		prePos = me.getPos();
-		_graph->setCursorLocation(prePos);
-		_barChart->setCursorLocation(prePos);
+		auto & pos = me.getPos();
+		if (pos.x >= _graph->getX() && pos.x < _graph->getX() + _graph->getWidth() &&
+			pos.y >= _graph->getY() && pos.y < _graph->getY() + _graph->getHeight()) {
+
+			auto translateX = me.getX() - prePos.x;
+			_graph->translate(translateX, 0);
+			_barChart->translate(translateX, 0);
+			_liveMode = false;
+			prePos = me.getPos();
+			_graph->setCursorLocation(prePos);
+			_barChart->setCursorLocation(prePos);
+
+			dragging = true;
+		}
 	});
 
 	_baseTime = getCurrentTimeStamp();
@@ -701,6 +715,8 @@ void BasicApp::initBarchart(const std::list<CandleItem>& candles) {
 	_barChart->setBarWidth(barWith);
 	_pixelPerTime = (float)(barWith / barTimeLength);
 
+	_liveMode = true;
+
 	float alignX;
 
 	_barChart->acessSharedData([this, &candles, barTimeLength, barCount, &alignX](Widget*) {
@@ -750,6 +766,7 @@ void BasicApp::initBarchart(const std::list<CandleItem>& candles) {
 		_graph->clearPoints();
 		auto& area = _graph->getGraphRegion();
 		_graph->setInitalGraphRegion(area);
+		_graph->translate(-alignX, 0);
 
 		float y;
 		for (auto it = candles.rbegin(); it != candles.rend(); it++) {
@@ -759,17 +776,27 @@ void BasicApp::initBarchart(const std::list<CandleItem>& candles) {
 		}
 
 		auto& points = _graph->getPoints();
+		auto rightPoint = _graph->localToPoint(_graph->getGraphRegion().getWidth(), 0);
 		float translateY = 0;
 		if (points.size()) {
 			float yMin, yMax;
 			auto it = points.begin();
-			yMax = yMin = it->y;
 			for (; it != points.end(); it++) {
 				if (it->x >= alignX) {
 					break;
 				}
 			}
-			for (; it != points.end(); it++) {
+			auto ttt = convertXToTime(alignX);
+			auto tttstr = Utility::time2str(ttt);
+			if (it == points.end()) {
+				yMin = 0;
+				yMax = 0;
+			}
+			else {
+				yMin = it->y;
+				yMax = yMin;
+			}
+			for (; it != points.end() && it->x <= rightPoint.x; it++) {
 				if (yMax < it->y) {
 					yMax = it->y;
 				}
@@ -799,7 +826,7 @@ void BasicApp::initBarchart(const std::list<CandleItem>& candles) {
 				}
 			}
 		}
-		_graph->translate(-alignX, translateY);
+		_graph->translate(0, translateY);
 		_graph->adjustTransform();
 	});
 }

@@ -86,7 +86,7 @@ private:
 	typedef std::map<TRADE_ID, char> TradeLevelMap;
 	std::map<std::string, std::shared_ptr<TradeLevelMap>> _processLevelMap;
 	std::map<std::string, bool> _sentTradeSnapshotRequest;
-	std::map<std::string, bool> _sentCandleSnapshotRequest;
+	std::map<std::string, int> _sentCandleSnapshotRequest;
 	std::future<void> _sendTradeHistoryRequestLoop;
 	SymbolStatisticUpdatedHandler _onSymbolStatisticUpdated;
 private:

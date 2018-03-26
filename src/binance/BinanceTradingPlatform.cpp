@@ -761,14 +761,12 @@ void BinanceTradingPlatform::getCandleHistory(const char* pair, TIMESTAMP durati
 		pushLog("no need to request candle history\n");
 		return;
 	}
-	auto tEnd = endTime;
 	auto startTime = (endTime - duration);
 
 	bool stopSignal = false;
 	TIMESTAMP t1, t2;
 	TIMESTAMP processTime;
 	unsigned int bonusTime = 0, sleepTime = 0;
-	decltype(tEnd) tStart;
 
 	http_request marketDataRequest(methods::GET);
 	auto& headers = marketDataRequest.headers();
@@ -784,7 +782,7 @@ void BinanceTradingPlatform::getCandleHistory(const char* pair, TIMESTAMP durati
 	bool shouldStop = false;
 	constexpr int candleDuration = 60;
 
-	auto parseCandle = [this, &candleItems, candleDuration, startTime, &shouldStop, &bonusTime](http_response& response) {
+	auto parseCandle = [this, &candleItems, candleDuration, &shouldStop, &bonusTime](http_response& response) {
 		if (response.status_code() == 200) {
 			auto js = response.extract_json().get();
 			if (js.is_array() == false) {
@@ -792,7 +790,7 @@ void BinanceTradingPlatform::getCandleHistory(const char* pair, TIMESTAMP durati
 			}
 			else {
 				auto& jsArray = js.as_array();
-				for (auto it = jsArray.rbegin(); it != jsArray.rend(); it++) {
+				for (auto it = jsArray.begin(); it != jsArray.end(); it++) {
 					auto& elm = *it;
 					if (elm.is_array() == false) {
 						pushLog("unexpected trade history format\n");
@@ -829,13 +827,7 @@ void BinanceTradingPlatform::getCandleHistory(const char* pair, TIMESTAMP durati
 						// candle duration was set on request
 						candleItem.duration = candleDuration;
 
-						// only get trade item from start time to end time
-						if (candleItem.timestamp < startTime) {
-							shouldStop = true;
-							break;
-						}
-
-						candleItems.push_back(candleItem);
+						candleItems.push_front(candleItem);
 					}
 				}
 				if (jsArray.size() == 0) {
@@ -859,7 +851,6 @@ void BinanceTradingPlatform::getCandleHistory(const char* pair, TIMESTAMP durati
 	TIMESTAMP interval = 60 * 1000 / (numberOfRequestPerMinMax / 2);
 	utility::string_t parameters;
 
-	TIMESTAMP endTimeTurn = endTime;
 	startTime = startTime / (candleDuration * 1000) * (candleDuration * 1000);
 
 	do
@@ -874,7 +865,7 @@ void BinanceTradingPlatform::getCandleHistory(const char* pair, TIMESTAMP durati
 		parameters += U("&startTime=");
 		parameters += TO_STRING_T(startTime);
 		parameters += U("&endTime=");
-		parameters += TO_STRING_T(endTimeTurn);
+		parameters += TO_STRING_T(endTime);
 
 		bonusTime = 0;
 
@@ -889,7 +880,7 @@ void BinanceTradingPlatform::getCandleHistory(const char* pair, TIMESTAMP durati
 			pushLog("get trade history failed: unknown error\n");
 		}
 
-		endTimeTurn = candleItems.back().timestamp - candleDuration * 1000;
+		startTime = candleItems.front().timestamp + candleDuration * 1000;
 
 		t2 = getCurrentTimeStamp();
 
@@ -899,7 +890,7 @@ void BinanceTradingPlatform::getCandleHistory(const char* pair, TIMESTAMP durati
 			sleepTime = (unsigned int)(interval - processTime);
 		}
 
-	} while (shouldStop == false && endTimeTurn > startTime && _stopLoopTask.waitSignal(stopSignal, sleepTime + bonusTime) == false);
+	} while (shouldStop == false && endTime > startTime && _stopLoopTask.waitSignal(stopSignal, sleepTime + bonusTime) == false);
 }
 
 TIMESTAMP BinanceTradingPlatform::getSyncTime(TIMESTAMP localTime) {

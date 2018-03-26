@@ -30,7 +30,15 @@ void WxLineGraph::draw() {
 		gl::begin(GL_LINE_STRIP);
 
 		auto leftPoint = localToPoint(0, 0);
-		for (auto it = _points.rbegin(); it != _points.rend(); it++) {
+		auto rightPoint = localToPoint(_displayArea.getWidth(), 0);
+		auto it = _points.rbegin();
+		for (; it != _points.rend(); it++) {
+			if (it->x <= rightPoint.x) {
+				break;
+			}
+		}
+
+		for (; it != _points.rend(); it++) {
 			vec2 pos = pointToWindow(it->x, it->y);
 			gl::vertex(pos);
 			if (it->x < leftPoint.x) {

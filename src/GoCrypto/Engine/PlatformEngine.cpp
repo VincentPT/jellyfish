@@ -512,11 +512,15 @@ void PlatformEngine::onTrade(int i, NAPMarketEventHandler* sender, TradeItem* in
 }
 
 void PlatformEngine::onCandle(int i, NAPMarketEventHandler* sender, CandleItem* candleItems, int count, bool snapshot) {
-	if (_sentCandleSnapshotRequest.find(sender->getPair()) == _sentCandleSnapshotRequest.end()) {
+	auto it = _sentCandleSnapshotRequest.insert(std::make_pair(sender->getPair(), 0));
+	if (it.second || (it.first->second < 7 && snapshot)) {
 		auto& candleItems = sender->getCandleHistoriesNonSync();
 		if (candleItems.size()) {
+			//TIMESTAMP tEnd = candleItems.back().timestamp - 1;
+			//TIMESTAMP duration = 24 * 3600 * 1000 - (candleItems.front().timestamp - tEnd);
+
 			TIMESTAMP tEnd = candleItems.back().timestamp - 1;
-			TIMESTAMP duration = 24 * 3600 * 1000 - (candleItems.front().timestamp - tEnd);
+			TIMESTAMP duration = 24 * 3600 * 1000;
 
 			RequestEventHistoryMessage message;
 			message.pair = sender->getPair();
@@ -524,8 +528,9 @@ void PlatformEngine::onCandle(int i, NAPMarketEventHandler* sender, CandleItem* 
 			message.endTime = tEnd;
 			message.eventType = EventHistoryType::CandleHistory;
 
-			_sentCandleSnapshotRequest[sender->getPair()] = true;
 			_symbolQueue.pushMessage(message);
+
+			it.first->second++;
 		}
 	}
 }
