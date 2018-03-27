@@ -38,13 +38,13 @@ void mergeParts(const Range<T>& part1, const Range<T>& part2,
 	auto& t4 = part2.end;
 
 	if (newRange) {
-		newRange->start = std::min(t1, t3);
-		newRange->end = std::max(t2, t4);
+		newRange->start =min(t1, t3);
+		newRange->end = max(t2, t4);
 	}
 	
 	if (overlap) {
-		overlap->start = std::max(t1, t3);
-		overlap->end = std::min(t2, t4);
+		overlap->start = max(t1, t3);
+		overlap->end = min(t2, t4);
 	}
 }
 

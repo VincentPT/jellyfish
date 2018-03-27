@@ -294,7 +294,11 @@ void NAPMarketEventHandler::onTradesUpdate(TradeItem* trades, int count, bool sn
 			//pushLog("update trade event 4\n");
 		}
 		else {
-			pushLog("no need to update trade event\n");
+			//pushLog("merge update event into trade history\n");
+			auto it = std::find_if(_tradeHistory.begin(), _tradeHistory.end(), [trades](const TradeItem& item) {
+				return trades->timestamp > item.timestamp;
+			});
+			_tradeHistory.insert(it, *trades);
 		}
 	}
 

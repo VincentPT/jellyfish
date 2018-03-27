@@ -350,6 +350,13 @@ void PlatformEngine::onTrade(int i, NAPMarketEventHandler* sender, TradeItem* in
 
 	// check if it is a snapshot event or update event not the lastest item in the trade history list
 	if (snapshot || incommingTrades->oderId != trades.front().oderId) {
+		// save the ticker that mark as processed
+		list<TickerUI> markTickers;
+		for (auto it = tickers.begin(); it != tickers.end(); it++) {
+			if (it->processLevel >= 0) {
+				markTickers.push_back(*it);
+			}
+		}
 		// build tickers for all trade items of curent pair on snapshot event
 		tickers.clear();
 		if (trades.size()) {
@@ -361,7 +368,36 @@ void PlatformEngine::onTrade(int i, NAPMarketEventHandler* sender, TradeItem* in
 
 			buildFromEmptyTickers(trades.rbegin(), trades.rend(), nextIter, tickers);
 		}
-		//pushLog("built ticker as snapshot event\n");
+
+		// restore the mark ticker
+		auto jt = tickers.begin();
+
+		Range<TIMESTAMP> markRange;
+		Range<TIMESTAMP> newRange;
+		Range<TIMESTAMP> overlapped;
+
+		auto f = [&markRange, &newRange, &overlapped](TickerUI& item) {
+			newRange.start = item.firstPrice.at;
+			newRange.end = item.lastPrice.at;
+			mergeParts<TIMESTAMP>(markRange, newRange, nullptr, &overlapped);
+
+			return (overlapped.start <= overlapped.end);
+		};
+
+		for (auto it = markTickers.begin(); it != markTickers.end() && jt != tickers.end(); it++) {
+			markRange.start = it->firstPrice.at;
+			markRange.end = it->lastPrice.at;
+
+			jt = std::find_if(jt, tickers.end(), f);
+
+			if (jt != tickers.end()) {
+				jt->processLevel = it->processLevel;
+				pushLog("restore process level %s\n", sender->getPair());
+
+				jt++;
+			}
+		}
+		//pushLog("built ticker as snapshot event %s\n", sender->getPair());
 	}
 	else if(incommingTrades && count > 0) {
 		// update tickers for the last trade events
@@ -433,7 +469,7 @@ void PlatformEngine::onTrade(int i, NAPMarketEventHandler* sender, TradeItem* in
 							tickers.push_front(*it);
 						}
 
-						//pushLog("merged tickers \n");
+						pushLog("merged tickers \n");
 					}
 					else if (newBaseTime > oldBaseTime) {
 						// add empty tickers until reach the new time frame
