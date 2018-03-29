@@ -562,8 +562,6 @@ void BasicApp::onSelectedTradeEvent(NAPMarketEventHandler* handler, TradeItem* i
 	else {
 		if (isGraphDataCandle() == false) {
 			_barChart->acessSharedData([this, items, handler](Widget*) {
-				pushLog("acessSharedData begin\n");
-
 				TIMESTAMP barTimeLength = _barTimeLength;
 				auto lastAlignedTime = roundDown(items->timestamp, barTimeLength);
 				auto& candles = handler->getCandleHistoriesNonSync();
@@ -579,13 +577,11 @@ void BasicApp::onSelectedTradeEvent(NAPMarketEventHandler* handler, TradeItem* i
 					if (lastAlignedTime == lastAnlignedTimeInChart) {
 						// update last bar
 						lastPoint.y += abs(items->amount);
-						pushLog("case 1\n");
 					}
 					else if(lastAlignedTime > lastAnlignedTimeInChart){
 						// add new bar
 						glm::vec2 newBarPoint(convertRealTimeToDisplayTime(lastAlignedTime), abs(items->amount));
 						_barChart->addPoint(newBarPoint);
-						pushLog("case 2 %lld, %lld\n", lastAlignedTime, lastAnlignedTimeInChart);
 					}
 					else {
 						// some trade event item come to client late
@@ -599,20 +595,14 @@ void BasicApp::onSelectedTradeEvent(NAPMarketEventHandler* handler, TradeItem* i
 								it->y += abs(items->amount);
 							}
 						}
-
-						pushLog("case 3\n");
 					}
 				}
 				else {
 					// add new bar
 					glm::vec2 newBarPoint(convertRealTimeToDisplayTime(lastAlignedTime), abs(items->amount));
 					_barChart->addPoint(newBarPoint);
-
-					pushLog("case 4\n");
 				}
 				_barChart->adjustTransform();
-
-				pushLog("acessSharedData end\n");
 			});
 		}
 
@@ -882,7 +872,7 @@ float BasicApp::convertRealTimeToDisplayTime(TIMESTAMP t) {
 }
 
 TIMESTAMP BasicApp::convertXToTime(float x) {
-	return _baseTime + (TIMESTAMP)(((double)x) / _pixelPerTime);
+	return _baseTime + (TIMESTAMP)( x * 1.0 / _pixelPerTime + 0.5);
 }
 
 void BasicApp::mouseDown( MouseEvent event )
