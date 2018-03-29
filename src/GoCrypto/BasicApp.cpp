@@ -49,7 +49,7 @@ class BasicApp : public App {
 	int _lastEventId;
 	int _lastCandleEventId;
 	NAPMarketEventHandler* _lastSelectedHandler;
-	int _barTimeLength = 15;
+	int _barTimeLength = 15 * 60 * 1000;
 	bool _liveMode = true;
 public:
 	BasicApp();
@@ -80,9 +80,13 @@ public:
 	void createCandleWindow();
 
 	void onSelectedSymbolChanged(Widget*);
-	void onSelectedGraphModeChanged(Widget*);
+
 	void initBarchart(const std::list<CandleItem>& candles);
+	void initBarchart(const std::list<TradeItem>& items);
 	void onWindowSizeChanged();
+	bool isGraphDataCandle();
+	void initChart();
+	TIMESTAMP computeBarTimeLength();
 };
 
 void pushLog(const char* fmt, ...) {
@@ -129,26 +133,20 @@ void BasicApp::onWindowSizeChanged() {
 	_topCotrol->setSize((float)w, (float)h);
 	_topCotrol->setPos(0, 0);
 
-	NAPMarketEventHandler* handler = nullptr;
-	auto selectedSymbol = _cryptoBoard->getSelectedSymbol();
-	if (selectedSymbol) {
-		auto platform = _platformRunner->getPlatform();
-		if (platform) {
-			handler = (NAPMarketEventHandler*)platform->getHandler(selectedSymbol);
-		}
-	}
-
-	_graph->setInitalGraphRegion(Area(20, 20, (int)_graph->getWidth() - 20, (int)_graph->getHeight() - 20));
+	_graph->setInitalGraphRegion(Area(20, 20, (int)_graph->getWidth() - 20, (int)_graph->getHeight() / 2));
 	_barChart->setInitalGraphRegion(Area(20, (int)_barChart->getHeight() - 20, (int)_barChart->getWidth() - 20, (int)_barChart->getHeight() / 2 - 10));
 
-	if (handler) {
-		auto& candles = handler->getCandleHistoriesNonSync();
-		initBarchart(candles);
+	if (_lastSelectedHandler) {
+		initChart();
 	}
 	else {
 		_barChart->adjustTransform();
 		_graph->adjustTransform();
 	}
+}
+
+bool BasicApp::isGraphDataCandle() {
+	return _controlBoard->getCurrentGraphLengh() >= 12 * 3600;
 }
 
 void BasicApp::setup()
@@ -202,8 +200,8 @@ void BasicApp::setup()
 	_barChart->setLineColor(ColorA8u(255, 255, 0, 255));
 	_barChart->setBarColor(ColorA8u(69, 69, 69, 255));
 
-	graphLine->setIndicateAligment(HorizontalIndicatorAlignment::Left, VerticalIndicatorAlignment::None);
-	_barChart->setIndicateAligment(HorizontalIndicatorAlignment::Right, VerticalIndicatorAlignment::Bottom);
+	graphLine->setIndicateAligment(HorizontalIndicatorAlignment::Left, VerticalIndicatorAlignment::Bottom);
+	_barChart->setIndicateAligment(HorizontalIndicatorAlignment::Right, VerticalIndicatorAlignment::None);
 
 	graphLine->drawBackground(false);
 
@@ -386,7 +384,13 @@ void BasicApp::setup()
 		applySelectedCurrency(_controlBoard->getCurrentCurrency());
 	});
 
-	//_controlBoard->setOnSelectedGraphModeChangedHandler(std::bind(&BasicApp::onSelectedGraphModeChanged, this, _1));
+	_controlBoard->setOnNotificationModeChangedHandler([this](Widget*) {
+		Notifier::getInstance()->enablePushToCloud(_controlBoard->isPushToCloudEnable());
+	});
+
+	_controlBoard->setOnGraphLengthChangedHandler([this](Widget*) {
+		initChart();
+	});
 
 	_asynTasksWorkder = std::thread([this]() {
 		while (_runFlag)
@@ -424,82 +428,12 @@ void BasicApp::onSelectedSymbolChanged(Widget*) {
 	// add new event handler
 	_lastSelectedHandler = ((NAPMarketEventHandler*)handler);
 
-	_lastSelectedHandler->accessSharedData([this](NAPMarketEventHandler* handler) {
-		auto graphMode = _controlBoard->getCurrentGraphMode();
-		if (graphMode == GraphMode::Price) {
-			auto& tickers = handler->getTradeHistoriesNonSync();
-			if (tickers.size()) {
-				_graph->acessSharedData([this, &tickers](Widget* sender) {
-					WxLineGraphLive* graph = (WxLineGraphLive*)sender;
-
-					// reset the graph
-					_graph->clearPoints();
-					_graph->setInitalGraphRegion(_graph->getGraphRegion());
-
-
-					TIMESTAMP timeLength = 4 * 60 * 60 * 1000;
-					_pixelPerTime = (float)(graph->getWidth() / timeLength);
-					float timeScale;
-
-					// import the first n - 1 points
-					for (auto it = tickers.rbegin(); it != tickers.rend(); it++) {
-						timeScale = convertRealTimeToDisplayTime(it->timestamp);
-						vec2 point(timeScale, (float)it->price);
-						graph->addPointAndConstruct(point);
-					}
-
-					// add last point and adjust the transform
-					auto& lastTicker = tickers.front();
-
-					auto& area = graph->getGraphRegion();
-					graph->scale(1.0f, (float)(area.getHeight() / (lastTicker.price / 200)));
-
-					// at time zero, the point will display at x = graph->getWidth() * 4 / 5
-					float expectedXAtBeginTime = area.getWidth() * 95 / 100;
-
-					auto t = convertRealTimeToDisplayTime(lastTicker.timestamp);
-					auto actualPointAtT = graph->pointToLocal(t, (float)lastTicker.price);
-
-					auto expectedXAtT = expectedXAtBeginTime + t;
-					auto correctionX = expectedXAtT - actualPointAtT.x;
-					if (correctionX > 0) {
-						graph->translate(correctionX, 0);
-					}
-					graph->adjustTransform();
-				});
-			}
-		}
-		else if (graphMode == GraphMode::Volume) {
-			auto& candles = handler->getCandleHistoriesNonSync();
-			if (candles.size()) {
-				initBarchart(candles);
-			}
-		}
-	});
+	initChart();
 
 	auto eventListener = std::bind(&BasicApp::onSelectedTradeEvent, this, _1, _2, _3, _4);
 	auto candleEventListener = std::bind(&BasicApp::onCandle, this, _1, _2, _3, _4);
 	_lastEventId = _lastSelectedHandler->addTradeEventListener(eventListener);
 	_lastCandleEventId = _lastSelectedHandler->addCandleEventListener(candleEventListener);
-}
-
-void BasicApp::onSelectedGraphModeChanged(Widget*) {
-	auto bottomSpilter = (Spliter*)_spliter.getChild2().get();
-	if (_controlBoard->getCurrentGraphMode() == GraphMode::Volume) {
-		static bool initGraph = false;
-		bottomSpilter->setChild1(_barChart);
-		if (initGraph == false) {
-			_barChart->setInitalGraphRegion(Area(20, 20, (int)_barChart->getWidth() - 20, (int)_barChart->getHeight() - 20));
-			_barChart->setGraphRegionColor(ColorA8u(0, 0, 0, 255));
-			_barChart->setLineColor(ColorA8u(255, 255, 0, 255));
-			_barChart->setBarColor(ColorA8u(69, 69, 69, 255));
-		}
-	}
-	else {
-		bottomSpilter->setChild1(_graph);
-	}
-
-	onSelectedSymbolChanged(nullptr);
 }
 
 void BasicApp::createCandleWindow() {
@@ -619,8 +553,69 @@ void BasicApp::onSelectedTradeEvent(NAPMarketEventHandler* handler, TradeItem* i
 	//});
 
 	if(snapShot) {
+		if (isGraphDataCandle()) {
+			return;
+		}
+		auto& items = handler->getTradeHistoriesNonSync();
+		initBarchart(items);
 	}
 	else {
+		if (isGraphDataCandle() == false) {
+			_barChart->acessSharedData([this, items, handler](Widget*) {
+				pushLog("acessSharedData begin\n");
+
+				TIMESTAMP barTimeLength = _barTimeLength;
+				auto lastAlignedTime = roundDown(items->timestamp, barTimeLength);
+				auto& candles = handler->getCandleHistoriesNonSync();
+				if (candles.size() == 0)
+					return;
+
+				auto& points = _barChart->getPoints();
+				if (points.size()) {
+					auto& lastPoint = points.back();
+					auto lastTimeInChart = convertXToTime(lastPoint.x);
+					auto lastAnlignedTimeInChart = roundDown(lastTimeInChart, barTimeLength);
+
+					if (lastAlignedTime == lastAnlignedTimeInChart) {
+						// update last bar
+						lastPoint.y += abs(items->amount);
+						pushLog("case 1\n");
+					}
+					else if(lastAlignedTime > lastAnlignedTimeInChart){
+						// add new bar
+						glm::vec2 newBarPoint(convertRealTimeToDisplayTime(lastAlignedTime), abs(items->amount));
+						_barChart->addPoint(newBarPoint);
+						pushLog("case 2 %lld, %lld\n", lastAlignedTime, lastAnlignedTimeInChart);
+					}
+					else {
+						// some trade event item come to client late
+						// that is not lastest event
+						// so, we need to find the item which the event belong to
+						for (auto it = points.begin(); it != points.end(); it++) {
+							lastTimeInChart = convertXToTime(it->x);
+							lastAnlignedTimeInChart = roundDown(lastTimeInChart, barTimeLength);
+							if (lastAlignedTime == lastAnlignedTimeInChart) {
+								// update last bar
+								it->y += abs(items->amount);
+							}
+						}
+
+						pushLog("case 3\n");
+					}
+				}
+				else {
+					// add new bar
+					glm::vec2 newBarPoint(convertRealTimeToDisplayTime(lastAlignedTime), abs(items->amount));
+					_barChart->addPoint(newBarPoint);
+
+					pushLog("case 4\n");
+				}
+				_barChart->adjustTransform();
+
+				pushLog("acessSharedData end\n");
+			});
+		}
+
 		_graph->acessSharedData([this, items](Widget*) {
 			if (items) {
 				auto& points = _graph->getPoints();
@@ -642,17 +637,16 @@ void BasicApp::onSelectedTradeEvent(NAPMarketEventHandler* handler, TradeItem* i
 }
 
 void BasicApp::onCandle(NAPMarketEventHandler* sender, CandleItem* candleItems, int count, bool snapshot) {
-	if (_controlBoard->getCurrentGraphMode() != GraphMode::Volume) {
+	if (isGraphDataCandle() == false) {
 		return;
 	}
-
 	if (snapshot) {
 		auto& candles = sender->getCandleHistoriesNonSync();
 		initBarchart(candles);
 	}
 	else {
 		_barChart->acessSharedData([this, candleItems, sender](Widget*) {
-			TIMESTAMP barTimeLength = _barTimeLength * 60 * 1000;
+			TIMESTAMP barTimeLength = _barTimeLength;
 			auto lastAlignedTime = roundDown(candleItems->timestamp, barTimeLength);
 			auto& candles = sender->getCandleHistoriesNonSync();
 			if (candles.size() == 0)
@@ -708,42 +702,78 @@ void BasicApp::onCandle(NAPMarketEventHandler* sender, CandleItem* candleItems, 
 	}
 }
 
-void BasicApp::initBarchart(const std::list<CandleItem>& candles) {
-	TIMESTAMP barTimeLength = _barTimeLength * 60 * 1000;
-	int barCount = 24 * 60 / _barTimeLength;
+void BasicApp::initChart() {
+	if (_lastSelectedHandler == nullptr) return;
+	_lastSelectedHandler->accessSharedData([this](NAPMarketEventHandler* handler) {
+		if (isGraphDataCandle()) {
+			auto& candles = handler->getCandleHistoriesNonSync();
+			if (candles.size()) {
+				initBarchart(candles);
+			}
+		}
+		else {
+			auto& items = handler->getTradeHistoriesNonSync();
+			if (items.size()) {
+				initBarchart(items);
+			}
+		}
+	});
+}
+
+TIMESTAMP BasicApp::computeBarTimeLength() {
+	auto graphLength = _controlBoard->getCurrentGraphLengh();
+	int barCount = 0;
+	if (graphLength <= 60) {
+		barCount = 12;
+	}
+	else if (graphLength <= 5 * 60) {
+		barCount = 24;
+	}
+	else {
+		barCount = 60;
+	}
+
+	graphLength *= 1000;
+	_pixelPerTime = _barChart->getGraphRegion().getWidth() * 1.0f / graphLength;
 	float barWith = _barChart->getGraphRegion().getWidth() / barCount;
 	_barChart->setBarWidth(barWith);
-	_pixelPerTime = (float)(barWith / barTimeLength);
 
-	_liveMode = true;
+	return (TIMESTAMP)(graphLength / barCount);
+}
+
+template <class T, class FVolume, class FPrice>
+void initBarChart(WxBarCharLive* barChart, WxLineGraphLive* lineChart, 
+	const std::list<T>& items, TIMESTAMP barTimeLength, TIMESTAMP graphLength,
+	FVolume fVolume, FPrice fPrice) {
 
 	float alignX;
+	auto app = (BasicApp*)App::get();
 
-	_barChart->acessSharedData([this, &candles, barTimeLength, barCount, &alignX](Widget*) {
-		_barChart->clearPoints();
-		_barChart->setInitalGraphRegion(_barChart->getGraphRegion());
+	barChart->acessSharedData([barChart, app, &items, graphLength, barTimeLength, &alignX, &fVolume](Widget*) {
+		barChart->clearPoints();
+		barChart->setInitalGraphRegion(barChart->getGraphRegion());
 
-		auto it = candles.rbegin();
+		auto it = items.rbegin();
 
 		TIMESTAMP beginTime = it->timestamp;
 		TIMESTAMP alignTime = roundUp(beginTime, barTimeLength);
 
 		// import the first n - 1 points
-		for (; it != candles.rend(); it++) {
+		for (; it != items.rend(); it++) {
 			if (it->timestamp >= alignTime) {
 				break;
 			}
 		}
 		float volume = 0;
-		for (; it != candles.rend(); it++) {
+		for (; it != items.rend(); it++) {
 			if ((it->timestamp - alignTime) < barTimeLength) {
-				volume += it->volume;
+				volume += fVolume(*it);
 			}
 			else {
-				float x = convertRealTimeToDisplayTime(it->timestamp);
-				_barChart->addPoint(glm::vec2(x, volume));
-				alignTime = it->timestamp;
-				volume = it->volume;
+				alignTime = roundDown(it->timestamp, barTimeLength);
+				float x = app->convertRealTimeToDisplayTime(alignTime);
+				barChart->addPoint(glm::vec2(x, volume));
+				volume = fVolume(*it);
 			}
 		}
 
@@ -751,32 +781,30 @@ void BasicApp::initBarchart(const std::list<CandleItem>& candles) {
 		alignTime = roundUp(getCurrentTimeStamp(), barTimeLength);
 
 		// begin time of graph should be
-		beginTime = alignTime - barCount * barTimeLength;
-		alignX = convertRealTimeToDisplayTime(beginTime);
+		beginTime = alignTime - graphLength;
+		alignX = app->convertRealTimeToDisplayTime(beginTime);
 
 		// begin time should be display at begin of the graph
-		_barChart->translate(-alignX, 0);
-		_barChart->adjustTransform();
+		barChart->translate(-alignX, 0);
+		barChart->adjustTransform();
 	});
 
-	_graph->acessSharedData([this, &candles, &alignX](Widget* sender) {
-		WxLineGraphLive* graph = (WxLineGraphLive*)sender;
-
+	lineChart->acessSharedData([app, lineChart, &items, &alignX, &fPrice](Widget*) {
 		// reset the graph
-		_graph->clearPoints();
-		auto& area = _graph->getGraphRegion();
-		_graph->setInitalGraphRegion(area);
-		_graph->translate(-alignX, 0);
+		lineChart->clearPoints();
+		auto& area = lineChart->getGraphRegion();
+		lineChart->setInitalGraphRegion(area);
+		lineChart->translate(-alignX, 0);
 
 		float y;
-		for (auto it = candles.rbegin(); it != candles.rend(); it++) {
-			float x = convertRealTimeToDisplayTime(it->timestamp);
-			y = (float)((it->high + it->low) / 2);
-			_graph->addPointAndConstruct(glm::vec2(x, y));
+		for (auto it = items.rbegin(); it != items.rend(); it++) {
+			float x = app->convertRealTimeToDisplayTime(it->timestamp);
+			y = fPrice(*it);
+			lineChart->addPointAndConstruct(glm::vec2(x, y));
 		}
 
-		auto& points = _graph->getPoints();
-		auto rightPoint = _graph->localToPoint(_graph->getGraphRegion().getWidth(), 0);
+		auto& points = lineChart->getPoints();
+		auto rightPoint = lineChart->localToPoint(lineChart->getGraphRegion().getWidth(), 0);
 		float translateY = 0;
 		if (points.size()) {
 			float yMin, yMax;
@@ -786,8 +814,6 @@ void BasicApp::initBarchart(const std::list<CandleItem>& candles) {
 					break;
 				}
 			}
-			auto ttt = convertXToTime(alignX);
-			auto tttstr = Utility::time2str(ttt);
 			if (it == points.end()) {
 				yMin = 0;
 				yMax = 0;
@@ -805,7 +831,7 @@ void BasicApp::initBarchart(const std::list<CandleItem>& candles) {
 				}
 			}
 			constexpr int graphPart = 6;
-			constexpr int initArea = 3;
+			constexpr int initArea = 6;
 			constexpr int topArea = 0;
 			float partHeight = area.getHeight() * 1.0f / graphPart;
 
@@ -813,9 +839,9 @@ void BasicApp::initBarchart(const std::list<CandleItem>& candles) {
 				(yMax == 0 ? 1.0f : area.getHeight() / yMax) :
 				(initArea * partHeight) / (yMax - yMin);
 
-			_graph->scale(1.0f, scaleY);
+			lineChart->scale(1.0f, scaleY);
 			if (yMin != 0) {
-				auto bottom = _graph->pointToLocal(0, yMin);
+				auto bottom = lineChart->pointToLocal(0, yMin);
 				auto overlapBottomPart = bottom.y - (topArea + initArea) * partHeight;
 				if (overlapBottomPart > 0) {
 					// yMin will display bellow the bottom area
@@ -826,9 +852,29 @@ void BasicApp::initBarchart(const std::list<CandleItem>& candles) {
 				}
 			}
 		}
-		_graph->translate(0, translateY);
-		_graph->adjustTransform();
+		lineChart->translate(0, translateY);
+		lineChart->adjustTransform();
 	});
+}
+
+void BasicApp::initBarchart(const std::list<CandleItem>& candles) {
+	_barTimeLength = computeBarTimeLength();
+	auto graphLength = _controlBoard->getCurrentGraphLengh() * 1000;
+	_liveMode = true;
+
+	initBarChart(_barChart.get(), _graph.get(), candles, _barTimeLength, graphLength,
+		[](const CandleItem& item) { return item.volume; },
+		[](const CandleItem& item) { return (float)((item.low + item.high) / 2); });
+}
+
+void BasicApp::initBarchart(const std::list<TradeItem>& items) {
+	_barTimeLength = computeBarTimeLength();
+	auto graphLength = _controlBoard->getCurrentGraphLengh() * 1000;
+	_liveMode = true;
+
+	initBarChart(_barChart.get(), _graph.get(), items, _barTimeLength, graphLength,
+		[](const TradeItem& item) { return abs(item.amount); },
+		[](const TradeItem& item) { return (float)item.price; });
 }
 
 float BasicApp::convertRealTimeToDisplayTime(TIMESTAMP t) {

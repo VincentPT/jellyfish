@@ -2,7 +2,7 @@
 
 const char* platforms[] = { "bitfinex", "binance" };
 
-WxControlBoard::WxControlBoard() : _checkedButton(-1), _currentPlatform(platforms[0]), _graphMode(GraphMode::Price)
+WxControlBoard::WxControlBoard() : _checkedButton(-1), _currentPlatform(platforms[0]), _currentGraphLength(1)
 {
 	_window_flags |= ImGuiWindowFlags_NoTitleBar;
 	_window_flags |= ImGuiWindowFlags_NoMove;
@@ -28,7 +28,7 @@ void WxControlBoard::update() {
 		return;
 	}
 
-	if (ImGui::BeginCombo("Platform", _currentPlatform))
+	if (ImGui::BeginCombo(" ", _currentPlatform))
 	{
 		for (int n = 0; n < IM_ARRAYSIZE(platforms); n++)
 		{
@@ -59,19 +59,9 @@ void WxControlBoard::update() {
 			_exportButtonClickHandler(this);
 		}
 	}
-
-	int* graphMode = (int*)&_graphMode;
-	int oldSelected = *graphMode;
-	ImGui::BeginGroup();
-	ImGui::RadioButton("price", graphMode, 0);
-	ImGui::RadioButton("volume", graphMode, 1);
-	ImGui::EndGroup();
-
-	// disable change graph mode
-	_graphMode = GraphMode::Volume;
-
-	if (oldSelected != *graphMode && _selectedGraphModeChangedHandler) {
-		_selectedGraphModeChangedHandler(this);
+	ImGui::Separator();
+	if (ImGui::CollapsingHeader("Notification", ImGuiTreeNodeFlags_DefaultOpen)) {
+		ImGui::Checkbox("Push message", &_pushToCloud);
 	}
 
 	ImGui::Separator();
@@ -90,6 +80,27 @@ void WxControlBoard::update() {
 			_selectedCurrencyChangedHandler(this);
 		}
 	}
+	ImGui::Separator();
+	if (ImGui::CollapsingHeader("Graph mode", ImGuiTreeNodeFlags_DefaultOpen)) {
+		const char* graphLengths[] = {"7d", "1d", "12h", "4h", "1h", "30m", "5m", "1m" };
+		if (ImGui::BeginCombo("  ", graphLengths[_currentGraphLength]))
+		{
+			int oldSelection = _currentGraphLength;
+			for (int n = 0; n < IM_ARRAYSIZE(graphLengths); n++)
+			{
+				bool is_selected = _currentGraphLength == n;
+				if (ImGui::Selectable(graphLengths[n], is_selected))
+					_currentGraphLength = n;
+				if (is_selected)
+					ImGui::SetItemDefaultFocus();   // Set the initial focus when opening the combo (scrolling + for keyboard navigation support in the upcoming navigation branch)
+			}
+			ImGui::EndCombo();
+			if (oldSelection != _currentGraphLength && _graphLengthChangedHandler) {
+				_graphLengthChangedHandler(this);
+			}
+		}
+	}
+
 	ImGui::End();
 }
 
@@ -109,8 +120,12 @@ void WxControlBoard::setOnSelectedCurrencyChangedHandler(ButtonClickEventHandler
 	_selectedCurrencyChangedHandler = handler;
 }
 
-void WxControlBoard::setOnSelectedGraphModeChangedHandler(ButtonClickEventHandler&& handler) {
-	_selectedGraphModeChangedHandler = handler;
+void WxControlBoard::setOnNotificationModeChangedHandler(ButtonClickEventHandler&& handler) {
+	_notificationModeChangedHandler = handler;
+}
+
+void WxControlBoard::setOnGraphLengthChangedHandler(ButtonClickEventHandler&& handler) {
+	_graphLengthChangedHandler = handler;
 }
 
 void WxControlBoard::accessSharedData(const AccessSharedDataFunc& f) {
@@ -132,6 +147,21 @@ const char* WxControlBoard::getCurrentPlatform() const {
 	return _currentPlatform;
 }
 
-GraphMode WxControlBoard::getCurrentGraphMode() const {
-	return _graphMode;
+bool WxControlBoard::isPushToCloudEnable() const {
+	return _pushToCloud;
+}
+
+unsigned int WxControlBoard::getCurrentGraphLengh() const {
+	static unsigned int graphLengths[] = {
+		7 * 24 * 3600,
+		1 * 24 * 3600,
+		12 * 3600,
+		4 * 3600,
+		1 * 3600,
+		30 * 60,
+		5 * 60,
+		60,
+	};
+
+	return graphLengths[_currentGraphLength];
 }

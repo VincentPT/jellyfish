@@ -140,7 +140,7 @@ PlatformEngine::~PlatformEngine() {
 
 void PlatformEngine::pushMessageLoop() {
 	InternalNotificationData notification;
-	Notifier notifier;
+	Notifier* notifier = Notifier::getInstance();
 	while (_runFlag) {
 		if (_messageQueue.popMessage(notification, 1000) && _runFlag) {
 			auto it = _pairListenerMap.find(notification.pair);
@@ -153,7 +153,7 @@ void PlatformEngine::pushMessageLoop() {
 						// Wait for all the outstanding I/O to complete and handle any exceptions
 						try
 						{
-							if (notifier.pushNotification(messageInfo)) {
+							if (notifier->pushNotification(messageInfo)) {
 								break;
 							}
 						}

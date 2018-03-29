@@ -29,18 +29,18 @@ void WxLineGraphLive::adjustVerticalTransform(const glm::vec2& point) {
 
 	auto left = localToPoint(0, 0);
 	auto right = localToPoint(_displayArea.getWidth(), 0);
-	auto it = _points.begin();
-	for (; it != _points.end(); it++) {
-		if (it->x >= left.x) {
+	auto it = _points.rbegin();
+	for (; it != _points.rend(); it++) {
+		if (it->x <= right.x) {
 			break;
 		}
 	}
-	if (it == _points.end()) return;
+	if (it == _points.rend()) return;
 
 	float minY = it->y;
 	float maxY = minY;
 
-	for (; it != _points.end() && it->x < right.x; it++) {
+	for (; it != _points.rend() && it->x >= left.x; it++) {
 		if (maxY < it->y) {
 			maxY = it->y;
 		}
@@ -51,20 +51,28 @@ void WxLineGraphLive::adjustVerticalTransform(const glm::vec2& point) {
 
 	auto yTop = pointToLocal(0, maxY);
 	auto yBellow = pointToLocal(0, minY);
-	auto currHeight = std::abs(yBellow.y - yTop.y);
+	auto currHeight = maxY - minY;
 
-	if (currHeight > _displayArea.getHeight()) {
-		auto scaleY = _displayArea.getHeight() / currHeight;
-		scale(1.0f, scaleY);
-
-		yTop = pointToLocal(0, maxY);
-		yBellow = pointToLocal(0, minY);
+	if (currHeight * _scale.y > _displayArea.getHeight()) {
+		_scale.y = _displayArea.getHeight() / currHeight;
+	}
+	else if (currHeight > 0 && _scale.y * currHeight < _displayArea.getHeight() * 2.0f / 3) {
+		_scale.y = _displayArea.getHeight() * 2.0f / (3 * currHeight);
 	}
 	
+	//if (yTop.y < 0) {
+	//	translate(0, -yTop.y);
+	//}
+	//else if (yBellow.y > _displayArea.getHeight()) {
+	//	translate(0, _displayArea.getHeight() - yBellow.y);
+	//}
+
+	yTop = pointToLocal(0, maxY);
+	yBellow = pointToLocal(0, minY);
 	if (yTop.y < 0) {
 		translate(0, -yTop.y);
 	}
-	else if (yBellow.y > _displayArea.getHeight()) {
+	if (yBellow.y > _displayArea.getHeight()) {
 		translate(0, _displayArea.getHeight() - yBellow.y);
 	}
 }
@@ -124,10 +132,8 @@ void WxLineGraphLive::draw() {
 	std::unique_lock<std::mutex> lk(_mutex);
 
 	if (_points.size()) {
-		auto points = _points;
-
-		auto localPoint = pointToWindow(points.back().x, points.back().y);
-		vec2 constructPoint = pointToWindow(_lastestX, points.back().y);
+		auto localPoint = pointToWindow(_points.back().x, _points.back().y);
+		vec2 constructPoint = pointToWindow(_lastestX, _points.back().y);
 
 		WxLineGraph::draw();
 
@@ -138,7 +144,7 @@ void WxLineGraphLive::draw() {
 		gl::color(color);
 
 		if (_translateFunction) {
-			auto pointStr = _translateFunction(points.back());
+			auto pointStr = _translateFunction(_points.back());
 			
 			ci::Font font("Arial", 20);
 

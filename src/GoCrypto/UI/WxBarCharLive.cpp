@@ -14,23 +14,26 @@ WxBarCharLive::~WxBarCharLive() {
 void WxBarCharLive::adjustTransform() {
 	auto left = localToPoint(0, 0);
 	auto right = localToPoint(_displayArea.getWidth(), 0);
-	auto it = _points.begin();
-	for (; it != _points.end(); it++) {
-		if (it->x >= left.x) {
+	auto it = _points.rbegin();
+	for (; it != _points.rend(); it++) {
+		if (it->x <= right.x) {
 			break;
 		}
 	}
-	if (it != _points.end()) {
+	if (it != _points.rend()) {
 		float max_y = it->y;
 
-		for (; it != _points.end() && it->x < right.x; it++) {
+		for (; it != _points.rend() && it->x >= left.x; it++) {
 			if (max_y < it->y) {
 				max_y = it->y;
 			}
 		}
 
-		if (_scale.y * max_y > (float)_displayArea.getHeight()) {
+		if (_scale.y * max_y >(float)_displayArea.getHeight()) {
 			_scale.y = _displayArea.getHeight() / max_y;
+		}
+		else if (max_y > 0 && _scale.y * max_y < _displayArea.getHeight() * 2.0f / 3) {
+			_scale.y = _displayArea.getHeight() * 2.0f / (3 * max_y);
 		}
 
 		auto bottom = pointToLocal(0, 0);
@@ -62,10 +65,16 @@ void WxBarCharLive::draw() {
 	}
 
 	glm::vec2 leftMostPoint = localToPoint(0, 0);
+	glm::vec2 rightMost = localToPoint(_displayArea.getWidth(), 0);
+
+	auto baseX = localToPoint(0, 0);
+	auto firstExpectedX = localToPoint(_barWidth, 0);
+	auto barWidth = firstExpectedX.x - baseX.x;
+
 	// skip out of range bars
 	auto it = _points.begin();
 	for (; it != _points.end(); it++) {
-		if (it->x >= leftMostPoint.x) {
+		if ((it->x + barWidth) > leftMostPoint.x) {
 			break;
 		}
 	}
@@ -73,15 +82,12 @@ void WxBarCharLive::draw() {
 
 	auto basePoint = pointToWindow(it->x, 0);
 	auto lastBasePoint = pointToWindow(_currentX, 0);
-	auto baseX = localToPoint(0, 0);
-	auto firstExpectedX = localToPoint(_barWidth, 0);
-	auto batWidth = firstExpectedX.x - baseX.x;
 
-	for (it; it != _points.end(); it++) {
+	for (it; it != _points.end() && it->x < rightMost.x; it++) {
 		glm::vec2 point = pointToWindow(it->x, it->y);
 
 		Rectf barRect(point.x, point.y, point.x + _barWidth, basePoint.y);
-		if (it->x + batWidth > _currentX) {
+		if (it->x + barWidth > _currentX) {
 			barRect.x2 = lastBasePoint.x;
 		}
 
@@ -113,8 +119,8 @@ const ci::ColorA8u& WxBarCharLive::getBarColor() const {
 void WxBarCharLive::setLiveX(float x) {
 	_currentX = x;
 	auto rightMostPoint = pointToLocal(_currentX, 0);
-	if (rightMostPoint.x > _displayArea.x2) {
-		translate(rightMostPoint.x - _displayArea.x2, 0);
+	if (rightMostPoint.x > _displayArea.getWidth()) {
+		translate(_displayArea.getWidth() - rightMostPoint.x, 0);
 	}
 }
 

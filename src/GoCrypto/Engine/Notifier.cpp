@@ -15,11 +15,21 @@ using namespace std;
 using namespace web::http;                  // Common HTTP functionality
 using namespace web::http::client;          // HTTP client features
 
-extern const char* platformName;
-
 Notifier::Notifier() {}
 
 Notifier::~Notifier() {}
+
+Notifier* Notifier::getInstance() {
+	static Notifier notifier;
+	return &notifier;
+}
+
+bool Notifier::isPushToCloudEnable() const {
+	return _pushToCloud;
+}
+void Notifier::enablePushToCloud(bool enable) {
+	_pushToCloud = enable;
+}
 
 bool Notifier::pushNotification(const Notification& notification) {
 	const UserListenerInfo& userInfo = *(notification.target);
@@ -38,6 +48,7 @@ bool Notifier::pushNotification(const Notification& notification) {
 	pushLog("[%s] %s %s\n", str.c_str(), title.c_str(), message.c_str());
 
 	bool res = true;
+	if (_pushToCloud == false) return res;
 	//ofstream out;
 	//try {
 	//	string fileName(platformName);
@@ -53,29 +64,28 @@ bool Notifier::pushNotification(const Notification& notification) {
 	//	printf("Error exception:%s\n", e.what());
 	//}
 
-	//web::json::value jsonBody;
-	//jsonBody[U("title")] = web::json::value::string(CPPREST_TO_STRING(title));
-	//jsonBody[U("message")] = web::json::value::string(CPPREST_TO_STRING(message));
-	//jsonBody[U("token")] = web::json::value::string(CPPREST_TO_STRING(userInfo.applicationKey));
-	//jsonBody[U("user")] = web::json::value::string(CPPREST_TO_STRING(userInfo.userKey));
+	web::json::value jsonBody;
+	jsonBody[U("title")] = web::json::value::string(CPPREST_TO_STRING(title));
+	jsonBody[U("message")] = web::json::value::string(CPPREST_TO_STRING(message));
+	jsonBody[U("token")] = web::json::value::string(CPPREST_TO_STRING(userInfo.applicationKey));
+	jsonBody[U("user")] = web::json::value::string(CPPREST_TO_STRING(userInfo.userKey));
 
-	//http_request request(methods::POST);
-	//request.set_body(jsonBody);
+	http_request request(methods::POST);
+	request.set_body(jsonBody);
 
-	////bool res = false;
-	//res = false;
-	//auto task = client.request(request).then([&res](http_response response) {
-	//	auto code = response.status_code();
-	//	if (code == status_codes::OK) {
-	//		cout << "push message succeed:" << response.extract_utf8string(true).get() << endl;
-	//		res = true;
-	//	}
-	//	else {
-	//		string errorMsg("server response error:");
-	//		errorMsg.append(to_string(code));
-	//		cout << "push message failed:" << errorMsg << endl;
-	//	}
-	//});
-	//task.wait();
+	//bool res = false;
+	res = false;
+	auto task = client.request(request).then([&res](http_response response) {
+		auto code = response.status_code();
+		if (code == status_codes::OK) {
+			res = true;
+		}
+		else {
+			string errorMsg("server response error:");
+			errorMsg.append(to_string(code));
+			pushLog("push message failed:%s\n", errorMsg.c_str());
+		}
+	});
+	task.wait();
 	return res;
 }
