@@ -61,7 +61,11 @@ void WxControlBoard::update() {
 	}
 	ImGui::Separator();
 	if (ImGui::CollapsingHeader("Notification", ImGuiTreeNodeFlags_DefaultOpen)) {
+		bool oldVal = _pushToCloud;
 		ImGui::Checkbox("Push message", &_pushToCloud);
+		if (oldVal != _pushToCloud && _notificationModeChangedHandler) {
+			_notificationModeChangedHandler(this);
+		}
 	}
 
 	ImGui::Separator();
