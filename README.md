@@ -2,8 +2,10 @@
 A crypto application to help people in trading by showing and analyzing crypto's information.
 
 ## Getting Started
+Application screen.
 ![Application screen](/docs/GoCrypto-with-marks.PNG)
 
+Mobile notification.
 ![Notification](/docs/notifications.jpg)
 
 1. platform name(platform's config file name without extension)  
