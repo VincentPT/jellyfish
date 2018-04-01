@@ -13,26 +13,25 @@ A crypto application to help people in trading by showing and analyzing crypto's
        The currencies which use as base currencies to exchange to other cryocurencies.
        For example: USD, BTC, ETH, ... in Bitfinex trading platform.
        
-    4. Chart time length.
+4. Chart time length.
        The time length which use to display the chart current view.
        
-    5. Log filter
+5. Log filter
     
-    6. Log level
+6. Log level
     
-    7. Log messages area
+7. Log messages area
     
-    8. Charts
+8. Charts
        * Bart chart for volume.
        * Line chart for price.
        
-    9. Average prices.
+9. Average prices.
        Average prices for specific periods.
        
-    10.Total volume.
+10.Total volume.
        Total volume of base symbol exchanged for specific periods.
-       
-    11.Buy Per Shell.
+11.Buy Per Shell.
        Ratio in percent of bought volume per sold volume.
        
 ### Prerequisites
