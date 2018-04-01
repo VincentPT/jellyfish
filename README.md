@@ -4,6 +4,8 @@ A crypto application to help people in trading by showing and analyzing crypto's
 ## Getting Started
 ![Application screen](/docs/GoCrypto-with-marks.PNG)
 
+![Notification](/docs/notifications.jpg)
+
 1. platform name(platform's config file name without extension)  
 platform name list is loaded in forlder ./platforms in binaries folder.
        
@@ -34,7 +36,10 @@ Total volume of base symbol exchanged for specific periods.
 
 11.Buy Per Shell.  
 Ratio in percent of bought volume per sold volume.
-       
+
+12. Notification.  
+Notification through PushOver platform.
+
 ### Prerequisites
     #### Windows
     * Visual studio 2012, 2015. 
