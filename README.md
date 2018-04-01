@@ -4,12 +4,12 @@ A crypto application to help people in trading by showing and analyzing crypto's
 ## Getting Started
 ![Application screen](/docs/GoCrypto-with-marks.PNG)
 
-    1. platform name(platform's config file name without extension)
+1. platform name(platform's config file name without extension)
        platform name list is loaded in forlder ./platforms in binaries folder.
        
-    2. Message notification through PushOver platform.
+2. Message notification through PushOver platform.
     
-    3. Platform currencies.
+3. Platform currencies.
        The currencies which use as base currencies to exchange to other cryocurencies.
        For example: USD, BTC, ETH, ... in Bitfinex trading platform.
        
