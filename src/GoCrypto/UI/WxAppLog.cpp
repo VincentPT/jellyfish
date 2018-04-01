@@ -40,8 +40,30 @@ void WxAppLog::draw()
 
     ImGui::SameLine();
     bool copy = ImGui::Button("Copy");
-    ImGui::SameLine();
-    Filter.Draw("Filter", -100.0f);
+
+	ImGui::SameLine();
+	Filter.Draw("Filter", -200.0f);
+
+	ImGui::SameLine();
+	static int _logLevel = 0;
+	const char* logLevels[] = { "Debug", "Info", "Error"};
+	if (ImGui::BeginCombo("Log level", logLevels[_logLevel]))
+	{
+		int oldSelection = _logLevel;
+		for (int n = 0; n < IM_ARRAYSIZE(logLevels); n++)
+		{
+			bool is_selected = _logLevel == n;
+			if (ImGui::Selectable(logLevels[n], is_selected))
+				_logLevel = n;
+			if (is_selected)
+				ImGui::SetItemDefaultFocus();   // Set the initial focus when opening the combo (scrolling + for keyboard navigation support in the upcoming navigation branch)
+		}
+		ImGui::EndCombo();
+		//if (oldSelection != _logLevel && _graphLengthChangedHandler) {
+		//	_graphLengthChangedHandler(this);
+		//}
+	}
+
     ImGui::Separator();
     ImGui::BeginChild("scrolling", ImVec2(0,0), false, ImGuiWindowFlags_HorizontalScrollbar);
     if (copy) ImGui::LogToClipboard();

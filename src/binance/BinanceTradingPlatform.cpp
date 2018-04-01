@@ -780,13 +780,15 @@ void BinanceTradingPlatform::getCandleHistory(const char* pair, TIMESTAMP durati
 
 	auto limit = 500;
 	bool shouldStop = false;
+	bool tryAgain = false;
 	constexpr int candleDuration = 60;
 
-	auto parseCandle = [this, &candleItems, candleDuration, &shouldStop, &bonusTime](http_response& response) {
+	auto parseCandle = [this, &tryAgain, &candleItems, candleDuration, &shouldStop, &bonusTime](http_response& response) {
 		if (response.status_code() == 200) {
 			auto js = response.extract_json().get();
 			if (js.is_array() == false) {
 				pushLog("unexpected trade history format\n");
+				tryAgain = true;
 			}
 			else {
 				auto& jsArray = js.as_array();
@@ -838,6 +840,7 @@ void BinanceTradingPlatform::getCandleHistory(const char* pair, TIMESTAMP durati
 		else if (response.status_code() == 429) {
 			pushLog("The API has reached the limit, pause to the next minutes\n");
 			bonusTime = 60 * 1000;
+			tryAgain = true;
 		}
 		else if (response.status_code() == 418) {
 			pushLog("The client's IP has been banned by Binance\n");
@@ -845,6 +848,7 @@ void BinanceTradingPlatform::getCandleHistory(const char* pair, TIMESTAMP durati
 		}
 		else {
 			pushLog("request failed\n");
+			tryAgain = true;
 		}
 	};
 
@@ -868,6 +872,7 @@ void BinanceTradingPlatform::getCandleHistory(const char* pair, TIMESTAMP durati
 		parameters += TO_STRING_T(endTime);
 
 		bonusTime = 0;
+		tryAgain = false;
 
 		try {
 			http_client client(baseURL + parameters);
@@ -879,8 +884,9 @@ void BinanceTradingPlatform::getCandleHistory(const char* pair, TIMESTAMP durati
 		catch (...) {
 			pushLog("get trade history failed: unknown error\n");
 		}
-
-		startTime = candleItems.front().timestamp + candleDuration * 1000;
+		if (candleItems.size() && tryAgain == false) {
+			startTime = candleItems.front().timestamp + candleDuration * 1000;
+		}
 
 		t2 = getCurrentTimeStamp();
 

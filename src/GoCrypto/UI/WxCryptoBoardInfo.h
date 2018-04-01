@@ -168,6 +168,8 @@ class WxCryptoBoardInfo :
 
 	std::vector<int> _rawElmInfoOffsets;
 	std::mutex _mutex;
+	int _currentSortIndex;
+	float _lastSortTime;
 private:
 	ItemSelecionChangedHandler onItemSelectedChanged;
 private:
@@ -191,7 +193,7 @@ private:
 	bool checkValidVolPeriod(int i, int iOffset);
 	bool checkValidBPSh(int i, int iOffset);
 
-	void onSort(int columnIdx);
+	void onSort(int columnIdx, bool autoReverse);
 public:
 	WxCryptoBoardInfo();
 	virtual ~WxCryptoBoardInfo();

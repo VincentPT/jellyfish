@@ -1007,6 +1007,11 @@ void BFXTradingPlatform::getCandleHistory(const char* pair, TIMESTAMP duration, 
 						shouldStop = true;
 					}
 				}
+				else {
+					pushLog("Enter maintenance mode, try again in one minute\n");
+					additionalTime = 60 * 1000;
+					tryAgain = true;
+				}
 			}
 			else {
 				pushLogV("unknow response format %s\n", CPPREST_FROM_STRING(js.as_string()).c_str());

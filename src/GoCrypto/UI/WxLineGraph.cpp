@@ -22,8 +22,11 @@ void WxLineGraph::draw() {
 	if(_drawBackground)
 	{
 		ci::Rectf graphRect(_displayArea.x1 + tl_x, _displayArea.y1 + tl_y, _displayArea.x2 + tl_x, _displayArea.y2 + tl_y);
-		gl::ScopedColor color(_graphRegionColor);
+		gl::color(_graphRegionColor);
 		gl::drawSolidRect(graphRect);
+
+		//gl::color(_lineColor);
+		//gl::drawStrokedRect(graphRect);
 	}
 	{
 		gl::ScopedColor color(_lineColor);

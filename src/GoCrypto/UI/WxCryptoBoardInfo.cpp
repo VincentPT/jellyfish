@@ -191,7 +191,7 @@ void WxCryptoBoardInfo::updateCellBufferForBPSh(char* buffer, size_t bufferSize,
 	_cryptoBoardInfoAdapter->updateCellBufferForBPSh(buffer, bufferSize, i, iOffset);
 }
 
-WxCryptoBoardInfo::WxCryptoBoardInfo() : _selected(-1), _fixedItems(nullptr)
+WxCryptoBoardInfo::WxCryptoBoardInfo() : _selected(-1), _fixedItems(nullptr), _currentSortIndex(-1), _lastSortTime(0)
 {
 	_window_flags |= ImGuiWindowFlags_NoTitleBar;
 	_window_flags |= ImGuiWindowFlags_NoMove;
@@ -205,14 +205,14 @@ WxCryptoBoardInfo::WxCryptoBoardInfo() : _selected(-1), _fixedItems(nullptr)
 	resetCryptoAdapterToDefault();
 }
 
-void WxCryptoBoardInfo::onSort(int columnIdx) {
+void WxCryptoBoardInfo::onSort(int columnIdx, bool autoReverse) {
 	// set all other cloumns's sort type is not sort
 	for (size_t i = 0; i < _columns.size(); i++) {
 		auto& columInfo = _columnAdditionalInfo[i];
 		if (i != columnIdx) {
 			columInfo.sortType = SortType::NotSort;
 		}
-		else {
+		else if(autoReverse) {
 			if (columInfo.sortType == SortType::NotSort) {
 				columInfo.sortType = SortType::Accessding;
 			}
@@ -222,6 +222,9 @@ void WxCryptoBoardInfo::onSort(int columnIdx) {
 			else if (columInfo.sortType == SortType::Descending) {
 				columInfo.sortType = SortType::Accessding;
 			}
+		}
+		else if (columInfo.sortType == SortType::NotSort) {
+			columInfo.sortType = SortType::Accessding;
 		}
 	}
 	auto& columInfo = _columnAdditionalInfo[columnIdx];
@@ -241,6 +244,9 @@ void WxCryptoBoardInfo::onSort(int columnIdx) {
 			return compareFunc(i2, i1);
 		});
 	}
+
+	_lastSortTime = ImGui::GetTime();
+	_currentSortIndex = columnIdx;
 }
 
 
@@ -250,6 +256,8 @@ WxCryptoBoardInfo::~WxCryptoBoardInfo()
 }
 
 void WxCryptoBoardInfo::update() {
+	float currentTime = ImGui::GetTime();
+
 	FUNCTON_LOG();
 
 	std::unique_lock<std::mutex> lk(_mutex);
@@ -280,7 +288,7 @@ void WxCryptoBoardInfo::update() {
 		auto& column = _columns[i];
 		//ImGui::Text(column.label);
 		if (ImGui::Button(column.label.c_str(), ImVec2(column.size, 0))) {
-			onSort(column.additionalIdx);
+			onSort(column.additionalIdx, true);
 		}
 		ImGui::SetColumnOffset(-1, offset);
 		offset += column.size;
@@ -289,6 +297,11 @@ void WxCryptoBoardInfo::update() {
 	ImGui::Separator();
 	ImGui::Columns(1);
 	ImGui::EndChild();
+
+	// make sorting update-to-date every second
+	if (_currentSortIndex >= 0 && currentTime - _lastSortTime >= 1.0f) {
+		onSort(_currentSortIndex, false);
+	}
 
 	auto oldSelection = _selected;
 
@@ -364,6 +377,8 @@ void WxCryptoBoardInfo::setItems(const std::vector<CryptoBoardElmInfo*>* fixedIt
 		_fixedItems = nullptr;
 		_dataIndexcies.resize(0);
 		_cellBuffers.resize(0);
+
+		_selected = -1;
 	}
 	else {
 		_fixedItems = fixedItems;

@@ -53,27 +53,21 @@ void WxLineGraphLive::adjustVerticalTransform(const glm::vec2& point) {
 	auto yBellow = pointToLocal(0, minY);
 	auto currHeight = maxY - minY;
 
-	if (currHeight * _scale.y > _displayArea.getHeight()) {
-		_scale.y = _displayArea.getHeight() / currHeight;
+	auto autoScaleRangeY1 = _autoScaleRange.x - _displayArea.y1;
+	auto autoScaleRangeY2 = _autoScaleRange.y - _displayArea.y1;
+	auto autoScaleHeight = autoScaleRangeY2 - autoScaleRangeY1;
+
+	if (currHeight > 0 && currHeight * _scale.y != autoScaleHeight) {
+		_scale.y = autoScaleHeight / currHeight;
 	}
-	else if (currHeight > 0 && _scale.y * currHeight < _displayArea.getHeight() * 2.0f / 3) {
-		_scale.y = _displayArea.getHeight() * 2.0f / (3 * currHeight);
-	}
-	
-	//if (yTop.y < 0) {
-	//	translate(0, -yTop.y);
-	//}
-	//else if (yBellow.y > _displayArea.getHeight()) {
-	//	translate(0, _displayArea.getHeight() - yBellow.y);
-	//}
 
 	yTop = pointToLocal(0, maxY);
 	yBellow = pointToLocal(0, minY);
-	if (yTop.y < 0) {
-		translate(0, -yTop.y);
+	if (yTop.y < autoScaleRangeY1) {
+		translate(0, autoScaleRangeY1 - yTop.y);
 	}
-	if (yBellow.y > _displayArea.getHeight()) {
-		translate(0, _displayArea.getHeight() - yBellow.y);
+	if (yBellow.y > autoScaleRangeY2) {
+		translate(0, autoScaleRangeY2 - yBellow.y);
 	}
 }
 
@@ -105,6 +99,7 @@ void WxLineGraphLive::acessSharedData(const AccessSharedDataFunc& f) {
 void WxLineGraphLive::addPointAndConstruct(const glm::vec2& point) {
 	if (_points.size() == 0) {
 		WxLineGraph::addPoint(point);
+		//_lastestX = point.x - 1;
 	}
 	else {
 		auto constructPoint = _points.back();
@@ -112,7 +107,10 @@ void WxLineGraphLive::addPointAndConstruct(const glm::vec2& point) {
 		WxLineGraph::addPoint(constructPoint);
 		WxLineGraph::addPoint(point);
 	}
-	_lastestX = point.x;
+	//if (_lastestX < point.x) {
+		_lastestX = point.x;
+	//	adjustHorizontalTransform(point);
+	//}
 }
 
 void WxLineGraphLive::clearPoints() {
@@ -174,6 +172,22 @@ void WxLineGraphLive::draw() {
 }
 
 void WxLineGraphLive::setLiveX(float x) {
-	_lastestX = x;
-	adjustHorizontalTransform(glm::vec2(_lastestX, 0));
+	if (x > _lastestX) {
+		_lastestX = x;
+		adjustHorizontalTransform(glm::vec2(_lastestX, 0));
+	}
+}
+
+float WxLineGraphLive::getLiveX() const {
+	return _lastestX;
+}
+
+void WxLineGraphLive::setInitalGraphRegion(const ci::Area& area) {
+	WxLineGraph::setInitalGraphRegion(area);
+	setAutoScaleRange((float)area.y1, (float)area.y2);
+}
+
+void WxLineGraphLive::setAutoScaleRange(float y1, float y2) {
+	_autoScaleRange.x = y1;
+	_autoScaleRange.y = y2;
 }
