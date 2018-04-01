@@ -72,7 +72,7 @@ Notification through PushOver platform.
   Howerver, notification feature is only available if the PushOver's keys is specifed in platform's configuration file.  
   if you don't have a PushOver's account, you can register for trial [here](https://pushover.net/).  
     
-- In case you want to run application with Binance's services you should supplied your API key in platform's configuration file too.
+- In case you want to run application with Binance's services you should supply your API key in platform's configuration file too.
     
 - The platform's configuration file can be found in platforms folder in the binaries package.
 ## Authors
