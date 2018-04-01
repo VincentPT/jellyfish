@@ -53,20 +53,20 @@ Notification through PushOver platform.
 * Imgui
 * Cinder-ImGui
     
-    #### Linux
-    * Not supported yet
+#### Linux
+* Not supported yet
     
-    #### MacOS
-    * Not supported yet
+ #### MacOS
+* Not supported yet
 
 ## Build.
-    ### Windows.
+### Windows.
     
-    ### Linux.
-    * Not supported yet
-    
-    ### MacOS
-    * Not supported yet
+### Linux.
+* Not supported yet
+### MacOS
+* Not supported yet
+
 ## Run.
 - The binaries package is already to run.  
   Howerver, notification feature is only available if the PushOver's keys is specifed in platform's configuration file.  
