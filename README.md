@@ -46,12 +46,12 @@ Notification through PushOver platform.
 
 ### Prerequisites
     #### Windows
-    * Visual studio 2012, 2015. 
-    * CMake 3.2 or above
-    * Casablanca C++ REST SDK 2.9.2
-    * Cinder 0.9 or above
-    * Imgui
-    * Cinder-ImGui
+* Visual studio 2012, 2015. 
+* CMake 3.2 or above
+* Casablanca C++ REST SDK 2.9.2
+* Cinder 0.9 or above
+* Imgui
+* Cinder-ImGui
     
     #### Linux
     * Not supported yet
@@ -68,13 +68,13 @@ Notification through PushOver platform.
     ### MacOS
     * Not supported yet
 ## Run.
-    - The binaries package is already to run.
-    Howerver, notification feature is only available if the PushOver's keys is specifed in platform's configuration file.
-    if you don't have a PushOver's account, you can register for trial [here](https://pushover.net/).
+- The binaries package is already to run.  
+  Howerver, notification feature is only available if the PushOver's keys is specifed in platform's configuration file.  
+  if you don't have a PushOver's account, you can register for trial [here](https://pushover.net/).  
     
-    - In case you want to run application with Binance's services you should supplied your API key in platform's configuration file too.
+- In case you want to run application with Binance's services you should supplied your API key in platform's configuration file too.
     
-    - The platform's configuration file can be found in platforms folder in the binaries package.
+- The platform's configuration file can be found in platforms folder in the binaries package.
 ## Authors
 * **Vincent Pham** - [VincentPT](https://github.com/VincentPT)
 
