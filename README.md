@@ -45,7 +45,7 @@ Ratio in percent of bought volume per sold volume.
 Notification through PushOver platform.
 
 ### Prerequisites
-    #### Windows
+#### Windows
 * Visual studio 2012, 2015. 
 * CMake 3.2 or above
 * Casablanca C++ REST SDK 2.9.2
