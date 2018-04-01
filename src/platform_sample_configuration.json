@@ -1,7 +1,24 @@
 {
 	"module": "<module>.dll",
+	"apiKey": "<use for Binance only>",
 	"triggers": [
         {
+			"startTime": 90,
+            "endTime": 120,
+			"changedPerMin": 2
+		},{
+			"startTime": 120,
+            "endTime": 300,
+			"changedPerMin": 1
+		},{
+			"startTime": 300,
+            "endTime": 900,
+			"changedPerMin": 0.6
+		},{
+			"startTime": 900,
+            "endTime": 1800,
+			"changedPerMin": 0.5
+		},{
 			"startTime": 1800,
             "endTime": 3600,
 			"changedPerMin": 0.2
