@@ -33,10 +33,10 @@ The time length which use to display the chart current view.
 9. Average prices.  
 Average prices for specific periods.
        
-10.Total volume.  
+10. Total volume.  
 Total volume of base symbol exchanged for specific periods.  
 
-11.Buy Per Shell.  
+11. Buy Per Shell.  
 Ratio in percent of bought volume per sold volume.
 
 12. Notification.  
