@@ -1,0 +1,64 @@
+{
+	"module": "bitfinex.dll",
+	"triggers": [
+        {
+			"startTime": 90,
+            "endTime": 120,
+			"changedPerMin": 2
+		},{
+			"startTime": 120,
+            "endTime": 300,
+			"changedPerMin": 1
+		},{
+			"startTime": 300,
+            "endTime": 900,
+			"changedPerMin": 0.6
+		},{
+			"startTime": 900,
+            "endTime": 1800,
+			"changedPerMin": 0.5
+		},{
+			"startTime": 1800,
+            "endTime": 3600,
+			"changedPerMin": 0.2
+		},{
+			"startTime": 3600,
+            "endTime": 7200,
+			"changedPerMin": 0.1667
+		},{
+			"startTime": 7200,
+            "endTime": 14400,
+			"changedPerMin": 0.0833
+		},{
+			"startTime": 14400,
+            "endTime": 28800,
+			"changedPerMin": 0.0625
+		}
+	],
+    "periods": [
+        {
+            "name":"1m",
+            "duration":60
+        },{
+            "name":"1h",
+            "duration":3600
+        },{
+            "name":"2h",
+            "duration":3600
+        },{
+            "name":"3h",
+            "duration":3600
+        },{
+            "name":"4h",
+            "duration":3600
+        }
+    ],
+	"users": [
+        {
+			"userKey": "<your PushOver user key>",
+			"applicationKey": "<your PushOver application key>",
+			"interest": "all"
+		}
+	],
+    "currencies":["USD","BTC","ETH","EUR"]
+}
