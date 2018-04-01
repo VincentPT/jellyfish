@@ -1,4 +1,12 @@
-//#include <Windows.h>
+#ifdef WIN32
+#include <Windows.h>
+#include <filesystem>
+using namespace std::experimental;
+#else
+#include <unistd.h>
+#include <filesystem>
+using namespace std;
+#endif
 
 #include "cinder/app/App.h"
 #include "cinder/app/RendererGl.h"
@@ -18,6 +26,7 @@
 #include "../common/Utility.h"
 #include <ConvertableCryptoInfoAdapter.h>
 #include "UI/CiWndCandle.h"
+#include <cpprest/json.h>
 
 using namespace ci;
 using namespace ci::app;
@@ -180,6 +189,51 @@ bool BasicApp::isGraphDataCandle() {
 	return _controlBoard->getCurrentGraphLengh() >= 12 * 3600;
 }
 
+std::string getExecutableAbsolutePath() {
+	char buff[256];
+#ifdef WIN32
+	GetModuleFileNameA(nullptr, buff, sizeof(buff));
+#else
+	readlink("/proc/self/exe", buff, sizeof(buff));
+#endif // WIN32
+	return buff;
+}
+
+vector<string> listPlatformConfigs() {
+	filesystem::path path = getExecutableAbsolutePath();
+	path = path.parent_path();
+	path /= "platforms";
+
+	vector<string> configs;
+	for (auto & p : filesystem::directory_iterator(path)) {
+		if (p.path().filename().extension() == ".json") {
+			auto configPath = p.path().u8string();
+			ifstream in;
+			in.open(configPath);
+
+			auto fileName = p.path().filename().u8string();
+			auto platformName = fileName.substr(0, fileName.size() - 5);
+
+			if (in.is_open()) {
+				try {
+					web::json::value::parse(in);
+					configs.emplace_back(platformName);
+				}
+				catch (std::exception&e) {
+					pushLog((int)LogLevel::Error, "file %s is not a valid config file. error = %s", configPath.c_str(), e.what());
+				}
+				catch(...) {}
+				in.close();
+			}
+			else {
+				pushLog((int)LogLevel::Error, "file %s is unable to read", configPath.c_str());
+			}
+		}
+	}
+
+	return configs;
+}
+
 void BasicApp::setup()
 {
 	FUNCTON_LOG();
@@ -196,12 +250,16 @@ void BasicApp::setup()
 	_spliter.setPos(0, 0);
 	_topCotrol = &_spliter;
 
+	_applog = std::make_shared<WxAppLog>();
+
+	auto platforms = listPlatformConfigs();
+
 	_cryptoBoard = std::make_shared<WxCryptoBoardInfo>();
 	auto bottomSpliter = std::make_shared<Spliter>();
 	auto topSpliter = std::make_shared<Spliter>();
-	_applog = std::make_shared<WxAppLog>();
+	
 	auto graphLine = std::make_shared<WxLineGraphLive>();
-	_controlBoard = std::make_shared<WxControlBoard>();
+	_controlBoard = std::make_shared<WxControlBoard>(platforms);
 	_barChart = std::make_shared<WxBarCharLive>();
 	_panel = std::make_shared<Panel>();
 	_panel->addChild(_barChart);
@@ -492,15 +550,29 @@ void BasicApp::createCandleWindow() {
 
 void BasicApp::startServices() {
 	LOG_SCOPE_ACCESS(_logAdapter, __FUNCTION__);
+	pushLog((int)LogLevel::Info, "starting services...\n");
 	if (_platformRunner) {
 		pushLog((int)LogLevel::Error, "services have been already started\n");
 		return;
 	}
 
+	auto currentPlatform = _controlBoard->getCurrentPlatform();
+	if (currentPlatform == nullptr) {
+		pushLog((int)LogLevel::Error, "No available platform found\n");
+		return;
+	}
+
+
+	filesystem::path configPath = getExecutableAbsolutePath();
+	configPath = configPath.parent_path();
+	configPath /= "platforms";
+	configPath /= currentPlatform;
+	auto configFile = configPath.u8string() + ".json";
+
 	_liveMode = true;
 	{
 		std::unique_lock<std::mutex> lk(_serviceControlMutex);
-		_platformRunner = new PlatformEngine(_controlBoard->getCurrentPlatform());
+		_platformRunner = new PlatformEngine(configFile.c_str());
 	}
 	_platformRunner->getPlatform()->setLogger(_logAdapter);
 	_platformRunner->setSymbolStatisticUpdatedHandler([this](int i) {
@@ -519,10 +591,13 @@ void BasicApp::startServices() {
 	_controlBoard->accessSharedData([this](Widget*) {
 		_controlBoard->setBaseCurrencies(_platformRunner->getCurrencies());
 	});
+
+	pushLog((int)LogLevel::Info, "services have been started\n");
 }
 
 void BasicApp::stopServices() {
 	LOG_SCOPE_ACCESS(_logAdapter, __FUNCTION__);
+	pushLog((int)LogLevel::Info, "stopping services...\n");
 	if (!_platformRunner) {
 		pushLog((int)LogLevel::Error, "services are not running\n");
 		return;
@@ -551,6 +626,7 @@ void BasicApp::stopServices() {
 		delete _platformRunner;
 		_platformRunner = nullptr;
 	}
+	pushLog((int)LogLevel::Info, "services have been stopped\n");
 }
 
 void BasicApp::applySelectedCurrency(const std::string& currency) {

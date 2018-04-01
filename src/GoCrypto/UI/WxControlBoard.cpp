@@ -2,13 +2,21 @@
 
 const char* platforms[] = { "bitfinex", "binance" };
 
-WxControlBoard::WxControlBoard() : _checkedButton(-1), _currentPlatform(platforms[0]), _currentGraphLength(1)
+WxControlBoard::WxControlBoard(const std::vector<std::string>& platforms) : _checkedButton(-1), _currentGraphLength(1)
 {
 	_window_flags |= ImGuiWindowFlags_NoTitleBar;
 	_window_flags |= ImGuiWindowFlags_NoMove;
 	_window_flags |= ImGuiWindowFlags_NoResize;
 	_window_flags |= ImGuiWindowFlags_NoCollapse;
 	_window_flags |= ImGuiWindowFlags_NoScrollbar;
+
+	_platforms = platforms;
+	if (_platforms.size()) {
+		_currentPlatform = 0;
+	}
+	else {
+		_currentPlatform = -1;
+	}
 }
 
 
@@ -28,19 +36,21 @@ void WxControlBoard::update() {
 		return;
 	}
 
-	if (ImGui::BeginCombo(" ", _currentPlatform))
-	{
-		for (int n = 0; n < IM_ARRAYSIZE(platforms); n++)
+	if (_platforms.size()) {
+		if (ImGui::BeginCombo(" ", _platforms[_currentPlatform].c_str()))
 		{
-			bool is_selected = (_currentPlatform == platforms[n]);
-			if (ImGui::Selectable(platforms[n], is_selected))
-				_currentPlatform = platforms[n];
-			if (is_selected)
-				ImGui::SetItemDefaultFocus();   // Set the initial focus when opening the combo (scrolling + for keyboard navigation support in the upcoming navigation branch)
+			for (int n = 0; n < (int)_platforms.size(); n++)
+			{
+				bool is_selected = (_currentPlatform == n);
+				if (ImGui::Selectable(_platforms[n].c_str(), is_selected))
+					_currentPlatform = n;
+				if (is_selected)
+					ImGui::SetItemDefaultFocus();   // Set the initial focus when opening the combo (scrolling + for keyboard navigation support in the upcoming navigation branch)
+			}
+			ImGui::EndCombo();
 		}
-		ImGui::EndCombo();
+		ImGui::Separator();
 	}
-	ImGui::Separator();
 
 	if (ImGui::Button("start", ImVec2(120, 35))) {
 		if (_startButtonClickHandler) {
@@ -148,7 +158,8 @@ const std::string& WxControlBoard::getCurrentCurrency() const {
 }
 
 const char* WxControlBoard::getCurrentPlatform() const {
-	return _currentPlatform;
+	if (_currentPlatform < 0) return nullptr;
+	return _platforms[_currentPlatform].c_str();
 }
 
 bool WxControlBoard::isPushToCloudEnable() const {

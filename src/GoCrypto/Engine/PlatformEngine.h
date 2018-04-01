@@ -97,7 +97,7 @@ private:
 	void onTrade(int i, NAPMarketEventHandler* sender, TradeItem* tradeItem, int, bool);
 	void onCandle(int i, NAPMarketEventHandler* sender, CandleItem* candleItems, int, bool);
 public:
-	PlatformEngine(const char* platformName);
+	PlatformEngine(const char* configFile);
 	virtual ~PlatformEngine();
 
 	void run();

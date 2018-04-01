@@ -15,13 +15,14 @@ class WxControlBoard :
 	ButtonClickEventHandler _notificationModeChangedHandler;
 	ButtonClickEventHandler _graphLengthChangedHandler;
 	int _checkedButton;
-	const char* _currentPlatform;
+	int _currentPlatform;
+	std::vector<std::string> _platforms;
 	int _currentGraphLength;
 	bool _pushToCloud = false;
 	std::vector<std::string> _currencies;
 	mutable std::mutex _mutex;
 public:
-	WxControlBoard();
+	WxControlBoard(const std::vector<std::string>& platforms);
 	virtual ~WxControlBoard();
 
 	virtual void update();

@@ -1,4 +1,12 @@
-#include "Engine/PlatformEngine.h"
+#ifdef WIN32
+#include <filesystem>
+using namespace std::experimental;
+#else
+#include <filesystem>
+using namespace std;
+#endif
+
+#include "PlatformEngine.h"
 #include <iostream>
 #include <fstream>
 #include <vector>
@@ -14,13 +22,16 @@ using namespace std::chrono;
 using namespace std;
 typedef  TradingPlatform* (*CreatePlatformInstanceF)();
 
-PlatformEngine::PlatformEngine(const char* platformName) : _runFlag(false), _hLib(nullptr), _platformName(platformName) {
-
+PlatformEngine::PlatformEngine(const char* configFile) : _runFlag(false), _hLib(nullptr) {
 	_platform = nullptr;
 
-	std::string moduleName(platformName);
-	std::string settingFile(platformName);
-	settingFile.append(".json");
+	filesystem::path p(configFile);
+	auto pathFile = p.filename();
+	auto& pathExt = pathFile.extension();
+	auto fileName = pathFile.u8string();
+	_platformName = fileName.substr(0, fileName.size() - pathExt.u8string().size());
+
+	std::string moduleName;
 
 	auto parseTrigger = [](web::json::object& value) {
 		TriggerTimeBase trigger;
@@ -34,7 +45,7 @@ PlatformEngine::PlatformEngine(const char* platformName) : _runFlag(false), _hLi
 	try {
 
 		ifstream in;
-		in.open(settingFile);
+		in.open(configFile);
 		if (in.is_open()) {
 			auto settings = web::json::value::parse(in);
 
@@ -98,20 +109,26 @@ PlatformEngine::PlatformEngine(const char* platformName) : _runFlag(false), _hLi
 		}
 	}
 	catch(...) {
-		cout << "Load setting file " << settingFile <<  " failed" << endl;
+		pushLog((int)LogLevel::Error, "Load setting file %s failed\n", configFile);
 	}
 
 	_hLib = LoadLibraryA(moduleName.c_str());
 	if (_hLib == nullptr) {
-		cout << "cannot load runtime platform" << endl;
+		pushLog((int)LogLevel::Error, "cannot load runtime platform %s\n", moduleName.c_str());
 	}
 	else {
 		CreatePlatformInstanceF createFunc = (CreatePlatformInstanceF)GetProcAddress(_hLib, "createPlatformInstance");
 		if (createFunc != nullptr) {
 			_platform = createFunc();
 			if (_platform) {
-				_platform->setConfigFilePath(settingFile.c_str());
+				_platform->setConfigFilePath(configFile);
 			}
+			else {
+				pushLog((int)LogLevel::Error, "Create platform failed\n");
+			}
+		}
+		else {
+			pushLog((int)LogLevel::Error, "runtime platform %s is not valid\n", moduleName.c_str());
 		}
 	}
 
@@ -700,10 +717,6 @@ void PlatformEngine::stop() {
 
 	_platform->disconnect();
 
-	//pushLog("stoping interval task...\n");
-	//if (_broadCastIntervalTask.valid()) {
-	//	_broadCastIntervalTask.wait();
-	//}
 	pushLog((int)LogLevel::Debug, "stopped!\n");
 	pushLog((int)LogLevel::Debug, "stoping message loop task...\n");
 	if (_messageLoopTask.valid()) {
