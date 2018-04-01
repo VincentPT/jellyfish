@@ -2,6 +2,8 @@
 A crypto application to help people in trading by showing and analyzing crypto's information.
 
 ## Getting Started
+[Application binaries](/binaries/v1.0.0.zip)
+
 Application screen.  
 ![Application screen](/docs/GoCrypto-with-marks.PNG)
 
