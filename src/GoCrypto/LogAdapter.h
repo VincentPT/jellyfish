@@ -6,6 +6,6 @@ class LogAdapter : public ILogger {
 	WxAppLog* _appLog;
 public:
 	LogAdapter(WxAppLog* appLog);
-	virtual void log(const char* message);
-	virtual void logV(const char* fmt, ...);
+	virtual void log(LogLevel logLevel, const char* message);
+	virtual void logV(LogLevel logLevel, const char* fmt, ...);
 };

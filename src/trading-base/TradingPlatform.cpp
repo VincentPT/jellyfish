@@ -37,7 +37,7 @@ public:
 		auto it = _pairTraderMap.insert(std::make_pair(pair, handler));
 
 		if (it.second == false) {
-			pushLogV("Symbol %s  is already exist\n", pair);
+			pushLogV(LogLevel::Debug, "Symbol %s  is already exist\n", pair);
 			return false;
 		}
 

@@ -49,6 +49,6 @@ inline CryptoBoardElmInfo* createCrytpElm(int nPeriod) {
 	return res;
 }
 
-void pushLog(const char* fmt, ...);
+void pushLog(int logLevel, const char* fmt, ...);
 
 #define DEFAULT_CURRENCY "As is"

@@ -142,7 +142,7 @@ void ConvertableCryptoInfoAdapter::onTradeEvent(NAPMarketEventHandler* sender, T
 	auto pair = sender->getPair();
 	auto it = _symbolIndexMap.find(pair);
 	if (it == _symbolIndexMap.end()) {
-		pushLog("Something wrong, cannot find trade item to update for %s", pair);
+		pushLog((int)LogLevel::Error, "Something wrong, cannot find trade item to update for %s", pair);
 		return;
 	}
 

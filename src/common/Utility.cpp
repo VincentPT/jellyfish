@@ -42,10 +42,10 @@ std::string Utility::time2str(TIMESTAMP t) {
 void Utility::logScopeAccess(ILogger* logger, const char* functionName, bool access) {
 	if (logger) {
 		if (access) {
-			logger->logV(">>> %s\n", functionName);
+			logger->logV(LogLevel::Debug, ">>> %s\n", functionName);
 		}
 		else {
-			logger->logV("<<< %s\n", functionName);
+			logger->logV(LogLevel::Debug, "<<< %s\n", functionName);
 		}
 	}
 }

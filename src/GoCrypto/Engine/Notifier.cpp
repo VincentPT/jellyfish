@@ -45,7 +45,7 @@ bool Notifier::pushNotification(const Notification& notification) {
 	auto str = Utility::time2str(ms.count());
 
 	//cout << "push message {" << title << "," << message << "}" << endl;
-	pushLog("[%s] %s %s\n", str.c_str(), title.c_str(), message.c_str());
+	pushLog((int)LogLevel::Info, "[%s] %s %s\n", str.c_str(), title.c_str(), message.c_str());
 
 	bool res = true;
 	if (_pushToCloud == false) return res;
@@ -83,7 +83,7 @@ bool Notifier::pushNotification(const Notification& notification) {
 		else {
 			string errorMsg("server response error:");
 			errorMsg.append(to_string(code));
-			pushLog("push message failed:%s\n", errorMsg.c_str());
+			pushLog((int)LogLevel::Error, "push message failed:%s\n", errorMsg.c_str());
 		}
 	});
 	task.wait();

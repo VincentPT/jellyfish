@@ -137,15 +137,15 @@ bool BinanceTradingPlatform::connectImpl() {
 			_apiKey = CPPREST_FROM_STRING(settings[U("apiKey")].as_string());
 		}
 		else {
-			pushLogV("load setting file %s failed\n", settingFile);
+			pushLogV(LogLevel::Error, "load setting file %s failed\n", settingFile);
 		}
 	}
 	catch (...) {
-		pushLogV("load setting file %s failed\n", settingFile);
+		pushLogV(LogLevel::Error, "load setting file %s failed\n", settingFile);
 	}
 
 	if (_apiKey.empty()) {
-		pushLogV("trade history request won't work due to missing api key in setting file %s\n", settingFile);
+		pushLogV(LogLevel::Error, "trade history request won't work due to missing api key in setting file %s\n", settingFile);
 	}
 
 	auto sit = streams.begin();
@@ -497,28 +497,28 @@ void BinanceTradingPlatform::pingServerLoop() {
 						_serverTimeIsReady = true;
 					}
 					else {
-						pushLogV("unknow response format %s\n", CPPREST_FROM_STRING(js.as_string()).c_str());
+						pushLogV(LogLevel::Error, "unknow response format %s\n", CPPREST_FROM_STRING(js.as_string()).c_str());
 					}
 				}
 				else if (response.status_code() == 429) {
-					pushLog("The API has reached the limit, pause to the next minutes\n");
+					pushLog(LogLevel::Error, "The API has reached the limit, pause to the next minutes\n");
 					bonusTime = 60000;
 				}
 				else if (response.status_code() == 418) {
-					pushLog("The client's IP has been banned by Binance\n");
+					pushLog(LogLevel::Error, "The client's IP has been banned by Binance\n");
 				}
 				else {
-					pushLog("Ping server failed\n");
+					pushLog(LogLevel::Error, "Ping server failed\n");
 				}
 			});
 
 			task.wait();
 		}
 		catch (const std::exception&e) {
-			pushLogV("ping server failed: %s\n", e.what());
+			pushLogV(LogLevel::Error, "ping server failed: %s\n", e.what());
 		}
 		catch (...) {
-			pushLog("ping server failed: unknown error\n");
+			pushLog(LogLevel::Error, "ping server failed: unknown error\n");
 		}
 		
 		t2 = getCurrentTimeStamp();
@@ -542,13 +542,13 @@ void BinanceTradingPlatform::safeRequest(web::http::client::http_client& client,
 			f(response);
 		}
 		else if (response.status_code() == 429) {
-			pushLog("The API has reached the limit, pause to the next minutes\n");
+			pushLog(LogLevel::Error, "The API has reached the limit, pause to the next minutes\n");
 		}
 		else if (response.status_code() == 418) {
-			pushLog("The client's IP has been banned by Binance\n");
+			pushLog(LogLevel::Error, "The client's IP has been banned by Binance\n");
 		}
 		else {
-			pushLog("request failed\n");
+			pushLog(LogLevel::Error, "request failed\n");
 		}
 	});
 }
@@ -568,14 +568,14 @@ void BinanceTradingPlatform::getTradeHistory(const char* pair, TIMESTAMP duratio
 		if (response.status_code() == 200) {
 			auto js = response.extract_json().get();
 			if (js.is_array() == false) {
-				pushLog("unexpected trade history format\n");
+				pushLog(LogLevel::Error, "unexpected trade history format\n");
 			}
 			else {
 				auto& jsArray = js.as_array();
 				if (jsArray.size()) {
 					auto& firstElm = jsArray.at(0);
 					if (firstElm.is_object() == false || firstElm.has_field(U("l")) == false) {
-						pushLog("unexpected trade history format\n");
+						pushLog(LogLevel::Error, "unexpected trade history format\n");
 					}
 					else {
 						lastTradeId = firstElm[U("l")].as_number().to_uint64();
@@ -584,14 +584,14 @@ void BinanceTradingPlatform::getTradeHistory(const char* pair, TIMESTAMP duratio
 			}
 		}
 		else if (response.status_code() == 429) {
-			pushLog("The API has reached the limit, pause to the next minutes\n");
+			pushLog(LogLevel::Error, "The API has reached the limit, pause to the next minutes\n");
 			bonusTime = 60 * 1000;
 		}
 		else if (response.status_code() == 418) {
-			pushLog("The client's IP has been banned by Binance\n");
+			pushLog(LogLevel::Error, "The client's IP has been banned by Binance\n");
 		}
 		else {
-			pushLog("request failed\n");
+			pushLog(LogLevel::Error, "request failed\n");
 		}
 	};
 
@@ -625,10 +625,10 @@ void BinanceTradingPlatform::getTradeHistory(const char* pair, TIMESTAMP duratio
 			client.request(marketDataRequest).then(parseAggTrade).wait();
 		}
 		catch (const std::exception&e) {
-			pushLogV("get trade history failed: %s\n", e.what());
+			pushLogV(LogLevel::Error, "get trade history failed: %s\n", e.what());
 		}
 		catch (...) {
-			pushLog("get trade history failed: unknown error\n");
+			pushLog(LogLevel::Error, "get trade history failed: unknown error\n");
 		}
 
 		tEnd = tStart;
@@ -639,7 +639,7 @@ void BinanceTradingPlatform::getTradeHistory(const char* pair, TIMESTAMP duratio
 	}
 
 	if (lastTradeId == 0) {
-		pushLog("get trade history failed: no trade history found\n");
+		pushLog(LogLevel::Error, "get trade history failed: no trade history found\n");
 		return;
 	}
 
@@ -657,14 +657,14 @@ void BinanceTradingPlatform::getTradeHistory(const char* pair, TIMESTAMP duratio
 		if (response.status_code() == 200) {
 			auto js = response.extract_json().get();
 			if (js.is_array() == false) {
-				pushLog("unexpected trade history format\n");
+				pushLog(LogLevel::Error, "unexpected trade history format\n");
 			}
 			else {
 				auto& jsArray = js.as_array();
 				for (auto it = jsArray.rbegin(); it != jsArray.rend(); it++) {
 					auto& firstElm = *it;
 					if (firstElm.is_object() == false) {
-						pushLog("unexpected trade history format\n");
+						pushLog(LogLevel::Error, "unexpected trade history format\n");
 					}
 					else {
 						/*
@@ -705,15 +705,15 @@ void BinanceTradingPlatform::getTradeHistory(const char* pair, TIMESTAMP duratio
 			}
 		}
 		else if (response.status_code() == 429) {
-			pushLog("The API has reached the limit, pause to the next minutes\n");
+			pushLog(LogLevel::Error, "The API has reached the limit, pause to the next minutes\n");
 			bonusTime = 60 * 1000;
 		}
 		else if (response.status_code() == 418) {
-			pushLog("The client's IP has been banned by Binance\n");
+			pushLog(LogLevel::Error, "The client's IP has been banned by Binance\n");
 			shouldStop = true;
 		}
 		else {
-			pushLog("request failed\n");
+			pushLog(LogLevel::Error, "request failed\n");
 		}
 	};
 
@@ -738,10 +738,10 @@ void BinanceTradingPlatform::getTradeHistory(const char* pair, TIMESTAMP duratio
 			client.request(marketDataRequest).then(parseTrade).wait();
 		}
 		catch (const std::exception&e) {
-			pushLogV("get trade history failed: %s\n", e.what());
+			pushLogV(LogLevel::Error, "get trade history failed: %s\n", e.what());
 		}
 		catch (...) {
-			pushLog("get trade history failed: unknown error\n");
+			pushLog(LogLevel::Error, "get trade history failed: unknown error\n");
 		}
 
 		toId = fromId - 1;
@@ -758,7 +758,7 @@ void BinanceTradingPlatform::getTradeHistory(const char* pair, TIMESTAMP duratio
 
 void BinanceTradingPlatform::getCandleHistory(const char* pair, TIMESTAMP duration, TIMESTAMP endTime, CandleList& candleItems) {
 	if (duration <= 0) {
-		pushLog("no need to request candle history\n");
+		pushLog(LogLevel::Error, "no need to request candle history\n");
 		return;
 	}
 	auto startTime = (endTime - duration);
@@ -787,7 +787,7 @@ void BinanceTradingPlatform::getCandleHistory(const char* pair, TIMESTAMP durati
 		if (response.status_code() == 200) {
 			auto js = response.extract_json().get();
 			if (js.is_array() == false) {
-				pushLog("unexpected trade history format\n");
+				pushLog(LogLevel::Error, "unexpected trade history format\n");
 				tryAgain = true;
 			}
 			else {
@@ -795,7 +795,7 @@ void BinanceTradingPlatform::getCandleHistory(const char* pair, TIMESTAMP durati
 				for (auto it = jsArray.begin(); it != jsArray.end(); it++) {
 					auto& elm = *it;
 					if (elm.is_array() == false) {
-						pushLog("unexpected trade history format\n");
+						pushLog(LogLevel::Error, "unexpected trade history format\n");
 					}
 					else {
 						/*
@@ -838,16 +838,16 @@ void BinanceTradingPlatform::getCandleHistory(const char* pair, TIMESTAMP durati
 			}
 		}
 		else if (response.status_code() == 429) {
-			pushLog("The API has reached the limit, pause to the next minutes\n");
+			pushLog(LogLevel::Error, "The API has reached the limit, pause to the next minutes\n");
 			bonusTime = 60 * 1000;
 			tryAgain = true;
 		}
 		else if (response.status_code() == 418) {
-			pushLog("The client's IP has been banned by Binance\n");
+			pushLog(LogLevel::Error, "The client's IP has been banned by Binance\n");
 			shouldStop = true;
 		}
 		else {
-			pushLog("request failed\n");
+			pushLog(LogLevel::Error, "request failed\n");
 			tryAgain = true;
 		}
 	};
@@ -879,10 +879,10 @@ void BinanceTradingPlatform::getCandleHistory(const char* pair, TIMESTAMP durati
 			client.request(marketDataRequest).then(parseCandle).wait();
 		}
 		catch (const std::exception&e) {
-			pushLogV("get trade history failed: %s\n", e.what());
+			pushLogV(LogLevel::Error, "get trade history failed: %s\n", e.what());
 		}
 		catch (...) {
-			pushLog("get trade history failed: unknown error\n");
+			pushLog(LogLevel::Error, "get trade history failed: unknown error\n");
 		}
 		if (candleItems.size() && tryAgain == false) {
 			startTime = candleItems.front().timestamp + candleDuration * 1000;

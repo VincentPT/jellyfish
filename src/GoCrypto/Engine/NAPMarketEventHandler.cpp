@@ -19,7 +19,7 @@ NAPMarketEventHandler::~NAPMarketEventHandler()
 }
 
 void NAPMarketEventHandler::onTickerUpdate(Ticker& ticker) {
-	pushLog("%s's ticker: {%lf, %lf, %lf, %lf, %lf, %lf, %s}\n", _pair, ticker.bid, ticker.ask, ticker.lastPrice, ticker.volume, ticker.high, ticker.low, Utility::time2str(ticker.timestamp).c_str());
+	pushLog((int)LogLevel::Debug, "%s's ticker: {%lf, %lf, %lf, %lf, %lf, %lf, %s}\n", _pair, ticker.bid, ticker.ask, ticker.lastPrice, ticker.volume, ticker.high, ticker.low, Utility::time2str(ticker.timestamp).c_str());
 }
 
 void NAPMarketEventHandler::onBooksUpdate(BookItemEventArgs* books, bool snapShot) {}
@@ -55,14 +55,14 @@ void NAPMarketEventHandler::onCandlesUpdate(CandleItem* candles, int count, bool
 				for (auto pItem = candles; pItem < pItemEnd; pItem++) {
 					_candleHistory.push_back(*pItem);
 				}
-				pushLog("added trade event back\n");
+				pushLog((int)LogLevel::Verbose, "added trade event back\n");
 			}
 			else {
 				auto pItemEnd = candles;
 				for (auto pItem = candles + count - 1; pItem >= pItemEnd; pItem--) {
 					_candleHistory.push_front(*pItem);
 				}
-				pushLog("added candle event front\n");
+				pushLog((int)LogLevel::Verbose, "added candle event front\n");
 			}
 		}
 		else if (overlapped.start == overlapped.end) {
@@ -75,7 +75,7 @@ void NAPMarketEventHandler::onCandlesUpdate(CandleItem* candles, int count, bool
 				for (pItem++; pItem < pItemEnd; pItem++) {
 					_candleHistory.push_back(*pItem);
 				}
-				pushLog("merge trade event at the common time back\n");
+				pushLog((int)LogLevel::Verbose, "merge trade event at the common time back\n");
 			}
 			else {
 				// now the incoming range is newer
@@ -85,7 +85,7 @@ void NAPMarketEventHandler::onCandlesUpdate(CandleItem* candles, int count, bool
 					_candleHistory.push_front(*pItem);
 				}
 
-				pushLog("merge trade event at the common time front\n");
+				pushLog((int)LogLevel::Verbose, "merge trade event at the common time front\n");
 			}
 		}
 		else {
@@ -111,7 +111,7 @@ void NAPMarketEventHandler::onCandlesUpdate(CandleItem* candles, int count, bool
 				return item1.timestamp > item2.timestamp;
 			});
 
-			pushLog("merge trade event using general method\n");
+			pushLog((int)LogLevel::Verbose, "merge trade event using general method\n");
 		}
 	}
 	else if (count == 1) {
@@ -143,7 +143,7 @@ void NAPMarketEventHandler::onTradesUpdate(TradeItem* trades, int count, bool sn
 		for (auto pItem = trades; pItem < pItemEnd; pItem++) {
 			_tradeHistory.push_back(*pItem);
 		}
-		//pushLog("snapshot trade event\n");
+		pushLog((int)LogLevel::Verbose, "snapshot trade event\n");
 	}
 	else if (count > 1) {
 		auto& oldestItem = _tradeHistory.back();
@@ -165,14 +165,14 @@ void NAPMarketEventHandler::onTradesUpdate(TradeItem* trades, int count, bool sn
 				for (auto pItem = trades; pItem < pItemEnd; pItem++) {
 					_tradeHistory.push_back(*pItem);
 				}
-				pushLog("added trade event back\n");
+				pushLog((int)LogLevel::Verbose, "added trade event back\n");
 			}
 			else {
 				TradeItem* pItemEnd = trades;
 				for (auto pItem = trades + count - 1; pItem >= pItemEnd; pItem--) {
 					_tradeHistory.push_front(*pItem);
 				}
-				pushLog("added trade event front\n");
+				pushLog((int)LogLevel::Verbose, "added trade event front\n");
 			}
 		}
 		else if (overlapped.start == overlapped.end) {
@@ -203,7 +203,7 @@ void NAPMarketEventHandler::onTradesUpdate(TradeItem* trades, int count, bool sn
 					_tradeHistory.push_back(*pItem);
 				}
 
-				//pushLog("merge trade event at the common time back\n");
+				pushLog((int)LogLevel::Verbose, "merge trade event at the common time back\n");
 			}
 			else {
 				// now the incoming range is newer
@@ -230,7 +230,7 @@ void NAPMarketEventHandler::onTradesUpdate(TradeItem* trades, int count, bool sn
 					_tradeHistory.push_front(*pItem);
 				}
 
-				pushLog("merge trade event at the common time front\n");
+				pushLog((int)LogLevel::Verbose, "merge trade event at the common time front\n");
 			}
 		}
 		else {
@@ -256,7 +256,7 @@ void NAPMarketEventHandler::onTradesUpdate(TradeItem* trades, int count, bool sn
 				return item1.timestamp > item2.timestamp;
 			});
 
-			pushLog("merge trade event using general method\n");
+			pushLog((int)LogLevel::Verbose, "merge trade event using general method\n");
 		}
 	}
 	else {
@@ -271,7 +271,7 @@ void NAPMarketEventHandler::onTradesUpdate(TradeItem* trades, int count, bool sn
 				_tradeHistory.push_back(*trades);
 			}
 
-			//pushLog("update trade event 1\n");
+			pushLog((int)LogLevel::Verbose, "update trade event 1\n");
 		}
 		else if (trades->timestamp == _tradeHistory.front().timestamp) {
 			auto it = _tradeHistory.begin();
@@ -283,18 +283,18 @@ void NAPMarketEventHandler::onTradesUpdate(TradeItem* trades, int count, bool sn
 			if (it == _tradeHistory.end() || it->timestamp != trades->timestamp) {
 				_tradeHistory.push_front(*trades);
 			}
-			//pushLog("update trade event 2\n");
+			pushLog((int)LogLevel::Verbose, "update trade event 2\n");
 		}
 		else if (trades->timestamp < _tradeHistory.back().timestamp) {
 			_tradeHistory.push_back(*trades);
-			pushLog("update trade event 3\n");
+			pushLog((int)LogLevel::Verbose, "update trade event 3\n");
 		}
 		else if (trades->timestamp > _tradeHistory.front().timestamp) {
 			_tradeHistory.push_front(*trades);
-			//pushLog("update trade event 4\n");
+			pushLog((int)LogLevel::Verbose, "update trade event 4\n");
 		}
 		else {
-			//pushLog("merge update event into trade history\n");
+			pushLog((int)LogLevel::Verbose, "merge update event into trade history\n");
 			auto it = std::find_if(_tradeHistory.begin(), _tradeHistory.end(), [trades](const TradeItem& item) {
 				return trades->timestamp > item.timestamp;
 			});

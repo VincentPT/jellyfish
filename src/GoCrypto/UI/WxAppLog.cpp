@@ -1,6 +1,6 @@
 #include "WxAppLog.h"
 
-WxAppLog::WxAppLog() {
+WxAppLog::WxAppLog() : _logLevel(WxAppLog::LogLevel::Info) {
 	_window_flags |= ImGuiWindowFlags_NoTitleBar;
 	_window_flags |= ImGuiWindowFlags_NoMove;
 	_window_flags |= ImGuiWindowFlags_NoResize;
@@ -12,21 +12,27 @@ WxAppLog::~WxAppLog() {
 
 }
 
-void WxAppLog::addLog(const char* fmt, ...) IM_FMTARGS(2)
+void WxAppLog::addLog(WxAppLog::LogLevel logLevel, const char* fmt, ...) IM_FMTARGS(2)
 {
     va_list args;
     va_start(args, fmt);
-	addLogV(fmt, args);
+	addLogV(logLevel, fmt, args);
     va_end(args);
 }
 
-void WxAppLog::addLogV(const char* fmt, va_list args) {
+void WxAppLog::addLogV(WxAppLog::LogLevel logLevel, const char* fmt, va_list args) {
+	if ((int)logLevel < (int)_logLevel) return;
+
 	int old_size = Buf.size();
 	Buf.appendfv(fmt, args);
 	for (int new_size = Buf.size(); old_size < new_size; old_size++)
 		if (Buf[old_size] == '\n')
 			LineOffsets.push_back(old_size);
 	ScrollToBottom = true;
+}
+
+void WxAppLog::setLogLevel(WxAppLog::LogLevel logLevel) {
+	_logLevel = logLevel;
 }
 
 void WxAppLog::draw()
@@ -45,23 +51,21 @@ void WxAppLog::draw()
 	Filter.Draw("Filter", -200.0f);
 
 	ImGui::SameLine();
-	static int _logLevel = 0;
-	const char* logLevels[] = { "Debug", "Info", "Error"};
-	if (ImGui::BeginCombo("Log level", logLevels[_logLevel]))
+	int logLevel = (int)_logLevel;
+	const char* logLevels[] = { "Verbose" ,"Debug", "Info", "Error"};
+	if (ImGui::BeginCombo("Log level", logLevels[logLevel]))
 	{
-		int oldSelection = _logLevel;
+		int oldSelection = logLevel;
 		for (int n = 0; n < IM_ARRAYSIZE(logLevels); n++)
 		{
-			bool is_selected = _logLevel == n;
+			bool is_selected = logLevel == n;
 			if (ImGui::Selectable(logLevels[n], is_selected))
-				_logLevel = n;
+				logLevel = n;
 			if (is_selected)
 				ImGui::SetItemDefaultFocus();   // Set the initial focus when opening the combo (scrolling + for keyboard navigation support in the upcoming navigation branch)
 		}
 		ImGui::EndCombo();
-		//if (oldSelection != _logLevel && _graphLengthChangedHandler) {
-		//	_graphLengthChangedHandler(this);
-		//}
+		_logLevel  = (LogLevel)logLevel;
 	}
 
     ImGui::Separator();

@@ -159,13 +159,13 @@ void PlatformEngine::pushMessageLoop() {
 						}
 						catch (const std::exception &e)
 						{
-							pushLog("push message failed:%s\n", e.what());
+							pushLog((int)LogLevel::Error, "push message failed:%s\n", e.what());
 						}
 						catch (...) {
-							pushLog("push message failed: unknow error\n");
+							pushLog((int)LogLevel::Error, "push message failed: unknow error\n");
 						}
 						
-						pushLog("sending message again(%d)\n", tryCount);
+						pushLog((int)LogLevel::Error, "sending message again(%d)\n", tryCount);
 					}
 				}
 			}
@@ -185,7 +185,7 @@ void PlatformEngine::sheduleQueryHistory() {
 				if (hander) {
 					TradingList tradeItems;
 
-					pushLog("requesting trade history for %s\n", symbol);
+					pushLog((int)LogLevel::Debug, "requesting trade history for %s\n", symbol);
 					_platform->getTradeHistory(symbol, message.duration, message.endTime, tradeItems);
 					vector<TradeItem> tradeRawItems(tradeItems.size());
 					TradeItem* pItem = tradeRawItems.data();
@@ -193,7 +193,7 @@ void PlatformEngine::sheduleQueryHistory() {
 						*pItem++ = iter->value;
 					}
 
-					pushLog("received trade history for %s\n", symbol);
+					pushLog((int)LogLevel::Debug, "received trade history for %s\n", symbol);
 					hander->onTradesUpdate(tradeRawItems.data(), (int)tradeRawItems.size(), true);
 				}
 			}
@@ -202,7 +202,7 @@ void PlatformEngine::sheduleQueryHistory() {
 				auto hander = _platform->getHandler(symbol);
 				if (hander) {
 					CandleList candleItems;
-					pushLog("requesting candle history for %s\n", symbol);
+					pushLog((int)LogLevel::Debug, "requesting candle history for %s\n", symbol);
 					_platform->getCandleHistory(symbol, message.duration, message.endTime, candleItems);
 					vector<CandleItem> candleRawItems(candleItems.size());
 					CandleItem* pItem = candleRawItems.data();
@@ -210,7 +210,7 @@ void PlatformEngine::sheduleQueryHistory() {
 						*pItem++ = iter->value;
 					}
 
-					pushLog("received candle history for %s\n", symbol);
+					pushLog((int)LogLevel::Debug, "received candle history for %s\n", symbol);
 					hander->onCandlesUpdate(candleRawItems.data(), (int)candleRawItems.size(), true);
 				}
 			}
@@ -392,7 +392,7 @@ void PlatformEngine::onTrade(int i, NAPMarketEventHandler* sender, TradeItem* in
 
 			if (jt != tickers.end()) {
 				jt->processLevel = it->processLevel;
-				pushLog("restore process level %s\n", sender->getPair());
+				pushLog((int)LogLevel::Verbose, "restore process level %s\n", sender->getPair());
 
 				jt++;
 			}
@@ -425,7 +425,7 @@ void PlatformEngine::onTrade(int i, NAPMarketEventHandler* sender, TradeItem* in
 
 				pTicker->averagePrice = cost / (pTicker->soldVolume + pTicker->boughtVolume);
 
-				//pushLog("updated the last ticker\n");
+				pushLog((int)LogLevel::Verbose, "updated the last ticker\n");
 			}
 			else {
 				typedef decltype(incommingTrades) ITERATOR;
@@ -469,7 +469,7 @@ void PlatformEngine::onTrade(int i, NAPMarketEventHandler* sender, TradeItem* in
 							tickers.push_front(*it);
 						}
 
-						pushLog("merged tickers \n");
+						pushLog((int)LogLevel::Verbose, "merged tickers \n");
 					}
 					else if (newBaseTime > oldBaseTime) {
 						// add empty tickers until reach the new time frame
@@ -504,7 +504,7 @@ void PlatformEngine::onTrade(int i, NAPMarketEventHandler* sender, TradeItem* in
 						//pushLog("add tickers\n");
 					}
 					else {
-						pushLog("something wrong, the update trade event is not newest event\n");
+						pushLog((int)LogLevel::Error, "something wrong, the update trade event is not newest event\n");
 					}
 				}
 			}
@@ -604,11 +604,11 @@ void PlatformEngine::run() {
 			}
 		}
 		catch (std::exception& e) {
-			cout << e.what() << endl;
+			pushLog((int)LogLevel::Debug, "query list symbol failed, error: %s\n", e.what());
 			return;
 		}
 		catch (...) {
-			cout << "Unknow error" << endl;
+			pushLog((int)LogLevel::Debug, "query list symbol failed, unknown error\n");
 			return;
 		}
 	}
@@ -688,7 +688,7 @@ void PlatformEngine::run() {
 		_platform->connect();
 	}
 	catch (exception&e) {
-		pushLog("error:%s\n", e.what());
+		pushLog((int)LogLevel::Error, "failed to connect to server:%s\n", e.what());
 		return;
 	}
 }
@@ -704,19 +704,19 @@ void PlatformEngine::stop() {
 	//if (_broadCastIntervalTask.valid()) {
 	//	_broadCastIntervalTask.wait();
 	//}
-	pushLog("stopped!\n");
-	pushLog("stoping message loop task...\n");
+	pushLog((int)LogLevel::Debug, "stopped!\n");
+	pushLog((int)LogLevel::Debug, "stoping message loop task...\n");
 	if (_messageLoopTask.valid()) {
 		// push an empty message
 		_messageQueue.pushMessage({});
 		_messageLoopTask.wait();
 	}
-	pushLog("stopped!\n");
-	pushLog("stop querying trade history...\n");
+	pushLog((int)LogLevel::Debug, "stopped!\n");
+	pushLog((int)LogLevel::Debug, "stop querying trade history...\n");
 	if (_sendTradeHistoryRequestLoop.valid()) {
 		_sendTradeHistoryRequestLoop.wait();
 	}
-	pushLog("stopped!\n");
+	pushLog((int)LogLevel::Debug, "stopped!\n");
 }
 
 void formatPriceChanged(char* buffer, size_t bufferSize, const char* pair, const PricePoint& lastPrice, const PricePoint& basePrice) {

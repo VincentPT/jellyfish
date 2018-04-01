@@ -1,17 +1,15 @@
 #include "LogAdapter.h"
 #include "UI/WxAppLog.h"
 
-void pushLog(const char* fmt, ...);
-
 LogAdapter::LogAdapter(WxAppLog* appLog) : _appLog(appLog) {}
 
-void LogAdapter::log(const char* message) {
-	_appLog->addLog(message);
+void LogAdapter::log(LogLevel logLevel, const char* message) {
+	_appLog->addLog((WxAppLog::LogLevel)logLevel, message);
 }
 
- void LogAdapter::logV(const char* fmt, ...) {
+ void LogAdapter::logV(LogLevel logLevel, const char* fmt, ...) {
 	 va_list args;
 	 va_start(args, fmt);
-	 _appLog->addLogV(fmt, args);
+	 _appLog->addLogV((WxAppLog::LogLevel)logLevel, fmt, args);
 	 va_end(args);
 }

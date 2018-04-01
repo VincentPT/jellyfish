@@ -66,9 +66,9 @@ public:
 	void stopServices();
 	void applySelectedCurrency(const std::string& currency);
 
-	void addLog(const char* fmt, va_list args) {
+	void addLog(LogLevel logLevel, const char* fmt, va_list args) {
 		if (_applog) {
-			_applog->addLogV(fmt, args);
+			_applog->addLogV( (WxAppLog::LogLevel) logLevel, fmt, args);
 		}
 	}
 
@@ -93,10 +93,10 @@ public:
 	void restoreTransformAfterInitOnly(function<void()>&& initFunction);
 };
 
-void pushLog(const char* fmt, ...) {
+void pushLog(int logLevel, const char* fmt, ...) {
 	va_list args;
 	va_start(args, fmt);
-	((BasicApp*)app::App::get())->addLog(fmt, args);
+	((BasicApp*)app::App::get())->addLog((LogLevel)logLevel, fmt, args);
 	va_end(args);
 }
 
@@ -360,7 +360,6 @@ void BasicApp::setup()
 
 	getWindow()->getSignalKeyDown().connect([this](KeyEvent& event) {
 		if (event.getCode() == KeyEvent::KEY_ESCAPE) {
-			pushLog("pressed escaped\n");
 			_runFlag = false;
 		}
 	});
@@ -494,7 +493,7 @@ void BasicApp::createCandleWindow() {
 void BasicApp::startServices() {
 	LOG_SCOPE_ACCESS(_logAdapter, __FUNCTION__);
 	if (_platformRunner) {
-		pushLog("services have been already started\n");
+		pushLog((int)LogLevel::Error, "services have been already started\n");
 		return;
 	}
 
@@ -525,7 +524,7 @@ void BasicApp::startServices() {
 void BasicApp::stopServices() {
 	LOG_SCOPE_ACCESS(_logAdapter, __FUNCTION__);
 	if (!_platformRunner) {
-		pushLog("services are not running\n");
+		pushLog((int)LogLevel::Error, "services are not running\n");
 		return;
 	}
 	_lastSelectedHandler = nullptr;
