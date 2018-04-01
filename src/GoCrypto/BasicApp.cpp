@@ -53,6 +53,7 @@ class BasicApp : public App {
 	bool _liveMode = true;
 
 	mutex _serviceControlMutex;
+	mutex _chartMutex;
 public:
 	BasicApp();
 	~BasicApp();
@@ -131,6 +132,7 @@ void BasicApp::cleanup() {
 }
 
 void BasicApp::onWindowSizeChanged() {
+	std::unique_lock<std::mutex> lk(_chartMutex);
 	// back up transform
 	static TIMESTAMP tAtZero;
 	if (_liveMode == false) {
@@ -156,8 +158,14 @@ void BasicApp::onWindowSizeChanged() {
 		if (_liveMode == false) {
 			auto xAtZero = convertRealTimeToDisplayTime(tAtZero);
 			auto newPointOfX = _graph->pointToLocal(xAtZero, 0);
+
+			_barChart->setLiveX(_graph->getLiveX());
+
 			_graph->translate(-newPointOfX.x, 0);
-			_barChart->translate(-newPointOfX.x, 0);
+			auto t = _graph->getTranslate();
+			t.y = _barChart->getTranslate().y;
+			_barChart->setTranslate(t);
+
 			_graph->adjustTransform();
 			_barChart->adjustTransform();
 		}
@@ -288,6 +296,7 @@ void BasicApp::setup()
 			pTimeDown = nullptr;
 		}
 		if (dragging) {
+			std::unique_lock<std::mutex> lk(_chartMutex);
 			dragging = false;
 			_graph->adjustTransform();
 			_barChart->adjustTransform();
@@ -327,13 +336,16 @@ void BasicApp::setup()
 	});
 
 	getWindow()->getSignalMouseDrag().connect([this](MouseEvent& me) {
+		std::unique_lock<std::mutex> lk(_chartMutex);
 		auto & pos = me.getPos();
 		if (pos.x >= _graph->getX() && pos.x < _graph->getX() + _graph->getWidth() &&
 			pos.y >= _graph->getY() && pos.y < _graph->getY() + _graph->getHeight()) {
 
 			auto translateX = me.getX() - prePos.x;
 			_graph->translate(translateX, 0);
-			_barChart->translate(translateX, 0);
+			auto t = _graph->getTranslate();
+			t.y = _barChart->getTranslate().y;
+			_barChart->setTranslate(t);
 			_liveMode = false;
 			prePos = me.getPos();
 			_graph->setCursorLocation(prePos);
@@ -418,6 +430,7 @@ void BasicApp::setup()
 	});
 
 	_controlBoard->setOnGraphLengthChangedHandler([this](Widget*) {
+		std::unique_lock<std::mutex> lk(_chartMutex);
 		initChart();
 	});
 
@@ -456,8 +469,10 @@ void BasicApp::onSelectedSymbolChanged(Widget*) {
 	}
 	// add new event handler
 	_lastSelectedHandler = ((NAPMarketEventHandler*)handler);
-
-	initChart();
+	{
+		std::unique_lock<std::mutex> lk(_chartMutex);
+		initChart();
+	}
 
 	auto eventListener = std::bind(&BasicApp::onSelectedTradeEvent, this, _1, _2, _3, _4);
 	auto candleEventListener = std::bind(&BasicApp::onCandle, this, _1, _2, _3, _4);
@@ -483,6 +498,7 @@ void BasicApp::startServices() {
 		return;
 	}
 
+	_liveMode = true;
 	{
 		std::unique_lock<std::mutex> lk(_serviceControlMutex);
 		_platformRunner = new PlatformEngine(_controlBoard->getCurrentPlatform());
@@ -525,16 +541,17 @@ void BasicApp::stopServices() {
 	});
 	
 	_platformRunner->getPlatform()->setLogger(nullptr);
-	_graph->acessSharedData([](Widget* sender) {
-		((WxLineGraph*)sender)->clearPoints();
-	});
-	_barChart->acessSharedData([](Widget* sender) {
-		((WxLineGraph*)sender)->clearPoints();
-	});
+	{
+		std::unique_lock<std::mutex> lk(_chartMutex);
+		_graph->clearPoints();
+		_barChart->clearPoints();
+	}
 
-	std::unique_lock<std::mutex> lk(_serviceControlMutex);
-	delete _platformRunner;
-	_platformRunner = nullptr;
+	{
+		std::unique_lock<std::mutex> lk(_serviceControlMutex);
+		delete _platformRunner;
+		_platformRunner = nullptr;
+	}
 }
 
 void BasicApp::applySelectedCurrency(const std::string& currency) {
@@ -682,19 +699,17 @@ void BasicApp::onSelectedTradeEvent(NAPMarketEventHandler* handler, TradeItem* i
 	}
 
 	if(snapShot) {
+		std::unique_lock<std::mutex> lk(_chartMutex);
 		auto& items = handler->getTradeHistoriesNonSync();
 		renewCharts(_barChart.get(), _graph.get(), items,
 			[](const TradeItem& item) { return abs(item.amount); },
 			[](const TradeItem& item) { return (float)item.price; });
 	}
 	else {
-		
-		_barChart->acessSharedData([this, items, handler](Widget*) {
+		std::unique_lock<std::mutex> lk(_chartMutex);
+		{
 			TIMESTAMP barTimeLength = _barTimeLength;
 			auto lastAlignedTime = roundDown(items->timestamp, barTimeLength);
-			auto& candles = handler->getCandleHistoriesNonSync();
-			if (candles.size() == 0)
-				return;
 
 			auto& points = _barChart->getPoints();
 			if (points.size()) {
@@ -706,7 +721,7 @@ void BasicApp::onSelectedTradeEvent(NAPMarketEventHandler* handler, TradeItem* i
 					// update last bar
 					lastPoint.y += abs(items->amount);
 				}
-				else if(lastAlignedTime > lastAnlignedTimeInChart){
+				else if (lastAlignedTime > lastAnlignedTimeInChart) {
 					// add new bar
 					glm::vec2 newBarPoint(convertRealTimeToDisplayTime(lastAlignedTime), abs(items->amount));
 					_barChart->addPoint(newBarPoint);
@@ -731,29 +746,28 @@ void BasicApp::onSelectedTradeEvent(NAPMarketEventHandler* handler, TradeItem* i
 				_barChart->addPoint(newBarPoint);
 			}
 			_barChart->adjustTransform();
-		});
+		}
 
-		_graph->acessSharedData([this, items](Widget*) {
-			if (items) {
-				auto& points = _graph->getPoints();
-				auto x = convertRealTimeToDisplayTime(items->timestamp);
-				auto y = items->price;
-				if (points.size()) {
-					if (points.back().y != y) {
-						_graph->addPointAndConstruct(glm::vec2(x, y));
-						_graph->adjustTransform();
-					}
-				}
-				else {
-					_graph->addPoint(glm::vec2(x, y));
+		if (items) {
+			auto& points = _graph->getPoints();
+			auto x = convertRealTimeToDisplayTime(items->timestamp);
+			auto y = items->price;
+			if (points.size()) {
+				if (points.back().y != y) {
+					_graph->addPointAndConstruct(glm::vec2(x, y));
 					_graph->adjustTransform();
 				}
 			}
-		});
+			else {
+				_graph->addPoint(glm::vec2(x, y));
+				_graph->adjustTransform();
+			}
+		}
 	}
 }
 
 void BasicApp::restoreTransformAfterInitOnly(function<void()>&& initFunction) {
+	std::unique_lock<std::mutex> lk(_chartMutex);
 	static float xAtZero;
 	if (_liveMode == false) {
 		xAtZero = _graph->localToPoint(0, 0).x;
@@ -764,7 +778,9 @@ void BasicApp::restoreTransformAfterInitOnly(function<void()>&& initFunction) {
 	if (_liveMode == false) {
 		auto newPointOfX = _graph->pointToLocal(xAtZero, 0);
 		_graph->translate(-newPointOfX.x, 0);
-		_barChart->translate(-newPointOfX.x, 0);
+		auto t = _graph->getTranslate();
+		t.y = _barChart->getTranslate().y;
+		_barChart->setTranslate(t);
 		_graph->adjustTransform();
 		_barChart->adjustTransform();
 	}
@@ -775,66 +791,65 @@ void BasicApp::onCandle(NAPMarketEventHandler* sender, CandleItem* candleItems, 
 		return;
 	}
 	if (snapshot) {
+		std::unique_lock<std::mutex> lk(_chartMutex);
 		auto& candles = sender->getCandleHistoriesNonSync();
 		renewCharts(_barChart.get(), _graph.get(), candles,
 			[](const CandleItem& item) { return item.volume; },
 			[](const CandleItem& item) { return (float)((item.low + item.high) / 2); });
 	}
 	else {
-		_barChart->acessSharedData([this, candleItems, sender](Widget*) {
+		std::unique_lock<std::mutex> lk(_chartMutex);
+		{
 			TIMESTAMP barTimeLength = _barTimeLength;
 			auto lastAlignedTime = roundDown(candleItems->timestamp, barTimeLength);
 			auto& candles = sender->getCandleHistoriesNonSync();
-			if (candles.size() == 0)
-				return;
+			if (candles.size()) {
+				// only calculate last hour
+				auto lastTotalVolume = 0;
+				for (auto it = candles.begin(); it != candles.end() && it->timestamp >= lastAlignedTime; it++) {
+					lastTotalVolume += it->volume;
+				}
 
-			// only calculate last hour
-			auto lastTotalVolume = 0;
-			for (auto it = candles.begin(); it != candles.end() && it->timestamp >= lastAlignedTime; it++) {
-				lastTotalVolume += it->volume;
-			}
+				auto& points = _barChart->getPoints();
+				if (points.size()) {
+					auto& lastPoint = points.back();
+					auto lastTimeInChart = convertXToTime(lastPoint.x);
+					auto lastAnlignedTimeInChart = roundDown(lastTimeInChart, barTimeLength);
 
-			auto& points = _barChart->getPoints();
-			if (points.size()) {
-				auto& lastPoint = points.back();
-				auto lastTimeInChart = convertXToTime(lastPoint.x);
-				auto lastAnlignedTimeInChart = roundDown(lastTimeInChart, barTimeLength);
-
-				if (lastAlignedTime == lastAnlignedTimeInChart) {
-					// update last bar
-					lastPoint.y = lastTotalVolume;
+					if (lastAlignedTime == lastAnlignedTimeInChart) {
+						// update last bar
+						lastPoint.y = lastTotalVolume;
+					}
+					else {
+						// add new bar
+						glm::vec2 newBarPoint(convertRealTimeToDisplayTime(lastAlignedTime), lastTotalVolume);
+						_barChart->addPoint(newBarPoint);
+					}
 				}
 				else {
 					// add new bar
 					glm::vec2 newBarPoint(convertRealTimeToDisplayTime(lastAlignedTime), lastTotalVolume);
 					_barChart->addPoint(newBarPoint);
 				}
+				_barChart->adjustTransform();
 			}
-			else {
-				// add new bar
-				glm::vec2 newBarPoint(convertRealTimeToDisplayTime(lastAlignedTime), lastTotalVolume);
-				_barChart->addPoint(newBarPoint);
-			}
-			_barChart->adjustTransform();
-		});
+		}
 
-		_graph->acessSharedData([this, candleItems, sender](Widget*) {
-			if (candleItems) {
-				auto& points = _graph->getPoints();
-				auto x = convertRealTimeToDisplayTime(candleItems->timestamp);
-				auto y = (candleItems->high + candleItems->low) / 2;
-				if (points.size()) {
-					if (points.back().y != y) {
-						_graph->addPointAndConstruct(glm::vec2(x, y));
-						_graph->adjustTransform();
-					}
-				}
-				else {
-					_graph->addPoint(glm::vec2(x, y));
+		if (candleItems) {
+			auto& points = _graph->getPoints();
+			auto x = convertRealTimeToDisplayTime(candleItems->timestamp);
+			auto y = (candleItems->high + candleItems->low) / 2;
+			if (points.size()) {
+				if (points.back().y != y) {
+					_graph->addPointAndConstruct(glm::vec2(x, y));
 					_graph->adjustTransform();
 				}
 			}
-		});
+			else {
+				_graph->addPoint(glm::vec2(x, y));
+				_graph->adjustTransform();
+			}
+		}
 	}
 }
 
@@ -930,19 +945,23 @@ void BasicApp::update()
 		if (liveTime == 0) {
 			liveTime = getCurrentTimeStamp();
 		}
-		auto liveX = convertRealTimeToDisplayTime(liveTime);
-		_barChart->acessSharedData([liveX](Widget* sender) {
-			((WxBarCharLive*)sender)->setLiveX(liveX);
-		});
-		_graph->acessSharedData([liveX](Widget* sender) {
-			((WxLineGraphLive*)sender)->setLiveX(liveX);
-		});
+		{
+			std::unique_lock<std::mutex> lk(_chartMutex);
+			auto liveX = convertRealTimeToDisplayTime(liveTime);
+			_barChart->setLiveX(liveX);
+			_graph->setLiveX(liveX);
+
+			auto t = _graph->getTranslate();
+			t.y = _barChart->getTranslate().y;
+			_barChart->setTranslate(t);
+		}
 	}
 }
 
 void BasicApp::draw()
 {
 	FUNCTON_LOG();
+	std::unique_lock<std::mutex> lk(_chartMutex);
 	//auto wndCandle = getWindow()->getUserData<CiWndCandle>();
 	//if (wndCandle) {
 	//	wndCandle->draw();

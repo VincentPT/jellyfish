@@ -17,13 +17,21 @@ enum class SubcribeStatus : unsigned char
 	Unsubcribed,
 };
 
+enum class LogLevel : int
+{
+	Verbose = 0,
+	Debug,
+	Info,
+	Error,
+};
+
 #define IS_STATUS_NOT_SUBSCRIBED(status) ((status) == SubcribeStatus::Unsubcribed || (status) == SubcribeStatus::Unsubcribing || (status) == SubcribeStatus::NA)
 
 class TRADING_PLATFORM_API ILogger {
 public:
-	virtual void log(const char* message) = 0;
-	virtual void logV(const char* fmt,...);
-	virtual void logVA(const char* fmt, va_list args);
+	virtual void log(LogLevel logLevel, const char* message) = 0;
+	virtual void logV(LogLevel logLevel, const char* fmt,...);
+	virtual void logVA(LogLevel logLevel, const char* fmt, va_list args);
 };
 
 class TRADING_PLATFORM_API TradingPlatform
@@ -93,8 +101,8 @@ public:
 
 	virtual ILogger* getLogger() const;
 	virtual void setLogger(ILogger* logger);
-	virtual void pushLog(const char* message);
-	virtual void pushLogV(const char* fmt, ...);
-	virtual void pushLogVA(const char* fmt, va_list args);
+	virtual void pushLog(LogLevel logLevel, const char* message);
+	virtual void pushLogV(LogLevel logLevel, const char* fmt, ...);
+	virtual void pushLogVA(LogLevel logLevel, const char* fmt, va_list args);
 };
 

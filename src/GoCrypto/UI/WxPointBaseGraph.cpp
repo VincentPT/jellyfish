@@ -117,6 +117,14 @@ void WxPointBaseGraph::translate(float x, float y) {
 	//_transform *= glm::translate(vec3(x, y, 0));
 }
 
+void WxPointBaseGraph::setTranslate(const ci::vec2& v) {
+	_translate = v;
+}
+
+const ci::vec2& WxPointBaseGraph::getTranslate() {
+	return _translate;
+}
+
 void WxPointBaseGraph::scale(float x, float y) {
 	//pushLog("scale %f, %f\n", x, y);
 

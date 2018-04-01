@@ -56,6 +56,8 @@ public:
 	virtual void setSize(float w, float h);
 	virtual void setPos(float w, float h);
 	virtual void translate(float x, float y);
+	virtual void setTranslate(const ci::vec2& v);
+	virtual const ci::vec2& getTranslate();
 	virtual void scale(float x, float y);
 	virtual ci::vec2 pointToWindow(float x, float y);
 	virtual ci::vec2 pointToLocal(float x, float y);

@@ -12,17 +12,17 @@
 
 using namespace std;
 
-void ILogger::logV(const char* fmt, ...) {
+void ILogger::logV(LogLevel logLevel, const char* fmt, ...) {
 	va_list args;
 	va_start(args, fmt);
-	this->logVA(fmt, args);
+	this->logVA(logLevel, fmt, args);
 	va_end(args);
 }
 
-void ILogger::logVA(const char* fmt, va_list args) {
+void ILogger::logVA(LogLevel logLevel, const char* fmt, va_list args) {
 	char buffer[1024];
 	vsprintf(buffer, fmt, args);
-	this->log(buffer);
+	this->log(logLevel, buffer);
 }
 
 class TradingPlatformImpl {
@@ -140,20 +140,20 @@ public:
 		_logger = logger;
 	}
 
-	void pushLog(const char* message) {
-		if(_logger) _logger->log(message);
+	void pushLog(LogLevel logLevel, const char* message) {
+		if(_logger) _logger->log(logLevel, message);
 	}
 
-	void pushLogV(const char* fmt, ...) {
+	void pushLogV(LogLevel logLevel, const char* fmt, ...) {
 		if (_logger) {
 			va_list args;
 			va_start(args, fmt);
-			_logger->logVA(fmt, args);
+			_logger->logVA(logLevel, fmt, args);
 			va_end(args);
 		}
 	}
-	void pushLogVA(const char* fmt, va_list args) {
-		if (_logger) _logger->logVA(fmt, args);
+	void pushLogVA(LogLevel logLevel, const char* fmt, va_list args) {
+		if (_logger) _logger->logVA(logLevel, fmt, args);
 	}
 
 	void setConfigFilePath(const char* path) {
@@ -314,17 +314,17 @@ const char* TradingPlatform::getConfigFilePath() const {
 	return _tradingPlatformImpl->getConfigFilePath();
 }
 
-void TradingPlatform::pushLog(const char* message) {
-	_tradingPlatformImpl->pushLog(message);
+void TradingPlatform::pushLog(LogLevel logLevel, const char* message) {
+	_tradingPlatformImpl->pushLog(logLevel, message);
 }
 
-void TradingPlatform::pushLogV(const char* fmt, ...) {
+void TradingPlatform::pushLogV(LogLevel logLevel, const char* fmt, ...) {
 	va_list args;
 	va_start(args, fmt);
-	_tradingPlatformImpl->pushLogVA(fmt, args);
+	_tradingPlatformImpl->pushLogVA(logLevel, fmt, args);
 	va_end(args);
 }
 
-void TradingPlatform::pushLogVA(const char* fmt, va_list args) {
-	_tradingPlatformImpl->pushLogVA(fmt, args);
+void TradingPlatform::pushLogVA(LogLevel logLevel, const char* fmt, va_list args) {
+	_tradingPlatformImpl->pushLogVA(logLevel, fmt, args);
 }
