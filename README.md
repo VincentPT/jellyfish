@@ -3,6 +3,7 @@ A crypto application to help people in trading by showing and analyzing crypto's
 
 ## Getting Started
 ![Application screen](/docs/GoCrypto-with-marks.PNG)
+
     1. platform name(platform's config file name without extension)
        platform name list is loaded in forlder ./platforms in binaries folder.
        
