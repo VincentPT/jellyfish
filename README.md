@@ -2,7 +2,7 @@
 A crypto application to help people in trading by showing and analyzing crypto's information.
 
 ## Getting Started
-[Application binaries](/binaries/v1.0.0.zip)
+[Application binaries - v1.0.0.zip](/binaries/v1.0.0.zip)
 
 Application screen.  
 ![Application screen](/docs/GoCrypto-with-marks.PNG)
@@ -68,8 +68,13 @@ Notification through PushOver platform.
     ### MacOS
     * Not supported yet
 ## Run.
+    - The binaries package is already to run.
+    Howerver, notification feature is only available if the PushOver's keys is specifed in platform's configuration file.
+    if you don't have a PushOver's account, you can register for trial [here](https://pushover.net/).
     
-
+    - In case you want to run application with Binance's services you should supplied your API key in platform's configuration file too.
+    
+    - The platform's configuration file can be found in platforms folder in the binaries package.
 ## Authors
 * **Vincent Pham** - [VincentPT](https://github.com/VincentPT)
 
