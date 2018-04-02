@@ -17,7 +17,7 @@ platform name list is loaded in forlder ./platforms in binaries folder.
     
 3. Platform currencies.  
 the currencies which use as base currencies to exchange to other cryocurencies.  
-For example: USD, BTC, ETH, ... in Bitfinex trading platform.  
+For example: USD, BTC, ETH,... in Bitfinex trading platform.  
        
 4. Chart time length.  
 The time length which use to display the chart current view.
