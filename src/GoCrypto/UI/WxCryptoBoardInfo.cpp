@@ -310,7 +310,7 @@ void WxCryptoBoardInfo::update() {
 		auto windowHeight = ImGui::GetWindowHeight() - itemHeight - 10;
 		//ImGui::SetNextWindowContentSize(ImVec2(0, 0));
 		ImGui::BeginChild("##ScrollingRegion", ImVec2(0, windowHeight), false, ImGuiWindowFlags_HorizontalScrollbar);
-		ImGui::Columns(_columns.size());
+		ImGui::Columns((int)_columns.size());
 
 		ImGuiListClipper clipper(ITEMS_COUNT);  // Also demonstrate using the clipper for large list
 
@@ -387,7 +387,7 @@ void WxCryptoBoardInfo::setItems(const std::vector<CryptoBoardElmInfo*>* fixedIt
 
 		for (int i = 0; i < (int)_dataIndexcies.size(); i++) {
 			_dataIndexcies[i] = i;
-			_cellBuffers[i] = createRowBuffer(3 + _periods.size() * 3 - 1);
+			_cellBuffers[i] = createRowBuffer(3 + (int)_periods.size() * 3 - 1);
 		}
 	}
 	_cryptoBoardInfoAdapter->setItems(_fixedItems);
@@ -522,6 +522,10 @@ const std::vector<int>& WxCryptoBoardInfo::getRawElemInfoOffsets() const {
 void WxCryptoBoardInfo::setAdapter(std::shared_ptr<CryptoBoardInfoModeAdapterBase> adapter) {
 	_cryptoBoardInfoAdapter = adapter;
 	refreshCached(-1);
+}
+
+std::shared_ptr<CryptoBoardInfoModeAdapterBase> WxCryptoBoardInfo::getAdapter() {
+	return _cryptoBoardInfoAdapter;
 }
 
 void WxCryptoBoardInfo::refreshCached(int symbolIndex) {

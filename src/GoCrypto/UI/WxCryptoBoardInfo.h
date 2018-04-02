@@ -210,6 +210,7 @@ public:
 	void resetCryptoAdapterToDefault();
 	const std::vector<int>& getRawElemInfoOffsets() const;
 	void setAdapter(std::shared_ptr<CryptoBoardInfoModeAdapterBase> adapter);
+	std::shared_ptr<CryptoBoardInfoModeAdapterBase> getAdapter();
 
 	void refreshCached(int symbolIndex);
 };

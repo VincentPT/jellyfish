@@ -368,8 +368,8 @@ void BasicApp::setup()
 
 	_graph = graphLine;
 
-	auto fTextTranslate = [this](const glm::vec2& point) -> std::tuple<std::string, std::string> {
-		TIMESTAMP t = convertXToTime(point.x);
+	auto translateTime = [this](float x) -> std::string {
+		TIMESTAMP t = convertXToTime(x);
 		char buffer[32];
 		time_t tst = (time_t)(t / 1000);
 		struct tm * timeinfo;
@@ -380,13 +380,67 @@ void BasicApp::setup()
 		else {
 			strftime(buffer, sizeof(buffer), "%b %d %T", timeinfo);
 		}
+		return buffer;
+	};
 
-		std::tuple<std::string, std::string> pointStr(buffer, std::to_string(point.y));
+	auto fPriceTranslate = [this, translateTime](const glm::vec2& point) -> std::tuple<std::string, std::string> {
+		string xStr = translateTime(point.x);
+		auto adapter = dynamic_cast<ConvertableCryptoInfoAdapter*>(_cryptoBoard->getAdapter().get());
+		auto selectedSymbol = _cryptoBoard->getSelectedSymbol();
+
+		string yStr;
+		double price;
+		if (adapter && selectedSymbol) {
+			if (adapter->convertPrice(selectedSymbol, (double)point.y, price)) {
+				yStr = std::to_string((float)price);
+			}
+			else {
+				yStr = "N/A-" + std::to_string(point.y);
+			}
+		}
+		else { 
+			yStr = std::to_string(point.y);
+		}
+
+		std::tuple<std::string, std::string> pointStr(xStr, yStr);
 		return pointStr;
 	};
 
-	_graph->setPointToTextTranslateFunction(fTextTranslate);
-	_barChart->setPointToTextTranslateFunction(fTextTranslate);
+	auto fVolumeTranslate = [this, translateTime](const glm::vec2& point) -> std::tuple<std::string, std::string> {
+		string xStr = translateTime(point.x);
+		string yStr;
+
+		auto adapter = dynamic_cast<ConvertableCryptoInfoAdapter*>(_cryptoBoard->getAdapter().get());
+		auto items = _cryptoBoard->getItems();
+		auto selectedItemIdx = _cryptoBoard->getSelectedSymbolIndex();
+
+		if (adapter && items && selectedItemIdx >= 0 && items->size() > 0) {
+			auto& originCrytoInfo = items->at(selectedItemIdx);
+			auto selectedSymbol = originCrytoInfo->symbol;
+			double price;
+			if (adapter->convertPrice(selectedSymbol, originCrytoInfo->price, price)) {
+				auto& quoteCurency = adapter->getQuote(selectedSymbol);
+				if (quoteCurency.empty()) {
+					yStr = "N/A-" + std::to_string(point.y);
+				}
+				else {
+					yStr = std::to_string((float)(point.y * price));
+				}
+			}
+			else {
+				yStr = "N/A-" + std::to_string(point.y);
+			}
+		}
+		else {
+			yStr = std::to_string(point.y);
+		}
+
+		std::tuple<std::string, std::string> pointStr(xStr, yStr);
+		return pointStr;
+	};
+
+	_graph->setPointToTextTranslateFunction(fPriceTranslate);
+	_barChart->setPointToTextTranslateFunction(fVolumeTranslate);
 
 	getWindow()->getSignalMouseMove().connect([this](MouseEvent& me) {
 		_graph->setCursorLocation(glm::vec2(me.getX(), me.getY()));
@@ -663,41 +717,42 @@ void initBarChart(WxBarCharLive* barChart, WxLineGraphLive* lineChart,
 	barChart->acessSharedData([barChart, app, &items, graphLength, barTimeLength, &alignX, &fVolume](Widget*) {
 		barChart->clearPoints();
 		barChart->setInitalGraphRegion(barChart->getGraphRegion());
+		if (items.size()) {
+			auto it = items.rbegin();
 
-		auto it = items.rbegin();
+			TIMESTAMP beginTime = it->timestamp;
+			TIMESTAMP alignTime = roundUp(beginTime, barTimeLength);
 
-		TIMESTAMP beginTime = it->timestamp;
-		TIMESTAMP alignTime = roundUp(beginTime, barTimeLength);
-
-		// import the first n - 1 points
-		for (; it != items.rend(); it++) {
-			if (it->timestamp >= alignTime) {
-				break;
+			// import the first n - 1 points
+			for (; it != items.rend(); it++) {
+				if (it->timestamp >= alignTime) {
+					break;
+				}
 			}
+			float volume = 0;
+			for (; it != items.rend(); it++) {
+				if ((it->timestamp - alignTime) < barTimeLength) {
+					volume += fVolume(*it);
+				}
+				else {
+					alignTime = roundDown(it->timestamp, barTimeLength);
+					float x = app->convertRealTimeToDisplayTime(alignTime);
+					barChart->addPoint(glm::vec2(x, volume));
+					volume = fVolume(*it);
+				}
+			}
+
+			// align current time
+			alignTime = roundUp(getCurrentTimeStamp(), barTimeLength);
+
+			// begin time of graph should be
+			beginTime = alignTime - graphLength;
+			alignX = app->convertRealTimeToDisplayTime(beginTime);
+
+			// begin time should be display at begin of the graph
+			barChart->translate(-alignX, 0);
+			barChart->adjustTransform();
 		}
-		float volume = 0;
-		for (; it != items.rend(); it++) {
-			if ((it->timestamp - alignTime) < barTimeLength) {
-				volume += fVolume(*it);
-			}
-			else {
-				alignTime = roundDown(it->timestamp, barTimeLength);
-				float x = app->convertRealTimeToDisplayTime(alignTime);
-				barChart->addPoint(glm::vec2(x, volume));
-				volume = fVolume(*it);
-			}
-		}
-
-		// align current time
-		alignTime = roundUp(getCurrentTimeStamp(), barTimeLength);
-
-		// begin time of graph should be
-		beginTime = alignTime - graphLength;
-		alignX = app->convertRealTimeToDisplayTime(beginTime);
-
-		// begin time should be display at begin of the graph
-		barChart->translate(-alignX, 0);
-		barChart->adjustTransform();
 	});
 
 	lineChart->acessSharedData([app, lineChart, &items, &alignX, &fPrice](Widget*) {
@@ -706,16 +761,17 @@ void initBarChart(WxBarCharLive* barChart, WxLineGraphLive* lineChart,
 		auto& area = lineChart->getGraphRegion();
 		lineChart->setInitalGraphRegion(area);
 		lineChart->setAutoScaleRange((float)area.y1, area.y1 + area.getHeight() / 2.0f);
-
-		float y;
-		for (auto it = items.rbegin(); it != items.rend(); it++) {
-			float x = app->convertRealTimeToDisplayTime(it->timestamp);
-			y = fPrice(*it);
-			lineChart->addPointAndConstruct(glm::vec2(x, y));
+		if (items.size()) {
+			float y;
+			for (auto it = items.rbegin(); it != items.rend(); it++) {
+				float x = app->convertRealTimeToDisplayTime(it->timestamp);
+				y = fPrice(*it);
+				lineChart->addPointAndConstruct(glm::vec2(x, y));
+			}
+			// align x for line chart to same as bar chart
+			lineChart->translate(-alignX, 0);
+			lineChart->adjustTransform();
 		}
-		// align x for line chart to same as bar chart
-		lineChart->translate(-alignX, 0);
-		lineChart->adjustTransform();
 	});
 }
 
@@ -933,15 +989,11 @@ void BasicApp::initChart() {
 	_lastSelectedHandler->accessSharedData([this](NAPMarketEventHandler* handler) {
 		if (isGraphDataCandle()) {
 			auto& candles = handler->getCandleHistoriesNonSync();
-			if (candles.size()) {
-				initBarchart(candles);
-			}
+			initBarchart(candles);
 		}
 		else {
 			auto& items = handler->getTradeHistoriesNonSync();
-			if (items.size()) {
-				initBarchart(items);
-			}
+			initBarchart(items);
 		}
 	});
 }
