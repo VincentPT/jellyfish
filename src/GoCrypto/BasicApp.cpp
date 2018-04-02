@@ -160,7 +160,7 @@ void BasicApp::onWindowSizeChanged() {
 	_barChart->setInitalGraphRegion(Area(graphX1, (int)_barChart->getHeight() / 2 - 10, graphX2, (int)_barChart->getHeight() - 20));
 
 	auto& area = _graph->getGraphRegion();
-	_graph->setAutoScaleRange(area.y1, area.y1 + area.getHeight() / 2);
+	_graph->setAutoScaleRange((float)area.y1, area.y1 + area.getHeight() / 2.0f);
 
 	if (_lastSelectedHandler) {
 		initChart();
@@ -400,7 +400,7 @@ void BasicApp::setup()
 			pos.y >= _graph->getY() && pos.y < _graph->getY() + _graph->getHeight()) {
 
 			auto translateX = me.getX() - prePos.x;
-			_graph->translate(translateX, 0);
+			_graph->translate((float)translateX, 0);
 			auto t = _graph->getTranslate();
 			t.y = _barChart->getTranslate().y;
 			_barChart->setTranslate(t);
@@ -705,7 +705,7 @@ void initBarChart(WxBarCharLive* barChart, WxLineGraphLive* lineChart,
 		lineChart->clearPoints();
 		auto& area = lineChart->getGraphRegion();
 		lineChart->setInitalGraphRegion(area);
-		lineChart->setAutoScaleRange(area.y1, area.y1 + area.getHeight() / 2);
+		lineChart->setAutoScaleRange((float)area.y1, area.y1 + area.getHeight() / 2.0f);
 
 		float y;
 		for (auto it = items.rbegin(); it != items.rend(); it++) {
@@ -777,7 +777,7 @@ void BasicApp::onSelectedTradeEvent(NAPMarketEventHandler* handler, TradeItem* i
 		std::unique_lock<std::mutex> lk(_chartMutex);
 		auto& items = handler->getTradeHistoriesNonSync();
 		renewCharts(_barChart.get(), _graph.get(), items,
-			[](const TradeItem& item) { return abs(item.amount); },
+			[](const TradeItem& item) { return (float)abs(item.amount); },
 			[](const TradeItem& item) { return (float)item.price; });
 	}
 	else {
@@ -794,7 +794,7 @@ void BasicApp::onSelectedTradeEvent(NAPMarketEventHandler* handler, TradeItem* i
 
 				if (lastAlignedTime == lastAnlignedTimeInChart) {
 					// update last bar
-					lastPoint.y += abs(items->amount);
+					lastPoint.y += (float)abs(items->amount);
 				}
 				else if (lastAlignedTime > lastAnlignedTimeInChart) {
 					// add new bar
@@ -810,7 +810,7 @@ void BasicApp::onSelectedTradeEvent(NAPMarketEventHandler* handler, TradeItem* i
 						lastAnlignedTimeInChart = roundDown(lastTimeInChart, barTimeLength);
 						if (lastAlignedTime == lastAnlignedTimeInChart) {
 							// update last bar
-							it->y += abs(items->amount);
+							it->y += (float)abs(items->amount);
 						}
 					}
 				}
@@ -869,7 +869,7 @@ void BasicApp::onCandle(NAPMarketEventHandler* sender, CandleItem* candleItems, 
 		std::unique_lock<std::mutex> lk(_chartMutex);
 		auto& candles = sender->getCandleHistoriesNonSync();
 		renewCharts(_barChart.get(), _graph.get(), candles,
-			[](const CandleItem& item) { return item.volume; },
+			[](const CandleItem& item) { return (float)item.volume; },
 			[](const CandleItem& item) { return (float)((item.low + item.high) / 2); });
 	}
 	else {
@@ -880,9 +880,9 @@ void BasicApp::onCandle(NAPMarketEventHandler* sender, CandleItem* candleItems, 
 			auto& candles = sender->getCandleHistoriesNonSync();
 			if (candles.size()) {
 				// only calculate last hour
-				auto lastTotalVolume = 0;
+				float lastTotalVolume = 0;
 				for (auto it = candles.begin(); it != candles.end() && it->timestamp >= lastAlignedTime; it++) {
-					lastTotalVolume += it->volume;
+					lastTotalVolume += (float)it->volume;
 				}
 
 				auto& points = _barChart->getPoints();
@@ -961,7 +961,7 @@ TIMESTAMP BasicApp::computeBarTimeLength() {
 
 	graphLength *= 1000;
 	_pixelPerTime = _barChart->getGraphRegion().getWidth() * 1.0f / graphLength;
-	float barWith = _barChart->getGraphRegion().getWidth() / barCount;
+	float barWith = (float)_barChart->getGraphRegion().getWidth() / barCount;
 	_barChart->setBarWidth(barWith);
 
 	return (TIMESTAMP)(graphLength / barCount);
@@ -969,22 +969,22 @@ TIMESTAMP BasicApp::computeBarTimeLength() {
 
 
 void BasicApp::initBarchart(const std::list<CandleItem>& candles) {
-	_barTimeLength = computeBarTimeLength();
+	_barTimeLength = (int)computeBarTimeLength();
 	auto graphLength = _controlBoard->getCurrentGraphLengh() * 1000;
 	//_liveMode = true;
 
 	initBarChart(_barChart.get(), _graph.get(), candles, _barTimeLength, graphLength,
-		[](const CandleItem& item) { return item.volume; },
+		[](const CandleItem& item) { return (float)item.volume; },
 		[](const CandleItem& item) { return (float)((item.low + item.high) / 2); });
 }
 
 void BasicApp::initBarchart(const std::list<TradeItem>& items) {
-	_barTimeLength = computeBarTimeLength();
+	_barTimeLength = (int)computeBarTimeLength();
 	auto graphLength = _controlBoard->getCurrentGraphLengh() * 1000;
 	//_liveMode = true;
 
 	initBarChart(_barChart.get(), _graph.get(), items, _barTimeLength, graphLength,
-		[](const TradeItem& item) { return abs(item.amount); },
+		[](const TradeItem& item) { return (float)abs(item.amount); },
 		[](const TradeItem& item) { return (float)item.price; });
 }
 
