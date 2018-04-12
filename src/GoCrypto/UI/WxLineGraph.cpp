@@ -50,5 +50,4 @@ void WxLineGraph::draw() {
 		}
 		gl::end();
 	}
-	drawPointAtCursor();
 }

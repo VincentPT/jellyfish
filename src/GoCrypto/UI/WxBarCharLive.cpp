@@ -99,8 +99,6 @@ void WxBarCharLive::draw() {
 	}
 	gl::color(_lineColor);
 	gl::drawLine(basePoint, lastBasePoint);
-
-	drawPointAtCursor();
 }
 
 void WxBarCharLive::acessSharedData(const AccessSharedDataFunc& f) {

@@ -40,5 +40,6 @@ public:
 	const char* getCurrentPlatform() const;
 	bool isPushToCloudEnable() const;
 	unsigned int getCurrentGraphLengh() const;
+	int getCurrentBarCount() const;
 };
 

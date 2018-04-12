@@ -138,7 +138,7 @@ void WxLineGraphLive::draw() {
 		gl::color(_lineColor);
 		gl::drawLine(localPoint, constructPoint);
 
-		ColorAf color(1, 1, 1);
+		ColorAf color(1, 1, 0);
 		gl::color(color);
 
 		if (_translateFunction) {
@@ -150,10 +150,10 @@ void WxLineGraphLive::draw() {
 			float x2  = _displayArea.x1 + getX();
 
 			if (_horizontalIndicator == HorizontalIndicatorAlignment::Right) {
-				gl::drawStringCentered(std::get<1>(pointStr), glm::vec2(x2 - 20, constructPoint.y), color, font);
+				gl::drawStringRight(std::get<1>(pointStr), glm::vec2(x2, constructPoint.y), color, font);
 			}
 			else if (_horizontalIndicator == HorizontalIndicatorAlignment::Left) {
-				gl::drawStringCentered(std::get<1>(pointStr), glm::vec2(x1 + 30, constructPoint.y), color, font);
+				gl::drawString(std::get<1>(pointStr), glm::vec2(x1, constructPoint.y), color, font);
 			}
 			
 			if (_horizontalIndicator == HorizontalIndicatorAlignment::Right) {

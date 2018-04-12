@@ -197,22 +197,22 @@ void WxPointBaseGraph::drawPointAtCursor() {
 			SCOPE_LOG(scope2);
 			glm::vec2 windowCursorLocation(_cursorLocation.x + graphRect.x1, _cursorLocation.y + graphRect.y1);
 
-			ColorAf color(1, 0, 0);
+			ColorA8u color(255, 255, 255);
 			ci::Font font("Arial", 20);
 			gl::color(color);
 
 			SCOPE_LOG(scope3);
 			if (_horizontalIndicator == HorizontalIndicatorAlignment::Right) {
-				gl::drawStringCentered(std::get<1>(pointStr), glm::vec2(graphRect.x2 - 20, windowCursorLocation.y), color, font);
+				gl::drawStringRight(std::get<1>(pointStr), glm::vec2(graphRect.x2, windowCursorLocation.y), color, font);
 			}
 			else if (_horizontalIndicator == HorizontalIndicatorAlignment::Left) {
-				gl::drawStringCentered(std::get<1>(pointStr), glm::vec2(graphRect.x1 + 30, windowCursorLocation.y), color, font);
+				gl::drawString(std::get<1>(pointStr), glm::vec2(graphRect.x1, windowCursorLocation.y), color, font);
 			}
 			if (_verticalIndicator == VerticalIndicatorAlignment::Bottom) {
-				gl::drawStringCentered(std::get<0>(pointStr), glm::vec2(windowCursorLocation.x - 20, graphRect.y2), color, font);
+				gl::drawStringCentered(std::get<0>(pointStr), glm::vec2(windowCursorLocation.x - 10, graphRect.y2), color, font);
 			}
 			else if (_verticalIndicator == VerticalIndicatorAlignment::Top) {
-				gl::drawStringCentered(std::get<0>(pointStr), glm::vec2(windowCursorLocation.x - 20, graphRect.y1), color, font);
+				gl::drawStringCentered(std::get<0>(pointStr), glm::vec2(windowCursorLocation.x - 10, graphRect.y1), color, font);
 			}
 
 			if (_horizontalIndicator == HorizontalIndicatorAlignment::Right) {

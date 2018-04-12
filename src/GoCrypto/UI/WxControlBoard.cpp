@@ -180,3 +180,17 @@ unsigned int WxControlBoard::getCurrentGraphLengh() const {
 
 	return graphLengths[_currentGraphLength];
 }
+
+int WxControlBoard::getCurrentBarCount() const {
+	static unsigned int barCounts[] = {
+		672,
+		480,
+		240,
+		120,
+		60,
+		60,
+		30,
+		12,
+	};
+	return barCounts[_currentGraphLength];
+}

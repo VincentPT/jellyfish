@@ -100,6 +100,7 @@ public:
 	void initChart();
 	TIMESTAMP computeBarTimeLength();
 	void restoreTransformAfterInitOnly(function<void()>&& initFunction);
+	TIMESTAMP getLiveTime();
 };
 
 void pushLog(int logLevel, const char* fmt, ...) {
@@ -285,9 +286,9 @@ void BasicApp::setup()
 	_spliter.setChild2(bottomSpliter);
 
 	graphLine->setGraphRegionColor(ColorA8u(0, 0, 0, 255));
-	graphLine->setLineColor(ColorA8u(255, 255, 0, 255));
+	graphLine->setLineColor(ColorA8u(165, 42, 42, 255));
 	_barChart->setGraphRegionColor(ColorA8u(0, 0, 0, 255));
-	_barChart->setLineColor(ColorA8u(255, 255, 0, 255));
+	_barChart->setLineColor(ColorA8u(0, 0, 255, 255));
 	_barChart->setBarColor(ColorA8u(69, 69, 69, 255));
 
 	graphLine->setIndicateAligment(HorizontalIndicatorAlignment::Left, VerticalIndicatorAlignment::Bottom);
@@ -709,7 +710,7 @@ void BasicApp::applySelectedCurrency(const std::string& currency) {
 template <class T, class FVolume, class FPrice>
 void initBarChart(WxBarCharLive* barChart, WxLineGraphLive* lineChart,
 	const std::list<T>& items, TIMESTAMP barTimeLength, TIMESTAMP graphLength,
-	FVolume fVolume, FPrice fPrice) {
+	const FVolume& fVolume, const FPrice& fPrice) {
 
 	float alignX;
 	auto app = (BasicApp*)App::get();
@@ -773,10 +774,83 @@ void initBarChart(WxBarCharLive* barChart, WxLineGraphLive* lineChart,
 			lineChart->adjustTransform();
 		}
 	});
+
+	//lineChart->acessSharedData([app, lineChart, &items, &alignX, &fVolume](Widget*) {
+	//	// reset the graph
+	//	lineChart->clearPoints();
+	//	auto& area = lineChart->getGraphRegion();
+	//	lineChart->setInitalGraphRegion(area);
+	//	lineChart->setAutoScaleRange((float)area.y1, area.y1 + area.getHeight() / 2.0f);
+
+	//	buildVolumeLineChartForSnapshot(lineChart, items, fVolume);
+
+	//	// align x for line chart to same as bar chart
+	//	lineChart->translate(-alignX, 0);
+	//	lineChart->adjustTransform();
+	//});
+}
+
+template <class T, class FVolume>
+void buildVolumeLineChartForSnapshot(WxLineGraphLive* lineChart, const std::list<T>& items, const FVolume& fVolume) {
+	auto app = (BasicApp*)App::get();
+
+	TIMESTAMP duration = 60 * 60 * 1000;
+	float initializeVolume = 0;
+
+	TIMESTAMP liveTime = app->getLiveTime();
+	TIMESTAMP timeEnd = liveTime - duration;
+
+	auto it = items.begin();
+	auto jt = it;
+	for (; jt != items.end(); jt++) {
+		if (jt->timestamp <= timeEnd) {
+			break;
+		}
+		initializeVolume += fVolume(*jt);
+	}
+	// application must have atleast one hour of data to draw this chart
+	if (jt->timestamp > timeEnd || jt == items.end()) {
+		return;
+	}
+
+	list<vec2> points;
+	float x = app->convertRealTimeToDisplayTime(it->timestamp);
+	float y = initializeVolume;
+	points.push_back(glm::vec2(x, y));
+
+	initializeVolume -= fVolume(*it);
+	if (initializeVolume < 0) {
+		initializeVolume = 0;
+	}
+	it++;
+	timeEnd = it->timestamp - duration;
+
+	for (jt++; jt != items.end();) {
+		if (jt->timestamp > timeEnd) {
+			initializeVolume += fVolume(*jt);
+			jt++;
+		}
+		else {
+			x = app->convertRealTimeToDisplayTime(it->timestamp);
+			y = initializeVolume;
+			points.push_back(glm::vec2(x, y));
+
+			initializeVolume -= fVolume(*it);
+			if (initializeVolume < 0) {
+				initializeVolume = 0;
+			}
+			it++;
+			timeEnd = it->timestamp - duration;
+		}
+	}
+
+	for (auto pt = points.rbegin(); pt != points.rend(); pt++) {
+		lineChart->addPointAndConstruct(*pt);
+	}
 }
 
 template <class T, class FVolume, class FPrice>
-void renewCharts(WxBarCharLive* barChart, WxLineGraphLive* lineChart, const std::list<T>& items, FVolume fVolume, FPrice fPrice) {
+void renewCharts(WxBarCharLive* barChart, WxLineGraphLive* lineChart, const std::list<T>& items, const FVolume& fVolume, const FPrice& fPrice) {
 	auto app = (BasicApp*)App::get();
 	auto barTimeLength = app->computeBarTimeLength();
 
@@ -821,6 +895,13 @@ void renewCharts(WxBarCharLive* barChart, WxLineGraphLive* lineChart, const std:
 		}
 		lineChart->adjustTransform();
 	});
+
+	//lineChart->acessSharedData([app, lineChart, &items, &fVolume](Widget*) {
+	//	// reset the graph
+	//	lineChart->clearPoints();
+	//	buildVolumeLineChartForSnapshot(lineChart, items, fVolume);
+	//	lineChart->adjustTransform();
+	//});
 }
 //////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -1000,16 +1081,7 @@ void BasicApp::initChart() {
 
 TIMESTAMP BasicApp::computeBarTimeLength() {
 	auto graphLength = _controlBoard->getCurrentGraphLengh();
-	int barCount = 0;
-	if (graphLength <= 60) {
-		barCount = 12;
-	}
-	else if (graphLength <= 5 * 60) {
-		barCount = 24;
-	}
-	else {
-		barCount = 60;
-	}
+	int barCount = _controlBoard->getCurrentBarCount();
 
 	graphLength *= 1000;
 	_pixelPerTime = _barChart->getGraphRegion().getWidth() * 1.0f / graphLength;
@@ -1052,6 +1124,23 @@ void BasicApp::mouseDown( MouseEvent event )
 {
 }
 
+TIMESTAMP BasicApp::getLiveTime() {
+	TIMESTAMP liveTime = 0;
+	if (_serviceControlMutex.try_lock()) {
+		if (_platformRunner) {
+			if (_platformRunner->getPlatform()->isServerTimeReady()) {
+				liveTime = _platformRunner->getPlatform()->getSyncTime(getCurrentTimeStamp());
+			}
+		}
+		_serviceControlMutex.unlock();
+	}
+	if (liveTime == 0) {
+		liveTime = getCurrentTimeStamp();
+	}
+
+	return liveTime;
+}
+
 void BasicApp::update()
 {
 	FUNCTON_LOG();
@@ -1060,18 +1149,7 @@ void BasicApp::update()
 		_ciWndCandle->update();
 	}
 	if (_liveMode) {
-		TIMESTAMP liveTime = 0;
-		if (_serviceControlMutex.try_lock()) {
-			if (_platformRunner) {
-				if (_platformRunner->getPlatform()->isServerTimeReady()) {
-					liveTime = _platformRunner->getPlatform()->getSyncTime(getCurrentTimeStamp());
-				}
-			}
-			_serviceControlMutex.unlock();
-		}
-		if (liveTime == 0) {
-			liveTime = getCurrentTimeStamp();
-		}
+		TIMESTAMP liveTime = getLiveTime();
 		{
 			std::unique_lock<std::mutex> lk(_chartMutex);
 			auto liveX = convertRealTimeToDisplayTime(liveTime);
@@ -1096,6 +1174,13 @@ void BasicApp::draw()
 	//else {
 		gl::clear(ColorA::black());
 		_topCotrol->draw();
+
+		if (_barChart) {
+			_barChart->drawPointAtCursor();
+		}
+		if (_graph) {
+			_graph->drawPointAtCursor();
+		}
 	//}
 }
 

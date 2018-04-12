@@ -34,9 +34,6 @@ protected:
 	VerticalIndicatorAlignment _verticalIndicator;
 	bool _drawBackground;
 
-protected:
-	void drawPointAtCursor();
-
 public:
 	WxPointBaseGraph();
 	virtual ~WxPointBaseGraph();
@@ -68,5 +65,6 @@ public:
 
 	virtual void setIndicateAligment(HorizontalIndicatorAlignment horizontal, VerticalIndicatorAlignment vertical);
 	virtual void drawBackground(bool drawBackground);
+	void drawPointAtCursor();
 };
 

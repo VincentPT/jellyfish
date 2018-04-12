@@ -586,6 +586,79 @@ void PlatformEngine::onCandle(int i, NAPMarketEventHandler* sender, CandleItem* 
 			it.first->second++;
 		}
 	}
+
+	// process notification for volume
+	//if (snapshot == false) {
+	//	static TIMESTAMP measureDuration = 2 * 60 * 1000;
+	//	auto& lastProcessingTime = _notifyProcessingVolumeMap[i];
+
+	//	auto& candleItems = sender->getCandleHistoriesNonSync();
+	//	auto it = candleItems.begin();
+	//	if (it == candleItems.end()) {
+	//		return;
+	//	}
+	//	auto lastestVolume = it->volume;
+	//	auto timePoint = it->timestamp;
+
+	//	for (it++; it != candleItems.end(); it++) {
+	//		if (it->timestamp <= lastProcessingTime) {
+	//			return;
+	//		}
+	//		if (timePoint - it->timestamp >= measureDuration) {
+	//			break;
+	//		}
+	//		lastestVolume += it->volume;
+	//	}
+	//	if (it == candleItems.end()) {
+	//		return;
+	//	}
+	//	auto previousVolume = it->volume;
+	//	auto previousTimePoint = it->timestamp;
+	//	auto lastCheckTime = previousTimePoint;
+	//	for (it++; it != candleItems.end(); it++) {
+	//		if (it->timestamp <= lastProcessingTime) {
+	//			return;
+	//		}
+	//		if (previousTimePoint - it->timestamp >= measureDuration) {
+	//			break;
+	//		}
+	//		previousVolume += it->volume;
+	//		lastCheckTime = it->timestamp;
+	//	}
+
+	//	static float changeThresholdMultiplication = 5.0f;
+	//	const char* action = nullptr;
+	//	float volumeChange, timeChange;
+
+	//	if (lastestVolume > previousVolume) {
+	//		volumeChange = (float)(lastestVolume / previousVolume);
+	//		if (volumeChange >= changeThresholdMultiplication) {
+	//			action = "jumped";
+	//		}
+	//	}
+	//	else if (lastestVolume < previousVolume) {
+	//		volumeChange = (float)(previousVolume / lastestVolume);
+	//		if (volumeChange >= changeThresholdMultiplication) {
+	//			action = "dropped";
+	//		}
+	//	}
+
+	//	if (action) {
+	//		char buffer[128];
+	//		auto priceChangedPercent = volumeChange * 100;
+	//		timeChange = (float)((lastCheckTime - timePoint) / (1000.0f * 60.0f));
+
+	//		sprintf_s(buffer, sizeof(buffer), "volume of %s has %s %.2f%% in %.2f min", sender->getPair(), action, (float)priceChangedPercent, timeChange);
+
+	//		InternalNotificationData notification;
+	//		notification.message.title = _platformName;
+	//		notification.message.message = buffer;
+	//		notification.pair = sender->getPair();
+	//		_messageQueue.pushMessage(notification);
+
+	//		lastProcessingTime = timePoint;
+	//	}
+	//}
 }
 
 void PlatformEngine::run() {
@@ -662,6 +735,7 @@ void PlatformEngine::run() {
 
 	_symbolsStatistics.resize(_pairListenerMap.size());
 	_symbolsTickers.resize(_symbolsStatistics.size());
+	_notifyProcessingVolumeMap.resize(_symbolsStatistics.size());
 	int i = 0;
 	int nPeriod = (int)_periods.size();
 
@@ -677,6 +751,7 @@ void PlatformEngine::run() {
 		elmInfo->symbol = it->first.c_str();
 
 		_symbolsStatistics[i] = elmInfo;
+		_notifyProcessingVolumeMap[i] = 0;
 
 		auto tradeEventListener = 
 			std::bind(&PlatformEngine::onTrade, this, i, _1 , _2, _3, _4);
@@ -761,6 +836,7 @@ inline bool updateBestPricePoint(const PricePoint*& bestPricePoint, const PriceP
 }
 
 void PlatformEngine::analyzeTickerForNotification(NAPMarketEventHandler* handler, const std::list<TickerUI>& tickers) {
+	return;
 	auto it = tickers.begin();
 
 	auto& lastTicker = *it;

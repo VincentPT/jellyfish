@@ -79,6 +79,7 @@ private:
 	std::list<UserListenerInfo> _userListeners;
 	std::map<std::string, std::shared_ptr<std::list<UserListenerInfo*>>> _pairListenerMap;
 	std::vector<CryptoBoardElmInfo*> _symbolsStatistics;
+	std::vector<TIMESTAMP> _notifyProcessingVolumeMap;
 	std::vector<std::list<TickerUI>> _symbolsTickers;
 	std::vector<std::string> _currencies;
 	std::vector<Period> _periods;
