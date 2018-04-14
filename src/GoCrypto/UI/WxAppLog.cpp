@@ -29,19 +29,34 @@ void WxAppLog::addLogV(WxAppLog::LogLevel logLevel, const char* fmt, va_list arg
 		if (Buf[old_size] == '\n')
 			LineOffsets.push_back(old_size);
 	ScrollToBottom = true;
+
+	// display log in console window but server mode must be enable
+	vprintf(fmt, args);
 }
 
 void WxAppLog::setLogLevel(WxAppLog::LogLevel logLevel) {
 	_logLevel = logLevel;
 }
 
-void WxAppLog::draw()
+void WxAppLog::setDoubleClickHandler(MouseDoubleClickEventHandler&& handler) {
+	_doubleClickHandler = handler;
+}
+
+void WxAppLog::update()
 {	
 	FUNCTON_LOG();
     ImGui::SetNextWindowSize(_window_size, ImGuiCond_Always);
 	ImGui::SetNextWindowPos(_window_pos);
 
     ImGui::Begin("application log", nullptr, _window_flags);
+	auto& io = ImGui::GetIO();
+	if (_doubleClickHandler && ImGui::IsMouseDoubleClicked(0)) {
+		if (io.MousePos.x >= getX() && io.MousePos.x <= getX() + getWidth() &&
+			io.MousePos.y >= getY() && io.MousePos.y <= getY() + getHeight()) {
+			_doubleClickHandler(this);
+		}
+	}
+
     if (ImGui::Button("Clear")) clear();
 
     ImGui::SameLine();
@@ -69,9 +84,9 @@ void WxAppLog::draw()
 	}
 
     ImGui::Separator();
+
     ImGui::BeginChild("scrolling", ImVec2(0,0), false, ImGuiWindowFlags_HorizontalScrollbar);
     if (copy) ImGui::LogToClipboard();
-
     if (Filter.IsActive())
     {
         const char* buf_begin = Buf.begin();

@@ -17,6 +17,7 @@ private:
     ImVector<int>       LineOffsets;        // Index to lines offset
 	LogLevel _logLevel;
     bool                ScrollToBottom;
+	MouseDoubleClickEventHandler _doubleClickHandler;
 public:
 	WxAppLog();
 	~WxAppLog();
@@ -24,6 +25,7 @@ public:
 
 	void    addLog(LogLevel logLevel, const char* fmt, ...) IM_FMTARGS(2);
 	void    addLogV(LogLevel logLevel, const char* fmt, va_list args);
-	void    draw();
+	void    update();
 	void setLogLevel(LogLevel logLevel);
+	void setDoubleClickHandler(MouseDoubleClickEventHandler&& handler);
 };

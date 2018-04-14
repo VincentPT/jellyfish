@@ -50,7 +50,7 @@ void CPPRESTBaseTradingPlatformThreadSafe::connect() {
 	LOG_SCOPE_ACCESS(getLogger(), __FUNCTION__);
 	std::unique_lock<std::mutex> lk(_connectionMutex);
 	if (_blConnected == true) {
-		std::cout << "client instance is already connected" << std::endl;
+		pushLog(LogLevel::Debug, "client instance is already connected\n");
 		return;
 	}
 
@@ -61,7 +61,7 @@ void CPPRESTBaseTradingPlatformThreadSafe::disconnect() {
 	LOG_SCOPE_ACCESS(getLogger(), __FUNCTION__);
 	std::unique_lock<std::mutex> lk(_connectionMutex);
 	if (_blConnected == false) {
-		std::cout << "client instance is already disconnected" << std::endl;
+		pushLog(LogLevel::Debug, "client instance is already disconnected\n");
 		return;
 	}
 

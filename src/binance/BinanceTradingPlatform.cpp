@@ -20,12 +20,10 @@ BinanceTradingPlatform::BinanceTradingPlatform() : _timeDiff(0), _stopLoopTask(t
 BinanceTradingPlatform::~BinanceTradingPlatform()
 {
 	disconnect();
-	cout << "deleted BinanceTradingPlatform object" << endl;
 }
 
 void BinanceTradingPlatform::messageHandlerImpl(const websocket_incoming_message& msg) {
 	auto bodyText = msg.extract_string().get();
-	//std::cout << "draw message: " << bodyText << std::endl;
 
 	stringstream sstream(bodyText);
 	std::error_code errorCode;
@@ -34,34 +32,34 @@ void BinanceTradingPlatform::messageHandlerImpl(const websocket_incoming_message
 	auto eventStream = json::value::parse(sstream, errorCode);
 
 	if (errorCode.value()) {
-		cout << "Parse response error" << endl;
+		pushLog(LogLevel::Debug, "Parse response error\n");
 		return;
 	}
 
 	if (eventStream.is_object() == false) {
-		cout << "wrong format" << endl;
+		pushLog(LogLevel::Debug, "wrong format\n");
 		return;
 	}
 	if (!eventStream.has_field(U("stream")) || !eventStream.has_field(U("data"))) {
-		cout << "unknown event:" << bodyText << endl;
+		pushLogV(LogLevel::Debug, "unknown event %s\n", bodyText.c_str());
 		return;
 	}
 
 	auto value = eventStream[U("data")];
 
 	if (value.is_object() == false) {
-		cout << "wrong format" << endl;
+		pushLog(LogLevel::Debug, "wrong format\n");
 		return;
 	}
 
 	if (!value.has_field(U("e")) || !value.has_field(U("s"))) {
-		cout << "unknown event:" << bodyText << endl;
+		pushLogV(LogLevel::Debug, "unknown event %s\n", bodyText.c_str());
 		return;
 	}
 	auto e = value[U("e")];
 	auto s = value[U("s")];
 	if (!e.is_string() || !s.is_string()) {
-		cout << "wrong format" << endl;
+		pushLog(LogLevel::Debug, "wrong format\n");
 		return;
 	}
 
@@ -84,7 +82,7 @@ void BinanceTradingPlatform::messageHandlerImpl(const websocket_incoming_message
 		}
 	}
 	else {
-		cout << "Cannot find handler for the symbol " << pair << endl;
+		pushLogV(LogLevel::Debug, "Cannot find handler for the symbol %s\n", pair.c_str());
 	}
 }
 
@@ -187,7 +185,7 @@ bool BinanceTradingPlatform::disconnectImpl() {
 
 bool BinanceTradingPlatform::addEventHandler(MarketEventHandler* handler, bool allowDelete) {
 	if (getConnectionStatus()) {
-		cout << "event handler must be added before connect to the platform server" << endl;
+		pushLog(LogLevel::Debug, "event handler must be added before connect to the platform server\n");
 		return false;
 	}
 	std::unique_lock<std::mutex> lk(_eventMutex);
@@ -201,39 +199,39 @@ void BinanceTradingPlatform::removeEventHandler(const char* pair) {
 }
 
 SubcribeStatus BinanceTradingPlatform::subscribeTickerImpl(const char* pair) {
-	std::cout << "BinanceTradingPlatform is not support this method, use MarketEventHandler properites instead" << std::endl;
+	pushLog(LogLevel::Debug, "BinanceTradingPlatform is not support this method, use MarketEventHandler properites instead\n");
 	return SubcribeStatus::NA;
 }
 
 SubcribeStatus BinanceTradingPlatform::subscribeBookImpl(const char* pair) {
-	std::cout << "BinanceTradingPlatform is not support this method, use MarketEventHandler properites instead" << std::endl;
+	pushLog(LogLevel::Debug, "BinanceTradingPlatform is not support this method, use MarketEventHandler properites instead\n");
 	return SubcribeStatus::NA;
 }
 
 SubcribeStatus BinanceTradingPlatform::subscribeTradeImpl(const char* pair) {
-	std::cout << "BinanceTradingPlatform is not support this method, use MarketEventHandler properites instead" << std::endl;
+	pushLog(LogLevel::Debug, "BinanceTradingPlatform is not support this method, use MarketEventHandler properites instead\n");
 	return SubcribeStatus::NA;
 }
 
 SubcribeStatus BinanceTradingPlatform::subscribeCandleImpl(const char* pair) {
-	std::cout << "BinanceTradingPlatform is not support this method, use MarketEventHandler properites instead" << std::endl;
+	pushLog(LogLevel::Debug, "BinanceTradingPlatform is not support this method, use MarketEventHandler properites instead\n");
 	return SubcribeStatus::NA;
 }
 
 SubcribeStatus BinanceTradingPlatform::unsubscribeTickerImpl(const char* pair) {
-	std::cout << "BinanceTradingPlatform is not support unsubcribe method, try using MarketEventHandler properites and reconnect instead" << std::endl;
+	pushLog(LogLevel::Debug, "BinanceTradingPlatform is not support unsubcribe method, try using MarketEventHandler properites and reconnect instead\n");
 	return SubcribeStatus::NA;
 }
 SubcribeStatus BinanceTradingPlatform::unsubscribeBookImpl(const char* pair) {
-	std::cout << "BinanceTradingPlatform is not support unsubcribe method, try using MarketEventHandler properites and reconnect instead" << std::endl;
+	pushLog(LogLevel::Debug, "BinanceTradingPlatform is not support unsubcribe method, try using MarketEventHandler properites and reconnect instead\n");
 	return SubcribeStatus::NA;
 }
 SubcribeStatus BinanceTradingPlatform::unsubscribeTradeImpl(const char* pair) {
-	std::cout << "BinanceTradingPlatform is not support unsubcribe method, try using MarketEventHandler properites and reconnect instead" << std::endl;
+	pushLog(LogLevel::Debug, "BinanceTradingPlatform is not support unsubcribe method, try using MarketEventHandler properites and reconnect instead\n");
 	return SubcribeStatus::NA;
 }
 SubcribeStatus BinanceTradingPlatform::unsubscribeCandleImpl(const char* pair) {
-	std::cout << "BinanceTradingPlatform is not support unsubcribe method, try using MarketEventHandler properites and reconnect instead" << std::endl;
+	pushLog(LogLevel::Debug, "BinanceTradingPlatform is not support unsubcribe method, try using MarketEventHandler properites and reconnect instead\n");
 	return SubcribeStatus::NA;
 }
 
@@ -283,13 +281,11 @@ void BinanceTradingPlatform::invokeTickerEvent(MarketEventHandler* handler, web:
 }
 
 void BinanceTradingPlatform::invokeBookEventSnapshot(MarketEventHandler* handler, web::json::value& value) {
-	wcout << value.serialize() << endl;
-	cout << "parsing book event has been not completed yet" << endl;
+	pushLog(LogLevel::Debug, "parsing book event has been not completed yet\n");
 }
 
 void BinanceTradingPlatform::invokeBookEventUpdate(MarketEventHandler* handler, web::json::value& value) {
-	wcout << value.serialize() << endl;
-	cout << "parsing book event has been not completed yet" << endl;
+	pushLog(LogLevel::Debug, "parsing book event has been not completed yet\n");
 }
 
 
@@ -395,18 +391,18 @@ void BinanceTradingPlatform::getAllPairs(StringList& pairs) {
 			for (auto it = prices.begin(); it != prices.end(); it++) {
 				auto& elm = *it;
 				if (!elm.is_object()) {
-					cout << "price element is not an object" << endl;
+					pushLog(LogLevel::Debug, "price element is not an object\n");
 					continue;
 				}
 				
 				if (!elm.has_field(U("symbol"))) {
-					cout << "price element is wrong format" << endl;
+					pushLog(LogLevel::Debug, "price element is wrong format\n");
 					continue;
 				}
 
 				auto symbolVal = elm[U("symbol")];
 				if (!symbolVal.is_string()) {
-					cout << "price element is wrong format" << endl;
+					pushLog(LogLevel::Debug, "price element is wrong format\n");
 					continue;
 				}
 

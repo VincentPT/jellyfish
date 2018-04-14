@@ -25,5 +25,6 @@ public:
 
 #include <functional>
 typedef std::function<void(Widget*)> ButtonClickEventHandler;
+typedef std::function<void(Widget*)> MouseDoubleClickEventHandler;
 typedef std::function<void(Widget*)> AccessSharedDataFunc;
 

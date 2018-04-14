@@ -15,9 +15,7 @@ void sendJsonContent(
 	std::string u8str = CPPREST_FROM_STRING(obj.serialize());
 
 	msg.set_utf8_message(u8str);
-	cout << "sending..." << endl;
 	client.send(msg).wait();
-	cout << "sent..." << endl;
 }
 
 void sendJsonContent(

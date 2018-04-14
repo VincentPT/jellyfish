@@ -8,6 +8,10 @@ using namespace std::experimental;
 using namespace std;
 #endif
 
+#include <stdio.h>
+#include <io.h>
+#include <fcntl.h>
+
 #include "cinder/app/App.h"
 #include "cinder/app/RendererGl.h"
 #include "cinder/gl/gl.h"
@@ -31,6 +35,8 @@ using namespace std;
 using namespace ci;
 using namespace ci::app;
 using namespace std;
+
+const char* enableGUIComand = "show gui";
 
 class BasicApp : public App {
 
@@ -63,6 +69,9 @@ class BasicApp : public App {
 
 	mutex _serviceControlMutex;
 	mutex _chartMutex;
+
+	thread _consoleThread;
+	bool _isConsoleThreadRunning = false;
 public:
 	BasicApp();
 	~BasicApp();
@@ -101,6 +110,9 @@ public:
 	TIMESTAMP computeBarTimeLength();
 	void restoreTransformAfterInitOnly(function<void()>&& initFunction);
 	TIMESTAMP getLiveTime();
+	void enalbeServerMode(bool serverMode);
+	void initializeConsole();
+	void uninitializeConsole();
 };
 
 void pushLog(int logLevel, const char* fmt, ...) {
@@ -142,6 +154,15 @@ void BasicApp::cleanup() {
 }
 
 void BasicApp::onWindowSizeChanged() {
+	// update root control size
+	int w = getWindow()->getWidth();
+	int h = getWindow()->getHeight();
+	_topCotrol->setSize((float)w, (float)h);
+	_topCotrol->setPos(0, 0);
+	if (_topCotrol == _applog.get()) {
+		return;
+	}
+
 	std::unique_lock<std::mutex> lk(_chartMutex);
 	// back up transform
 	static TIMESTAMP tAtZero;
@@ -149,11 +170,6 @@ void BasicApp::onWindowSizeChanged() {
 		auto xAtZero = _graph->localToPoint(0, 0).x;
 		tAtZero = convertXToTime(xAtZero);
 	}
-
-	int w = getWindow()->getWidth();
-	int h = getWindow()->getHeight();
-	_topCotrol->setSize((float)w, (float)h);
-	_topCotrol->setPos(0, 0);
 
 	int graphX1 = 20;
 	int graphX2 = (int)_barChart->getWidth() - 20;
@@ -235,6 +251,79 @@ vector<string> listPlatformConfigs() {
 	return configs;
 }
 
+void setupConsole() {
+	//AllocConsole();
+
+	//HANDLE handle_out = GetStdHandle(STD_OUTPUT_HANDLE);
+	//int hCrt = _open_osfhandle((intptr_t)handle_out, _O_TEXT);
+	//FILE* hf_out = _fdopen(hCrt, "w");
+	//setvbuf(hf_out, NULL, _IONBF, 1);
+	//*stdout = *hf_out;
+
+	//HANDLE handle_in = GetStdHandle(STD_INPUT_HANDLE);
+	//hCrt = _open_osfhandle((intptr_t)handle_in, _O_TEXT);
+	//FILE* hf_in = _fdopen(hCrt, "r");
+	//setvbuf(hf_in, NULL, _IONBF, 128);
+	//*stdin = *hf_in;
+
+	AllocConsole();
+	freopen("CONIN$", "r", stdin);
+	freopen("CONOUT$", "w", stdout);
+	freopen("CONOUT$", "w", stderr);
+}
+
+void BasicApp::initializeConsole() {
+	::setupConsole();
+
+	// read input command from console
+	_consoleThread = std::thread([this]() {
+		std::string command;
+		while (true)
+		{
+			std::getline(cin, command);
+			std::transform(command.begin(), command.end(), command.begin(), ::tolower);
+			
+			if (command == enableGUIComand) {
+				enalbeServerMode(false);
+			}
+			else {
+				cout << "unnkown command '" << command << "'" << endl;
+			}
+		}
+		_isConsoleThreadRunning = false;
+	});
+	_isConsoleThreadRunning = true;
+}
+
+void BasicApp::uninitializeConsole() {
+	if (_consoleThread.joinable()) {
+		if (_isConsoleThreadRunning) {
+#ifdef WIN32
+			HANDLE hThread = (HANDLE)_consoleThread.native_handle();
+			::TerminateThread(hThread, 0);
+#endif // WIN32
+		}
+		_consoleThread.join();
+	}
+}
+
+void BasicApp::enalbeServerMode(bool serverMode) {
+#ifdef WIN32
+	ShowWindow(GetConsoleWindow(), serverMode ? SW_SHOW : SW_HIDE);
+#else
+	// should implement for other OS
+#endif // WIN32
+
+	if (serverMode == true) {
+		getWindow()->hide();
+		pushLog((int)LogLevel::Info, "server mode is enable, type '%s' to show GUI\n", enableGUIComand);
+	}
+	else {
+		getWindow()->show();
+		pushLog((int)LogLevel::Info, "gui mode is enable, double click in log window to enable server mode\n");
+	}
+}
+
 void BasicApp::setup()
 {
 	FUNCTON_LOG();
@@ -298,6 +387,7 @@ void BasicApp::setup()
 
 	getWindow()->getSignalClose().connect([this]() {
 		_runFlag = false;
+		uninitializeConsole();
 	});
 
 	// handle mouse up and mouse down to emit mouse double click
@@ -333,10 +423,11 @@ void BasicApp::setup()
 		}
 	});
 	getWindow()->getSignalMouseUp().connect([this](MouseEvent& me) {
+		auto& pos = me.getPos();
 		auto timeUp = getElapsedSeconds();
 		auto doubleClickTime = Utility::getDoubleClickTime();
 		auto clickTime = (unsigned int)(timeUp - timeDown) * 1000;
-		if (clickCount == 2 && pTimeDown) {
+		if (clickCount == 2 && pTimeDown && std::abs(prePos.x - pos.x) <= 3 && std::abs(prePos.y - pos.y) <= 3) {
 			clickCount = 0;
 			pTimeDown = nullptr;
 			if (clickTime <= doubleClickTime) {
@@ -546,6 +637,14 @@ void BasicApp::setup()
 		initChart();
 	});
 
+	_applog->setDoubleClickHandler([this](Widget*) {
+		// enable server mode
+		//_topCotrol = _applog.get();
+		//_applog->addLog(WxAppLog::LogLevel::Info, "Server mode is enable\n");
+		enalbeServerMode(true);
+		//onWindowSizeChanged();
+	});
+
 	_asynTasksWorkder = std::thread([this]() {
 		while (_runFlag)
 		{
@@ -555,6 +654,9 @@ void BasicApp::setup()
 			}
 		}
 	});
+
+	initializeConsole();
+	enalbeServerMode(false);
 }
 
 void BasicApp::onSelectedSymbolChanged(Widget*) {
@@ -1144,6 +1246,8 @@ TIMESTAMP BasicApp::getLiveTime() {
 void BasicApp::update()
 {
 	FUNCTON_LOG();
+	if (getWindow()->isHidden()) return;
+
 	_topCotrol->update();
 	if (_ciWndCandle) {
 		_ciWndCandle->update();
@@ -1166,6 +1270,8 @@ void BasicApp::update()
 void BasicApp::draw()
 {
 	FUNCTON_LOG();
+	if (getWindow()->isHidden()) return;
+
 	std::unique_lock<std::mutex> lk(_chartMutex);
 	//auto wndCandle = getWindow()->getUserData<CiWndCandle>();
 	//if (wndCandle) {

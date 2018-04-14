@@ -87,19 +87,19 @@ public:
 		auto key = eventName + pair;
 		_subscriptionMap[key] = status;
 		if (status == SubcribeStatus::Subcribed) {
-			cout << eventName << pair << " is subscribed" << endl;
+			pushLogV(LogLevel::Debug, "%s %s is subscribed\n", eventName.c_str(), pair.c_str());
 		}
 		else if (status == SubcribeStatus::Unsubcribed) {
-			cout << eventName << pair << " is unsubscribed" << endl;
+			pushLogV(LogLevel::Debug, "%s %s is unsubscribed\n", eventName.c_str(), pair.c_str());
 		}
 		else if (status == SubcribeStatus::Subcribing) {
-			cout << eventName << pair << " is subcribing" << endl;
+			pushLogV(LogLevel::Debug, "%s %s is subcribing\n", eventName.c_str(), pair.c_str());
 		}
 		else if (status == SubcribeStatus::Unsubcribing) {
-			cout << eventName << pair << " is unsubcribing" << endl;
+			pushLogV(LogLevel::Debug, "%s %s is unsubcribing\n", eventName.c_str(), pair.c_str());
 		}
 		else {
-			cout << eventName << pair << "'s subscription status is reset" << endl;
+			pushLogV(LogLevel::Debug, "%s %s's subscription status is reset\n", eventName.c_str(), pair.c_str());
 		}
 	}
 

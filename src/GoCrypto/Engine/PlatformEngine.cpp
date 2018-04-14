@@ -704,7 +704,7 @@ void PlatformEngine::run() {
 	}
 
 	if (_pairListenerMap.size() == 0) {
-		cout << "no symbol defined" << endl;
+		pushLog((int)LogLevel::Debug, "no symbol defined\n");
 		return;
 	}
 
