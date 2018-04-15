@@ -621,7 +621,8 @@ void PlatformEngine::onCandle(int i, NAPMarketEventHandler* sender, CandleItem* 
 		auto lastestVolume = it->volume;
 		auto timePoint = it->timestamp;
 
-		auto priceTo = it->close;
+		auto priceLow = it->low;
+		auto priceHigh = it->high;
 
 		for (it++; it != candleItems.end(); it++) {
 			if (it->timestamp <= lastProcessingTime) {
@@ -631,6 +632,13 @@ void PlatformEngine::onCandle(int i, NAPMarketEventHandler* sender, CandleItem* 
 				break;
 			}
 			lastestVolume += it->volume;
+
+			if (priceLow > it->low) {
+				priceLow = it->low;
+			}
+			if (priceHigh < it->high) {
+				priceHigh = it->high;
+			}
 		}
 		if (it == candleItems.end()) {
 			return;
@@ -683,13 +691,15 @@ void PlatformEngine::onCandle(int i, NAPMarketEventHandler* sender, CandleItem* 
 			smallerVolume = 0.00001;
 		}
 
-		decltype(priceTo) priceFrom;
+		decltype(priceLow) priceFrom, priceTo;
 
-		if (std::abs(previousHigh - priceTo) > std::abs(priceTo - previousLow)) {
+		if (std::abs(previousHigh - priceLow) > std::abs(priceHigh - previousLow)) {
 			priceFrom = previousHigh;
+			priceTo = priceLow;
 		}
 		else {
 			priceFrom = previousLow;
+			priceTo = priceHigh;
 		}
 
 		auto priceChanged = (priceTo - priceFrom) / priceFrom;
@@ -726,7 +736,7 @@ void PlatformEngine::onCandle(int i, NAPMarketEventHandler* sender, CandleItem* 
 				priceAction = "dropped ";
 			}
 
-			sprintf_s(buffer, sizeof(buffer), "%s's volume has %s %.2f%% in %.2f min from %f to %f, price %s%f from %lf to %lf", sender->getPair(), action, (float)volumeChangedPercent, timeChange, (float)previousVolume, (float)lastestVolume,
+			sprintf_s(buffer, sizeof(buffer), "%s's volume has %s %.2f%% in %.2f min from %f to %f, price %s%.2f%% from %lf to %lf", sender->getPair(), action, (float)volumeChangedPercent, timeChange, (float)previousVolume, (float)lastestVolume,
 				priceAction, (float)(priceChanged * 100),  priceFrom, priceTo);
 
 			InternalNotificationData notification;
