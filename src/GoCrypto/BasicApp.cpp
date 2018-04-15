@@ -511,7 +511,7 @@ void BasicApp::setup()
 			auto selectedSymbol = originCrytoInfo->symbol;
 			double price;
 			if (adapter->convertPrice(selectedSymbol, originCrytoInfo->price, price)) {
-				auto& quoteCurency = adapter->getQuote(selectedSymbol);
+				auto& quoteCurency = _platformRunner->getQuote(selectedSymbol);
 				if (quoteCurency.empty()) {
 					yStr = "N/A-" + std::to_string(point.y);
 				}
@@ -628,8 +628,12 @@ void BasicApp::setup()
 		applySelectedCurrency(_controlBoard->getCurrentCurrency());
 	});
 
-	_controlBoard->setOnNotificationModeChangedHandler([this](Widget*) {
-		Notifier::getInstance()->enablePushToCloud(_controlBoard->isPushToCloudEnable());
+	_controlBoard->setOnPriceNotificationChangedHandler([this](Widget*) {
+		if(_platformRunner) _platformRunner->enablePriceNotification(_controlBoard->isPriceNotificationEnable());
+	});
+
+	_controlBoard->setOnVolumeNotificationChangedHandler([this](Widget*) {
+		if (_platformRunner) _platformRunner->enableVolumeNotification(_controlBoard->isVolumeNotificationEnable());
 	});
 
 	_controlBoard->setOnGraphLengthChangedHandler([this](Widget*) {
@@ -731,6 +735,10 @@ void BasicApp::startServices() {
 		std::unique_lock<std::mutex> lk(_serviceControlMutex);
 		_platformRunner = new PlatformEngine(configFile.c_str());
 	}
+
+	_platformRunner->enablePriceNotification(_controlBoard->isPriceNotificationEnable());
+	_platformRunner->enableVolumeNotification(_controlBoard->isVolumeNotificationEnable());
+
 	_platformRunner->getPlatform()->setLogger(_logAdapter);
 	_platformRunner->setSymbolStatisticUpdatedHandler([this](int i) {
 		_cryptoBoard->refreshCached(i);
@@ -838,9 +846,10 @@ void initBarChart(WxBarCharLive* barChart, WxLineGraphLive* lineChart,
 					volume += fVolume(*it);
 				}
 				else {
-					alignTime = roundDown(it->timestamp, barTimeLength);
 					float x = app->convertRealTimeToDisplayTime(alignTime);
 					barChart->addPoint(glm::vec2(x, volume));
+
+					alignTime = roundDown(it->timestamp, barTimeLength);
 					volume = fVolume(*it);
 				}
 			}

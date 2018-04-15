@@ -17,13 +17,10 @@ class NotifierImpl;
 
 class Notifier
 {
-	bool _pushToCloud = false;
 protected:
 	Notifier();
 public:
 	static Notifier* getInstance();
 	~Notifier();
 	bool pushNotification(const Notification& notification);
-	bool isPushToCloudEnable() const;
-	void enablePushToCloud(bool enable);
 };

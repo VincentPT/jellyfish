@@ -24,13 +24,6 @@ Notifier* Notifier::getInstance() {
 	return &notifier;
 }
 
-bool Notifier::isPushToCloudEnable() const {
-	return _pushToCloud;
-}
-void Notifier::enablePushToCloud(bool enable) {
-	_pushToCloud = enable;
-}
-
 bool Notifier::pushNotification(const Notification& notification) {
 	const UserListenerInfo& userInfo = *(notification.target);
 	http_client_config config;
@@ -41,14 +34,7 @@ bool Notifier::pushNotification(const Notification& notification) {
 	const std::string& title = notification.title;
 	const std::string& message = notification.message;
 
-	milliseconds ms = duration_cast< milliseconds >(system_clock::now().time_since_epoch());
-	auto str = Utility::time2str(ms.count());
-
-	//cout << "push message {" << title << "," << message << "}" << endl;
-	pushLog((int)LogLevel::Info, "[%s] %s %s\n", str.c_str(), title.c_str(), message.c_str());
-
 	bool res = true;
-	if (_pushToCloud == false) return res;
 	//ofstream out;
 	//try {
 	//	string fileName(platformName);

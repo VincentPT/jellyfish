@@ -60,6 +60,14 @@ PlatformEngine::PlatformEngine(const char* configFile) : _runFlag(false), _hLib(
 				return elm1.endTime < elm2.endTime;
 			});
 
+			auto& volumeTrigger = settings[U("volumeTrigger")].as_object();
+			_measureDuration = volumeTrigger[U("measureDuration")].as_integer() * 1000;
+			_volumeChangedThreshold = (float)volumeTrigger[U("volumeChangedThresholdInPercent")].as_double() / 100.0f;
+			if ( volumeTrigger.find(U("priceChangedThresholdInPercent")) != volumeTrigger.end()) {
+				_priceChangedThreshold = (float)volumeTrigger[U("priceChangedThresholdInPercent")].as_double() / 100.0f;
+			}
+			_miniumVolumeInBTC = volumeTrigger[U("miniumVolumeInBTC")].as_double();
+
 			loadedTriggers = true;
 
 			auto& users = settings[U("users")].as_array();
@@ -164,10 +172,24 @@ void PlatformEngine::pushMessageLoop() {
 			if (it != _pairListenerMap.end()) {
 				auto& users = it->second;
 				auto& messageInfo = notification.message;
+
+				// push message to log
+				const std::string& title = messageInfo.title;
+				const std::string& message = messageInfo.message;
+				auto str = Utility::time2str(notification.trigerTime);
+				pushLog((int)LogLevel::Info, "[%s] %s %s\n", str.c_str(), title.c_str(), message.c_str());
+
+				if (notification.notificationType == NotificationType::Price && _priceNotificationEnable == false) {
+					continue;
+				}
+				if (notification.notificationType == NotificationType::Volume && _volumeNotificationEnable == false) {
+					continue;
+				}
+
 				for (auto uit = users->begin(); uit != users->end() && _runFlag; uit++) {
 					messageInfo.target = *uit;
+					
 					for (int tryCount = 1; tryCount <= 2; tryCount++) {
-						// Wait for all the outstanding I/O to complete and handle any exceptions
 						try
 						{
 							if (notifier->pushNotification(messageInfo)) {
@@ -588,77 +610,136 @@ void PlatformEngine::onCandle(int i, NAPMarketEventHandler* sender, CandleItem* 
 	}
 
 	// process notification for volume
-	//if (snapshot == false) {
-	//	static TIMESTAMP measureDuration = 2 * 60 * 1000;
-	//	auto& lastProcessingTime = _notifyProcessingVolumeMap[i];
+	if (snapshot == false) {
+		auto& lastProcessingTime = _notifyProcessingVolumeMap[i];
 
-	//	auto& candleItems = sender->getCandleHistoriesNonSync();
-	//	auto it = candleItems.begin();
-	//	if (it == candleItems.end()) {
-	//		return;
-	//	}
-	//	auto lastestVolume = it->volume;
-	//	auto timePoint = it->timestamp;
+		auto& candleItems = sender->getCandleHistoriesNonSync();
+		auto it = candleItems.begin();
+		if (it == candleItems.end()) {
+			return;
+		}
+		auto lastestVolume = it->volume;
+		auto timePoint = it->timestamp;
 
-	//	for (it++; it != candleItems.end(); it++) {
-	//		if (it->timestamp <= lastProcessingTime) {
-	//			return;
-	//		}
-	//		if (timePoint - it->timestamp >= measureDuration) {
-	//			break;
-	//		}
-	//		lastestVolume += it->volume;
-	//	}
-	//	if (it == candleItems.end()) {
-	//		return;
-	//	}
-	//	auto previousVolume = it->volume;
-	//	auto previousTimePoint = it->timestamp;
-	//	auto lastCheckTime = previousTimePoint;
-	//	for (it++; it != candleItems.end(); it++) {
-	//		if (it->timestamp <= lastProcessingTime) {
-	//			return;
-	//		}
-	//		if (previousTimePoint - it->timestamp >= measureDuration) {
-	//			break;
-	//		}
-	//		previousVolume += it->volume;
-	//		lastCheckTime = it->timestamp;
-	//	}
+		auto priceTo = it->close;
 
-	//	static float changeThresholdMultiplication = 5.0f;
-	//	const char* action = nullptr;
-	//	float volumeChange, timeChange;
+		for (it++; it != candleItems.end(); it++) {
+			if (it->timestamp <= lastProcessingTime) {
+				return;
+			}
+			if (timePoint - it->timestamp >= _measureDuration) {
+				break;
+			}
+			lastestVolume += it->volume;
+		}
+		if (it == candleItems.end()) {
+			return;
+		}
+		auto previousVolume = it->volume;
+		auto previousTimePoint = it->timestamp;
+		auto lastCheckTime = previousTimePoint;
 
-	//	if (lastestVolume > previousVolume) {
-	//		volumeChange = (float)(lastestVolume / previousVolume);
-	//		if (volumeChange >= changeThresholdMultiplication) {
-	//			action = "jumped";
-	//		}
-	//	}
-	//	else if (lastestVolume < previousVolume) {
-	//		volumeChange = (float)(previousVolume / lastestVolume);
-	//		if (volumeChange >= changeThresholdMultiplication) {
-	//			action = "dropped";
-	//		}
-	//	}
+		auto previousLow = it->low;
+		auto previousHigh = it->high;
 
-	//	if (action) {
-	//		char buffer[128];
-	//		auto priceChangedPercent = volumeChange * 100;
-	//		timeChange = (float)((lastCheckTime - timePoint) / (1000.0f * 60.0f));
+		for (it++; it != candleItems.end(); it++) {
+			if (it->timestamp <= lastProcessingTime) {
+				return;
+			}
+			if (previousTimePoint - it->timestamp >= _measureDuration) {
+				break;
+			}
+			previousVolume += it->volume;
+			lastCheckTime = it->timestamp;
 
-	//		sprintf_s(buffer, sizeof(buffer), "volume of %s has %s %.2f%% in %.2f min", sender->getPair(), action, (float)priceChangedPercent, timeChange);
+			if (previousLow > it->low) {
+				previousLow = it->low;
+			}
+			if (previousHigh < it->high) {
+				previousHigh = it->high;
+			}
+		}
 
-	//		InternalNotificationData notification;
-	//		notification.message.title = _platformName;
-	//		notification.message.message = buffer;
-	//		notification.pair = sender->getPair();
-	//		_messageQueue.pushMessage(notification);
+		const char* action = nullptr;
+		float volumeChange, timeChange;
+		double smallerVolume, largerVolume;
 
-	//		lastProcessingTime = timePoint;
-	//	}
-	//}
+		if (lastestVolume > previousVolume) {
+			action = "jumped";
+			smallerVolume = previousVolume;
+			largerVolume = lastestVolume;
+		}
+		else {
+			smallerVolume = lastestVolume;
+			largerVolume = previousVolume;
+
+			volumeChange = previousVolume / smallerVolume;
+			// for drop action we must wait enough time to judge the movement
+			if (lastCheckTime - previousTimePoint >= _measureDuration * 90 / 1000) {
+				action = "dropped";
+			}
+		}
+		if (smallerVolume <= 0) {
+			smallerVolume = 0.00001;
+		}
+
+		decltype(priceTo) priceFrom;
+
+		if (std::abs(previousHigh - priceTo) > std::abs(priceTo - previousLow)) {
+			priceFrom = previousHigh;
+		}
+		else {
+			priceFrom = previousLow;
+		}
+
+		auto priceChanged = (priceTo - priceFrom) / priceFrom;
+		bool passedAllCondition = false;
+		
+		if (action) {
+			volumeChange = largerVolume / smallerVolume;
+
+			if (volumeChange >= _volumeChangedThreshold) {
+				auto& originCrytoInfo = _symbolsStatistics[i];
+				auto& symbol = originCrytoInfo->symbol;
+				const std::string baseCurrency = "BTC";
+				double convertedPrice;
+
+				if (_priceChangedThreshold <= 0 || std::abs(priceChanged) >= _priceChangedThreshold) {
+					// convert price to BTC to check minium volume base on BTC on the period
+					if (convertPrice(symbol, baseCurrency, originCrytoInfo->price, convertedPrice)) {
+						// trading volume must larger than a specific amount of BTC to trigger notification
+						if (largerVolume * convertedPrice >= _miniumVolumeInBTC) {
+							passedAllCondition = true;
+						}
+					}
+				}
+			}
+		}
+
+		if (passedAllCondition) {
+			char buffer[192];
+			auto volumeChangedPercent = volumeChange * 100;
+			timeChange = (float)((timePoint - lastCheckTime) / (1000.0f * 60.0f));
+
+			char* priceAction = "jumped +";
+			if (priceChanged < 0) {
+				priceAction = "dropped ";
+			}
+
+			sprintf_s(buffer, sizeof(buffer), "%s's volume has %s %.2f%% in %.2f min from %f to %f, price %s%f from %lf to %lf", sender->getPair(), action, (float)volumeChangedPercent, timeChange, (float)previousVolume, (float)lastestVolume,
+				priceAction, (float)(priceChanged * 100),  priceFrom, priceTo);
+
+			InternalNotificationData notification;
+			notification.notificationType = NotificationType::Volume;
+			notification.trigerTime = timePoint;
+			notification.message.title = _platformName;
+			notification.message.message = buffer;
+			notification.pair = sender->getPair();
+			_messageQueue.pushMessage(notification);
+
+			lastProcessingTime = timePoint;
+		}
+	}
 }
 
 void PlatformEngine::run() {
@@ -732,6 +813,7 @@ void PlatformEngine::run() {
 
 	destroy(_symbolsStatistics);
 	_symbolsTickers.clear();
+	_symbolIndexMap.clear();
 
 	_symbolsStatistics.resize(_pairListenerMap.size());
 	_symbolsTickers.resize(_symbolsStatistics.size());
@@ -752,6 +834,8 @@ void PlatformEngine::run() {
 
 		_symbolsStatistics[i] = elmInfo;
 		_notifyProcessingVolumeMap[i] = 0;
+		// map symbol with index of its element info
+		_symbolIndexMap[it->first] = i;
 
 		auto tradeEventListener = 
 			std::bind(&PlatformEngine::onTrade, this, i, _1 , _2, _3, _4);
@@ -811,14 +895,14 @@ void formatPriceChanged(char* buffer, size_t bufferSize, const char* pair, const
 
 	double priceChanged = lastPrice.price - basePrice.price;
 	TIMESTAMP duration = lastPrice.at - basePrice.at;
-	const char* movementStr = "jumped";
+	const char* movementStr = "jumped +";
 	if (priceChanged < 0) {
-		movementStr = "dropped";
+		movementStr = "dropped ";
 	}
 
 	auto priceChangedPercent = priceChanged / basePrice.price * 100;
 
-	sprintf_s(buffer, bufferSize, "%s %s %.2f%% in %.2f min from %lf to %lf", pair, movementStr,
+	sprintf_s(buffer, bufferSize, "%s %s%.2f%% in %.2f min from %lf to %lf", pair, movementStr,
 		(float)priceChangedPercent, (duration / (60 * 1000.0f)), basePrice.price, lastPrice.price);
 }
 
@@ -836,7 +920,6 @@ inline bool updateBestPricePoint(const PricePoint*& bestPricePoint, const PriceP
 }
 
 void PlatformEngine::analyzeTickerForNotification(NAPMarketEventHandler* handler, const std::list<TickerUI>& tickers) {
-	return;
 	auto it = tickers.begin();
 
 	auto& lastTicker = *it;
@@ -913,6 +996,8 @@ void PlatformEngine::analyzeTickerForNotification(NAPMarketEventHandler* handler
 					formatPriceChanged(buffer, sizeof(buffer), handler->getPair(), lastPrice, *bestPricePoint);
 
 					InternalNotificationData notification;
+					notification.trigerTime = lastPrice.at;
+					notification.notificationType = NotificationType::Price;
 					notification.message.title = _platformName;
 					notification.message.message = buffer;
 					notification.pair = handler->getPair();
@@ -946,4 +1031,59 @@ const std::vector<Period>& PlatformEngine::getPeriods() const {
 
 void PlatformEngine::setSymbolStatisticUpdatedHandler(SymbolStatisticUpdatedHandler&& handler) {
 	_onSymbolStatisticUpdated = handler;
+}
+
+void PlatformEngine::enablePriceNotification(bool enable) {
+	_priceNotificationEnable = enable;
+}
+
+void PlatformEngine::enableVolumeNotification(bool enable) {
+	_volumeNotificationEnable = enable;
+}
+
+const std::string& PlatformEngine::getQuote(const std::string& symbol) {
+	auto& currencies = getCurrencies();
+	for (auto it = currencies.begin(); it != currencies.end(); it++) {
+		if (symbol.compare(symbol.size() - it->size(), it->size(), *it) == 0) {
+			return *it;
+		}
+	}
+
+	static std::string emptyStr;
+	return emptyStr;
+}
+
+bool PlatformEngine::convertPrice(const std::string& symbol, const std::string& baseQuoteCurrency, const double& price, double& convertedPrice) {
+	auto& quoteCurency = getQuote(symbol);
+	if (quoteCurency.empty()) {
+		return false;
+	}
+	if (quoteCurency == baseQuoteCurrency) {
+		convertedPrice = price;
+		return true;
+	}
+
+	auto newSymbol = quoteCurency + baseQuoteCurrency;
+	auto it = _symbolIndexMap.find(newSymbol);
+	bool reverse = false;
+	if (it == _symbolIndexMap.end()) {
+		newSymbol = baseQuoteCurrency + quoteCurency;
+		it = _symbolIndexMap.find(newSymbol);
+		if (it == _symbolIndexMap.end()) {
+			return false;
+		}
+		reverse = true;
+	}
+
+	int i = it->second;
+	auto& originCrytoInfo = _symbolsStatistics[i];
+	auto& newPrice = originCrytoInfo->price;
+	if (reverse) {
+		convertedPrice = price / newPrice;
+	}
+	else {
+		convertedPrice = price * newPrice;
+	}
+
+	return true;
 }

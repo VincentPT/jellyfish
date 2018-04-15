@@ -109,7 +109,7 @@ void ConvertableCryptoInfoAdapter::updateElement(int elmIdx) {
 
 		priceFactor = crytoInfo->price / originCrytoInfo->price;
 
-		auto& quoteCurency = getQuote(symbol);
+		auto& quoteCurency = _engine->getQuote(symbol);
 		if (quoteCurency.empty()) {
 			crytoInfo->volume = 0;
 			
@@ -181,51 +181,41 @@ const std::string& ConvertableCryptoInfoAdapter::getCurrency() const {
 	return _currentCurrency;
 }
 
-const std::string& ConvertableCryptoInfoAdapter::getQuote(const std::string& symbol) {
-	auto& currencies = _engine->getCurrencies();
-	for (auto it = currencies.begin(); it != currencies.end(); it++) {
-		if (symbol.compare(symbol.size() - it->size(), it->size(), *it) == 0) {
-			return *it;
-		}
-	}
-
-	static std::string emptyStr;
-	return emptyStr;
-}
-
 bool ConvertableCryptoInfoAdapter::convertPrice(const std::string& symbol, const double& price, double& convertedPrice) {
-	auto& quoteCurency = getQuote(symbol);
-	if (quoteCurency.empty()) {
-		return false;
-	}
-	if (quoteCurency == _currentCurrency) {
-		convertedPrice = price;
-		return true;
-	}
+	//auto& quoteCurency = _engine->getQuote(symbol);
+	//if (quoteCurency.empty()) {
+	//	return false;
+	//}
+	//if (quoteCurency == _currentCurrency) {
+	//	convertedPrice = price;
+	//	return true;
+	//}
 
-	auto newSymbol = quoteCurency + _currentCurrency;
-	auto it = _symbolIndexMap.find(newSymbol);
-	bool reverse = false;
-	if (it == _symbolIndexMap.end()) {
-		newSymbol = _currentCurrency + quoteCurency;
-		it = _symbolIndexMap.find(newSymbol);
-		if (it == _symbolIndexMap.end()) {
-			return false;
-		}
-		reverse = true;
-	}
+	//auto newSymbol = quoteCurency + _currentCurrency;
+	//auto it = _symbolIndexMap.find(newSymbol);
+	//bool reverse = false;
+	//if (it == _symbolIndexMap.end()) {
+	//	newSymbol = _currentCurrency + quoteCurency;
+	//	it = _symbolIndexMap.find(newSymbol);
+	//	if (it == _symbolIndexMap.end()) {
+	//		return false;
+	//	}
+	//	reverse = true;
+	//}
 
-	int i = it->second;
-	auto& originCrytoInfo = _fixedItems->at(i);
-	auto& newPrice = originCrytoInfo->price;
-	if (reverse) {
-		convertedPrice = price / newPrice;
-	}
-	else {
-		convertedPrice = price * newPrice;
-	}
+	//int i = it->second;
+	//auto& originCrytoInfo = _fixedItems->at(i);
+	//auto& newPrice = originCrytoInfo->price;
+	//if (reverse) {
+	//	convertedPrice = price / newPrice;
+	//}
+	//else {
+	//	convertedPrice = price * newPrice;
+	//}
 
-	return true;
+	//return true;
+
+	return _engine->convertPrice(symbol, _currentCurrency, price, convertedPrice);
 }
 
 void ConvertableCryptoInfoAdapter::intialize(const std::vector<CryptoBoardElmInfo*>* fixedItems, PlatformEngine* engine) {

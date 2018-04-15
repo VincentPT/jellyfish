@@ -47,7 +47,14 @@ class PlatformEngine
 		bool all;
 	};
 
+	enum class NotificationType {
+		Price,
+		Volume,
+	};
+
 	struct InternalNotificationData {
+		NotificationType notificationType;
+		TIMESTAMP trigerTime;
 		Notification message;
 		std::string pair;
 	};
@@ -79,6 +86,7 @@ private:
 	std::list<UserListenerInfo> _userListeners;
 	std::map<std::string, std::shared_ptr<std::list<UserListenerInfo*>>> _pairListenerMap;
 	std::vector<CryptoBoardElmInfo*> _symbolsStatistics;
+	std::map<std::string, int> _symbolIndexMap;
 	std::vector<TIMESTAMP> _notifyProcessingVolumeMap;
 	std::vector<std::list<TickerUI>> _symbolsTickers;
 	std::vector<std::string> _currencies;
@@ -90,6 +98,12 @@ private:
 	std::map<std::string, int> _sentCandleSnapshotRequest;
 	std::future<void> _sendTradeHistoryRequestLoop;
 	SymbolStatisticUpdatedHandler _onSymbolStatisticUpdated;
+	bool _priceNotificationEnable = false;
+	bool _volumeNotificationEnable = false;
+	TIMESTAMP _measureDuration;
+	float _volumeChangedThreshold;
+	float _priceChangedThreshold = -1;
+	double _miniumVolumeInBTC;
 private:
 	void pushMessageLoop();
 	void sheduleQueryHistory();
@@ -109,6 +123,10 @@ public:
 	const std::vector<Period>& getPeriods() const;
 	const std::vector<std::string>& getCurrencies() const;
 	void setSymbolStatisticUpdatedHandler(SymbolStatisticUpdatedHandler&& handler);
+	void enablePriceNotification(bool enable);
+	void enableVolumeNotification(bool enable);
+	const std::string& getQuote(const std::string& symbol);
+	bool convertPrice(const std::string& symbol, const std::string& baseQuoteCurrency, const double& price, double& convertedPrice);
 };
 
 typedef std::shared_ptr<Notifier> TraderRef;

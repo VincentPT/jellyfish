@@ -71,10 +71,15 @@ void WxControlBoard::update() {
 	}
 	ImGui::Separator();
 	if (ImGui::CollapsingHeader("Notification", ImGuiTreeNodeFlags_DefaultOpen)) {
-		bool oldVal = _pushToCloud;
-		ImGui::Checkbox("Push message", &_pushToCloud);
-		if (oldVal != _pushToCloud && _notificationModeChangedHandler) {
-			_notificationModeChangedHandler(this);
+		bool oldVal = _notifyPriceMovement;
+		ImGui::Checkbox("Price movement", &_notifyPriceMovement);
+		if (oldVal != _notifyPriceMovement && _priceNotificationChangedHandler) {
+			_priceNotificationChangedHandler(this);
+		}
+		oldVal = _notifyVolumeMovement;
+		ImGui::Checkbox("Volume movement", &_notifyVolumeMovement);
+		if (oldVal != _notifyVolumeMovement && _volumeNotificationChangedHandler) {
+			_volumeNotificationChangedHandler(this);
 		}
 	}
 
@@ -134,8 +139,12 @@ void WxControlBoard::setOnSelectedCurrencyChangedHandler(ButtonClickEventHandler
 	_selectedCurrencyChangedHandler = handler;
 }
 
-void WxControlBoard::setOnNotificationModeChangedHandler(ButtonClickEventHandler&& handler) {
-	_notificationModeChangedHandler = handler;
+void WxControlBoard::setOnPriceNotificationChangedHandler(ButtonClickEventHandler&& handler) {
+	_priceNotificationChangedHandler = handler;
+}
+
+void WxControlBoard::setOnVolumeNotificationChangedHandler(ButtonClickEventHandler&& handler) {
+	_volumeNotificationChangedHandler = handler;
 }
 
 void WxControlBoard::setOnGraphLengthChangedHandler(ButtonClickEventHandler&& handler) {
@@ -162,8 +171,12 @@ const char* WxControlBoard::getCurrentPlatform() const {
 	return _platforms[_currentPlatform].c_str();
 }
 
-bool WxControlBoard::isPushToCloudEnable() const {
-	return _pushToCloud;
+bool WxControlBoard::isPriceNotificationEnable() const {
+	return _notifyPriceMovement;
+}
+
+bool WxControlBoard::isVolumeNotificationEnable() const {
+	return _notifyVolumeMovement;
 }
 
 unsigned int WxControlBoard::getCurrentGraphLengh() const {
@@ -182,13 +195,23 @@ unsigned int WxControlBoard::getCurrentGraphLengh() const {
 }
 
 int WxControlBoard::getCurrentBarCount() const {
+	//static unsigned int barCounts[] = {
+	//	672,
+	//	480,
+	//	240,
+	//	120,
+	//	60,
+	//	60,
+	//	30,
+	//	12,
+	//};
 	static unsigned int barCounts[] = {
 		672,
-		480,
-		240,
+		720,
+		360,
 		120,
-		60,
-		60,
+		30,
+		15,
 		30,
 		12,
 	};

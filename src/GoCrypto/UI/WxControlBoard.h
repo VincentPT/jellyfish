@@ -12,13 +12,15 @@ class WxControlBoard :
 	ButtonClickEventHandler _stopButtonClickHandler;
 	ButtonClickEventHandler _exportButtonClickHandler;
 	ButtonClickEventHandler _selectedCurrencyChangedHandler;
-	ButtonClickEventHandler _notificationModeChangedHandler;
+	ButtonClickEventHandler _priceNotificationChangedHandler;
+	ButtonClickEventHandler _volumeNotificationChangedHandler;
 	ButtonClickEventHandler _graphLengthChangedHandler;
 	int _checkedButton;
 	int _currentPlatform;
 	std::vector<std::string> _platforms;
 	int _currentGraphLength;
-	bool _pushToCloud = false;
+	bool _notifyPriceMovement = false;
+	bool _notifyVolumeMovement = false;
 	std::vector<std::string> _currencies;
 	mutable std::mutex _mutex;
 public:
@@ -31,14 +33,16 @@ public:
 	void setOnStopButtonClickHandler(ButtonClickEventHandler&& handler);
 	void setOnExportButtonClickHandler(ButtonClickEventHandler&& handler);
 	void setOnSelectedCurrencyChangedHandler(ButtonClickEventHandler&& handler);
-	void setOnNotificationModeChangedHandler(ButtonClickEventHandler&& handler);
+	void setOnPriceNotificationChangedHandler(ButtonClickEventHandler&& handler);
+	void setOnVolumeNotificationChangedHandler(ButtonClickEventHandler&& handler);
 	void setOnGraphLengthChangedHandler(ButtonClickEventHandler&& handler);
 
 	void accessSharedData(const AccessSharedDataFunc&);
 	void setBaseCurrencies(const std::vector<std::string>& currencies);
 	const std::string& getCurrentCurrency() const;
 	const char* getCurrentPlatform() const;
-	bool isPushToCloudEnable() const;
+	bool isPriceNotificationEnable() const;
+	bool isVolumeNotificationEnable() const;
 	unsigned int getCurrentGraphLengh() const;
 	int getCurrentBarCount() const;
 };

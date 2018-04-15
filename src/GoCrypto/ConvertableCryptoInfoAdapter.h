@@ -36,6 +36,5 @@ public:
 	void setCurrency(const std::string&);
 	const std::string& getCurrency() const;
 	bool convertPrice(const std::string& symbol, const double& price, double& convertedPrice);
-	const std::string& getQuote(const std::string& symbol);
 	void intialize(const std::vector<CryptoBoardElmInfo*>* fixedItems, PlatformEngine* engine);
 };
