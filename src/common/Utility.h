@@ -58,6 +58,7 @@ public:
 	static std::string toString(const std::wstring& str);
 	static std::string toMultibytes(const std::wstring& str);
 	static std::string time2str(TIMESTAMP t);
+	static std::string time2shortStr(TIMESTAMP t);
 	static void logScopeAccess(ILogger* logger, const char* functionName, bool access);
 
 	static unsigned int getDoubleClickTime();

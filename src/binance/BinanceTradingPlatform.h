@@ -15,12 +15,16 @@ private:
 	std::mutex _eventMutex;
 
 	std::future<void> _pingServerTask;
+	std::future<void> _restartServerTask;
+	std::future<void> _maintenanceConnectionTask;
 	std::shared_ptr<web::http::client::http_client> _restClient;
 	std::list<std::shared_ptr<web::websockets::client::websocket_callback_client>> _additionalClients;
+	std::list<std::shared_ptr<web::websockets::client::websocket_callback_client>> _inactiveClients;
 	Signal<bool> _stopLoopTask;
 	TIMESTAMP _timeDiff;
 	bool _serverTimeIsReady;
 	std::string _apiKey;
+	int _timeToRestart = 60;
 
 private:
 	void messageHandlerImpl(const web::websockets::client::websocket_incoming_message& msg);
@@ -31,6 +35,7 @@ private:
 	void invokeTradeEvent(MarketEventHandler* handler, web::json::value& value);
 	void invokeCandleEvent(MarketEventHandler* handler, web::json::value& value);
 	void pingServerLoop();
+	void maintanceConnection();
 protected:
 	virtual SubcribeStatus subscribeTickerImpl(const char* pair);
 	virtual SubcribeStatus subscribeBookImpl(const char* pair);

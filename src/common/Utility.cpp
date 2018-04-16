@@ -39,6 +39,19 @@ std::string Utility::time2str(TIMESTAMP t) {
 	return buffer;
 }
 
+std::string Utility::time2shortStr(TIMESTAMP t) {
+	char buffer[64];
+	time_t tst = (time_t)(t / 1000);
+
+	struct tm * timeinfo;
+	timeinfo = localtime(&tst);
+
+	// print format of time equivalent to Thu Aug 23 14:55:02
+	strftime(buffer, sizeof(buffer), "%T", timeinfo);
+	
+	return buffer;
+}
+
 void Utility::logScopeAccess(ILogger* logger, const char* functionName, bool access) {
 	if (logger) {
 		if (access) {

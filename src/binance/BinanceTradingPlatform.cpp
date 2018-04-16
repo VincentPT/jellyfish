@@ -133,6 +133,14 @@ bool BinanceTradingPlatform::connectImpl() {
 		if (in.is_open()) {
 			auto settings = web::json::value::parse(in);
 			_apiKey = CPPREST_FROM_STRING(settings[U("apiKey")].as_string());
+
+			if (settings.has_field(U("timeToRestart"))) {
+				_timeToRestart = settings[U("timeToRestart")].as_integer();
+			}
+			else {
+				// default time to restart is 18 hours
+				_timeToRestart = 18 * 3600;
+			}
 		}
 		else {
 			pushLogV(LogLevel::Error, "load setting file %s failed\n", settingFile);
@@ -158,6 +166,9 @@ bool BinanceTradingPlatform::connectImpl() {
 
 		client->connect(U("wss://stream.binance.com:9443/stream?streams=") + *sit).wait();
 	}
+
+	_maintenanceConnectionTask = std::async(std::launch::async, [this]() { maintanceConnection(); });
+
 	return true;
 }
 
@@ -171,6 +182,7 @@ bool BinanceTradingPlatform::disconnectImpl() {
 
 	_stopLoopTask.sendSignal(true);
 	_pingServerTask.wait();
+	_maintenanceConnectionTask.wait();
 	return true;
 }
 
@@ -525,6 +537,55 @@ void BinanceTradingPlatform::pingServerLoop() {
 			sleepTime = (unsigned int)(interval - processTime);
 		}
 	} while (_stopLoopTask.waitSignal(temp, sleepTime + bonusTime) == false);
+}
+
+void BinanceTradingPlatform::maintanceConnection() {
+	LOG_SCOPE_ACCESS(getLogger(), __FUNCTION__);
+	auto timeToRestartInMilisecond = (unsigned int)_timeToRestart * 1000;
+	// wait 18h to restart connection due to a requirement from binance.
+	// A single connection to stream.binance.com is only valid for 24 hours
+	bool signal;
+	bool waitRes = _stopLoopTask.waitSignal(signal, timeToRestartInMilisecond);
+
+	if (_restartServerTask.valid()) {
+		pushLog(LogLevel::Info, "waiting to previous restart task to finish...\n");
+		_restartServerTask.wait();
+		pushLog(LogLevel::Info, "waiting to previous restart task to finish completed!\n");
+	}
+
+	// check event is time out
+	// it means no restart event during start the thread and now it's time to restart the connections
+	if (waitRes == false) {
+		pushLog(LogLevel::Info, "raise restart events\n");
+		_restartServerTask = std::async(std::launch::async, [this]() {
+			pushLog(LogLevel::Info, "excuting restart events\n");
+			// store all current connection, because they are going to be closed and re-initialzed
+			// but re-innitialized on a closing connection may make program hang up
+			_inactiveClients.push_back(_client);
+			for (auto it = _additionalClients.begin(); it != _additionalClients.end(); it++) {
+				_inactiveClients.push_back(*it);
+			}
+
+			pushLog(LogLevel::Info, "excuting disconnect\n");
+			// disconnect connections only
+			// dont use disconnect because it will reset other state
+			_client->close();
+			for (auto it = _additionalClients.begin(); it != _additionalClients.end(); it++) {
+				auto client = *it;
+				client->close();
+			}
+			// wait the maintenance task completed
+			// because it will be reset in connectImpl method
+			_maintenanceConnectionTask.wait();
+
+			// create new web socket client and set event handlers
+			resetClientNonSync();
+
+			pushLog(LogLevel::Info, "excuting reconnect\n");
+			// reconnect connections
+			connect();
+		});
+	}
 }
 
 void BinanceTradingPlatform::startServerTimeQuery(TIMESTAMP updateInterval) {
