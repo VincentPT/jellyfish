@@ -17,6 +17,8 @@ WxControlBoard::WxControlBoard(const std::vector<std::string>& platforms) : _che
 	else {
 		_currentPlatform = -1;
 	}
+
+	_filterBuffer[0] = 0;
 }
 
 
@@ -119,6 +121,15 @@ void WxControlBoard::update() {
 			}
 		}
 	}
+	if (ImGui::CollapsingHeader("Symbol filter", ImGuiTreeNodeFlags_DefaultOpen)) {
+		if (ImGui::InputText("",
+			&_filterBuffer[0], sizeof(_filterBuffer),
+			ImGuiInputTextFlags_CharsNoBlank/* | ImGuiInputTextFlags_CharsUppercase*/)) {
+			if (_filterChangedHandler) {
+				_filterChangedHandler(this);
+			}
+		}
+	}
 
 	ImGui::End();
 }
@@ -149,6 +160,10 @@ void WxControlBoard::setOnVolumeNotificationChangedHandler(ButtonClickEventHandl
 
 void WxControlBoard::setOnGraphLengthChangedHandler(ButtonClickEventHandler&& handler) {
 	_graphLengthChangedHandler = handler;
+}
+
+void WxControlBoard::setFilterChanedHandler(FilterActiveChanged&& handler) {
+	_filterChangedHandler = handler;
 }
 
 void WxControlBoard::accessSharedData(const AccessSharedDataFunc& f) {
@@ -216,4 +231,8 @@ int WxControlBoard::getCurrentBarCount() const {
 		12,
 	};
 	return barCounts[_currentGraphLength];
+}
+
+const char* WxControlBoard::getFilterText() const {
+	return &_filterBuffer[0];
 }

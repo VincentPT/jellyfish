@@ -306,7 +306,7 @@ void WxCryptoBoardInfo::update() {
 	auto oldSelection = _selected;
 
 	if (_fixedItems) {
-		int ITEMS_COUNT = (int)_fixedItems->size();
+		int ITEMS_COUNT = (int)_dataIndexcies.size();
 		auto windowHeight = ImGui::GetWindowHeight() - itemHeight - 10;
 		//ImGui::SetNextWindowContentSize(ImVec2(0, 0));
 		ImGui::BeginChild("##ScrollingRegion", ImVec2(0, windowHeight), false, ImGuiWindowFlags_HorizontalScrollbar);
@@ -540,4 +540,38 @@ void WxCryptoBoardInfo::refreshCached(int symbolIndex) {
 			rowBuffer->cached = false;
 		}
 	}
+}
+
+void WxCryptoBoardInfo::enableFilter(const std::function<bool(const char*)>& filter) {
+	std::unique_lock<std::mutex> lk(_mutex);
+	if (_fixedItems == nullptr) return;
+
+	std::list<int> filteredItemIdxs;
+	for (size_t i = 0; i < _fixedItems->size(); i++) {
+		if (filter(_fixedItems->at(i)->symbol)) {
+			filteredItemIdxs.push_back((int)i);
+		}
+	}
+	_dataIndexcies.resize(filteredItemIdxs.size());
+
+	int i = 0;
+	for (auto it = filteredItemIdxs.begin(); it != filteredItemIdxs.end(); it++) {
+		_dataIndexcies[i++] = *it;
+	}
+
+	// force sorting next update time
+	_lastSortTime = 0;
+}
+
+void WxCryptoBoardInfo::disableFilter() {
+	std::unique_lock<std::mutex> lk(_mutex);
+	if (_fixedItems == nullptr) return;
+	_dataIndexcies.resize(_fixedItems->size());
+
+	for (int i = 0; i < (int)_dataIndexcies.size(); i++) {
+		_dataIndexcies[i] = i;
+	}
+
+	// force sorting next update time
+	_lastSortTime = 0;
 }

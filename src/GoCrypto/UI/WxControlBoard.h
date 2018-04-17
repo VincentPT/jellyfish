@@ -5,6 +5,8 @@
 #include <vector>
 #include <mutex>
 
+typedef ButtonClickEventHandler FilterActiveChanged;
+
 class WxControlBoard :
 	public ImWidget
 {
@@ -15,6 +17,7 @@ class WxControlBoard :
 	ButtonClickEventHandler _priceNotificationChangedHandler;
 	ButtonClickEventHandler _volumeNotificationChangedHandler;
 	ButtonClickEventHandler _graphLengthChangedHandler;
+	FilterActiveChanged _filterChangedHandler;
 	int _checkedButton;
 	int _currentPlatform;
 	std::vector<std::string> _platforms;
@@ -23,6 +26,7 @@ class WxControlBoard :
 	bool _notifyVolumeMovement = false;
 	std::vector<std::string> _currencies;
 	mutable std::mutex _mutex;
+	char _filterBuffer[16];
 public:
 	WxControlBoard(const std::vector<std::string>& platforms);
 	virtual ~WxControlBoard();
@@ -36,6 +40,7 @@ public:
 	void setOnPriceNotificationChangedHandler(ButtonClickEventHandler&& handler);
 	void setOnVolumeNotificationChangedHandler(ButtonClickEventHandler&& handler);
 	void setOnGraphLengthChangedHandler(ButtonClickEventHandler&& handler);
+	void setFilterChanedHandler(FilterActiveChanged&& handler);
 
 	void accessSharedData(const AccessSharedDataFunc&);
 	void setBaseCurrencies(const std::vector<std::string>& currencies);
@@ -45,5 +50,6 @@ public:
 	bool isVolumeNotificationEnable() const;
 	unsigned int getCurrentGraphLengh() const;
 	int getCurrentBarCount() const;
+	const char* getFilterText() const;
 };
 

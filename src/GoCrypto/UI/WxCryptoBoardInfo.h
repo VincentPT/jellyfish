@@ -213,5 +213,8 @@ public:
 	std::shared_ptr<CryptoBoardInfoModeAdapterBase> getAdapter();
 
 	void refreshCached(int symbolIndex);
+
+	void enableFilter(const std::function<bool(const char*)>& filter);
+	void disableFilter();
 };
 

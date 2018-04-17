@@ -31,6 +31,7 @@ using namespace std;
 #include <ConvertableCryptoInfoAdapter.h>
 #include "UI/CiWndCandle.h"
 #include <cpprest/json.h>
+#include <regex>
 
 using namespace ci;
 using namespace ci::app;
@@ -639,6 +640,72 @@ void BasicApp::setup()
 	_controlBoard->setOnGraphLengthChangedHandler([this](Widget*) {
 		std::unique_lock<std::mutex> lk(_chartMutex);
 		initChart();
+	});
+
+	static std::string searchPattern;
+	static auto filter = [this](const char* text) -> bool {
+		//try {
+		//	std::string s(text);
+		//	std::smatch m;
+		//	
+		//	std::regex e(searchPattern);
+		//	return std::regex_search(s, m, e);
+		//}
+		//catch (...) {
+		//	return false;
+		//}
+
+		std::string s(text);
+		if (searchPattern[0] == '*') {
+			auto res = s.find(searchPattern.data() + 1);
+			if (res == std::string::npos) return false;
+
+			return  s.size() - res == searchPattern.size() - 1;
+		}
+		if (searchPattern[searchPattern.size() - 1] == '*') {
+			return strncmp(text, searchPattern.c_str(), searchPattern.size() - 1) == 0;
+		}
+
+		auto starIdx = searchPattern.find('*');
+		if (starIdx == std::string::npos) {
+			return strstr(text, searchPattern.c_str()) != nullptr;
+		}
+
+		auto left = searchPattern.substr(0, starIdx);
+		auto right = searchPattern.substr(starIdx + 1);
+
+		auto res1 = s.find(right);
+		if (res1 == std::string::npos) return false;
+
+		if (s.size() - res1 != right.size()) return false;
+
+		return strncmp(text, left.c_str(), left.size()) == 0;
+	};
+
+	
+	_controlBoard->setFilterChanedHandler([this](Widget*) {
+		auto text = _controlBoard->getFilterText();
+		if (text[0] == 0) {
+			_cryptoBoard->disableFilter();
+		}
+		else {
+			searchPattern = text;
+			//if (searchPattern[0] == '*') {
+			//	searchPattern.erase(0);
+			//	searchPattern.append(1, '$');
+			//}
+			//if (searchPattern[searchPattern.size() - 1] == '*') {
+			//	searchPattern.erase(searchPattern.size() - 1);
+			//	searchPattern.insert(0, 1, '^');
+			//}
+			//size_t offset = 1;
+			//while ((offset = searchPattern.find('*', offset)) != std::string::npos) {
+			//	searchPattern.insert(offset, 1, '.');
+			//	offset+=2;
+			//}
+
+			_cryptoBoard->enableFilter(filter);
+		}
 	});
 
 	_applog->setDoubleClickHandler([this](Widget*) {
