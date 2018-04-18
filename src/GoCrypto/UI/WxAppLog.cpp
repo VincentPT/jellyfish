@@ -21,6 +21,8 @@ void WxAppLog::addLog(WxAppLog::LogLevel logLevel, const char* fmt, ...) IM_FMTA
 }
 
 void WxAppLog::addLogV(WxAppLog::LogLevel logLevel, const char* fmt, va_list args) {
+	std::unique_lock<std::mutex> lk(_mutex);
+
 	if ((int)logLevel < (int)_logLevel) return;
 
 	int old_size = Buf.size();

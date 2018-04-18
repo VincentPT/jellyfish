@@ -37,6 +37,8 @@ using namespace ci;
 using namespace ci::app;
 using namespace std;
 
+extern std::string formatPrice(double price);
+
 const char* enableGUIComand = "show gui";
 
 class BasicApp : public App {
@@ -328,6 +330,7 @@ void BasicApp::enalbeServerMode(bool serverMode) {
 void BasicApp::setup()
 {
 	FUNCTON_LOG();
+
 	using namespace std::placeholders;
 	ui::Options uiOptions;
 	ui::initialize(uiOptions);
@@ -485,14 +488,14 @@ void BasicApp::setup()
 		double price;
 		if (adapter && selectedSymbol) {
 			if (adapter->convertPrice(selectedSymbol, (double)point.y, price)) {
-				yStr = std::to_string((float)price);
+				yStr = formatPrice(price);
 			}
 			else {
-				yStr = "N/A-" + std::to_string(point.y);
+				yStr = "N/A-" + formatPrice((double)point.y);
 			}
 		}
 		else { 
-			yStr = std::to_string(point.y);
+			yStr = formatPrice((double)point.y);
 		}
 
 		std::tuple<std::string, std::string> pointStr(xStr, yStr);

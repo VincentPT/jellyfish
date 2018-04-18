@@ -101,7 +101,7 @@ void CryptoBoardInfoDefaultAdapter::updateCellBufferForVol(char* buffer, size_t 
 		strcpy_s(buffer, bufferSize, "N/A");
 	}
 	else {
-		sprintf_s(buffer, bufferSize, "%.8f", vol);
+		sprintf_s(buffer, bufferSize, "%f", vol);
 	}
 }
 void CryptoBoardInfoDefaultAdapter::updateCellBufferForVolPeriod(char* buffer, size_t bufferSize, int i, int iOffset) {
@@ -111,7 +111,7 @@ void CryptoBoardInfoDefaultAdapter::updateCellBufferForVolPeriod(char* buffer, s
 		strcpy_s(buffer, bufferSize, "N/A");
 	}
 	else {
-		sprintf_s(buffer, bufferSize, "%.8f", vol);
+		sprintf_s(buffer, bufferSize, "%f", vol);
 	}
 }
 void CryptoBoardInfoDefaultAdapter::updateCellBufferForBPSh(char* buffer, size_t bufferSize, int i, int iOffset) {
@@ -177,9 +177,13 @@ bool WxCryptoBoardInfo::compareVolBPSh(int i1, int i2, int iOffset) {
 
 void WxCryptoBoardInfo::updateCellBufferForPrice(char* buffer, size_t bufferSize, int i) {
 	_cryptoBoardInfoAdapter->updateCellBufferForPrice(buffer, bufferSize,  i);
+	// take only 8 digits of price
+	buffer[10] = 0;
 }
 void WxCryptoBoardInfo::updateCellBufferForPricePeriod(char* buffer, size_t bufferSize, int i, int iOffset) {
 	_cryptoBoardInfoAdapter->updateCellBufferForPricePeriod(buffer, bufferSize, i, iOffset);
+	// take only 8 digits of price
+	buffer[10] = 0;
 }
 void WxCryptoBoardInfo::updateCellBufferForVol(char* buffer, size_t bufferSize, int i) {
 	_cryptoBoardInfoAdapter->updateCellBufferForVol(buffer, bufferSize, i);

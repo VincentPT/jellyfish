@@ -13,6 +13,7 @@ using namespace std;
 #include <chrono>
 #include <cpprest/json.h>
 #include <algorithm>
+#include <string>
 
 #include "../common/Utility.h"
 
@@ -21,6 +22,14 @@ using namespace std;
 using namespace std::chrono;
 using namespace std;
 typedef  TradingPlatform* (*CreatePlatformInstanceF)();
+
+string formatPrice(double price) {
+	char buffer[32];
+	sprintf(buffer, "%.8f", price);
+	buffer[10] = 0;
+
+	return buffer;
+}
 
 PlatformEngine::PlatformEngine(const char* configFile) : _runFlag(false), _hLib(nullptr) {
 	_platform = nullptr;
@@ -736,8 +745,12 @@ void PlatformEngine::onCandle(int i, NAPMarketEventHandler* sender, CandleItem* 
 				priceAction = "dropped ";
 			}
 
-			sprintf_s(buffer, sizeof(buffer), "%s's volume %s %.2f%% in %.2f min from %f to %f, price %s%.2f%% from %lf to %lf at %s", sender->getPair(), action, (float)volumeChangedPercent, timeChange, (float)previousVolume, (float)lastestVolume,
-				priceAction, (float)(priceChanged * 100),  priceFrom, priceTo, Utility::time2shortStr(timePoint).c_str());
+			sprintf_s(buffer, sizeof(buffer), "%s's volume %s %.2f%% in %.2f min from %f to %f, price %s%.2f%% from %s to %s at %s",
+				sender->getPair(), action, (float)volumeChangedPercent, timeChange, (float)previousVolume, (float)lastestVolume,
+				priceAction, (float)(priceChanged * 100),  
+				formatPrice(priceFrom).c_str(),
+				formatPrice(priceTo).c_str(), Utility::time2shortStr(timePoint).c_str()
+			);
 
 			InternalNotificationData notification;
 			notification.notificationType = NotificationType::Volume;
@@ -882,6 +895,7 @@ void PlatformEngine::run() {
 void PlatformEngine::stop() {
 	LOG_SCOPE_ACCESS(_platform->getLogger(), __FUNCTION__);
 
+	if (_runFlag == false) return;
 	_runFlag = false;
 
 	_platform->disconnect();
@@ -912,8 +926,8 @@ void formatPriceChanged(char* buffer, size_t bufferSize, const char* pair, const
 
 	auto priceChangedPercent = priceChanged / basePrice.price * 100;
 
-	sprintf_s(buffer, bufferSize, "%s's price %s%.2f%% in %.2f min from %lf to %lf at %s", pair, movementStr,
-		(float)priceChangedPercent, (duration / (60 * 1000.0f)), basePrice.price, lastPrice.price, Utility::time2shortStr(lastPrice.at).c_str());
+	sprintf_s(buffer, bufferSize, "%s's price %s%.2f%% in %.2f min from %s to %s at %s", pair, movementStr,
+		(float)priceChangedPercent, (duration / (60 * 1000.0f)), formatPrice(basePrice.price).c_str(), formatPrice(lastPrice.price).c_str(), Utility::time2shortStr(lastPrice.at).c_str());
 }
 
 #define PROCESS_LEVEL(trade) ((levelIt = tradeLevelMap->find((trade).oderId)) != tradeLevelMap->end() ? levelIt->second : -1)

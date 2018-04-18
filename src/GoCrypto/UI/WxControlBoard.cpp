@@ -124,7 +124,7 @@ void WxControlBoard::update() {
 	if (ImGui::CollapsingHeader("Symbol filter", ImGuiTreeNodeFlags_DefaultOpen)) {
 		if (ImGui::InputText("",
 			&_filterBuffer[0], sizeof(_filterBuffer),
-			ImGuiInputTextFlags_CharsNoBlank/* | ImGuiInputTextFlags_CharsUppercase*/)) {
+			ImGuiInputTextFlags_CharsNoBlank | ImGuiInputTextFlags_CharsUppercase)) {
 			if (_filterChangedHandler) {
 				_filterChangedHandler(this);
 			}

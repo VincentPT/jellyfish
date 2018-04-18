@@ -18,6 +18,7 @@ private:
 	LogLevel _logLevel;
     bool                ScrollToBottom;
 	MouseDoubleClickEventHandler _doubleClickHandler;
+	mutable std::mutex _mutex;
 public:
 	WxAppLog();
 	~WxAppLog();
