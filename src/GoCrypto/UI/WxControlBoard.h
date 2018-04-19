@@ -22,6 +22,7 @@ class WxControlBoard :
 	int _currentPlatform;
 	std::vector<std::string> _platforms;
 	int _currentGraphLength;
+	int _barLengthIdx;
 	bool _notifyPriceMovement = false;
 	bool _notifyVolumeMovement = false;
 	std::vector<std::string> _currencies;
@@ -49,7 +50,7 @@ public:
 	bool isPriceNotificationEnable() const;
 	bool isVolumeNotificationEnable() const;
 	unsigned int getCurrentGraphLengh() const;
-	int getCurrentBarCount() const;
+	int getCurrentBarTime() const;
 	const char* getFilterText() const;
 };
 

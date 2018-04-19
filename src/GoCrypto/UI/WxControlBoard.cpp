@@ -1,8 +1,90 @@
 #include "WxControlBoard.h"
 
-const char* platforms[] = { "bitfinex", "binance" };
+struct BarGUIItem {
+	char* name;
+	int timeLength;
+};
 
-WxControlBoard::WxControlBoard(const std::vector<std::string>& platforms) : _checkedButton(-1), _currentGraphLength(1)
+struct GraphLengthItem {
+	char* name;
+	unsigned int timeLength;
+	int barCount;
+	int defaultSelection;
+	BarGUIItem* bars;
+};
+
+BarGUIItem barLengths7d[] = {
+	{ "1d", 24 * 3600 },
+	{ "12h", 12 * 3600 },
+	{ "4h", 4 * 3600 },
+	{ "1h", 1 * 3600 },
+	{ "30m", 30 * 60 },
+};
+
+BarGUIItem barLengths1d[] = {
+	{ "4h", 4 * 3600 },
+	{ "1h", 1 * 3600 },
+	{ "30m", 30 * 60 },
+	{ "5m", 5 * 60 },
+	{ "2m", 2 * 60 },
+};
+
+BarGUIItem barLengths12h[] = {
+	{ "1h", 1 * 3600 },
+	{ "30m", 30 * 60 },
+	{ "5m", 5 * 60 },
+	{ "2m", 2 * 60 },
+	{ "1m", 1 * 60 },
+};
+
+BarGUIItem barLengths4h[] = {
+	{ "30m", 30 * 60 },
+	{ "5m", 5 * 60 },
+	{ "2m", 2 * 60 },
+	{ "1m", 1 * 60 },
+	{ "30s", 30 },
+};
+
+BarGUIItem barLengths1h[] = {
+	{ "5m", 5 * 60 },
+	{ "2m", 2 * 60 },
+	{ "1m", 1 * 60 },
+	{ "30s", 30 },
+	{ "15s", 30 },
+	{ "5s", 5 },
+};
+
+BarGUIItem barLengths30m[] = {
+	{ "2m", 2 * 60 },
+	{ "1m", 1 * 60 },
+	{ "30s", 30 },
+	{ "15s", 30 },
+	{ "5s", 5 },
+};
+
+BarGUIItem barLengths5m[] = {
+	{ "30s", 30 },
+	{ "15s", 15 },
+	{ "5s", 5 },
+};
+
+BarGUIItem barLengths1m[] = {
+	{ "5s", 5 },
+};
+
+GraphLengthItem graphLengths[] = {
+	{ "7d", 7 * 24 * 3600, IM_ARRAYSIZE(barLengths7d), 4, barLengths7d },
+	{ "1d", 1 * 24 * 3600, IM_ARRAYSIZE(barLengths1d), 4, barLengths1d },
+	{ "12h", 12 * 3600, IM_ARRAYSIZE(barLengths12h), 3, barLengths12h },
+	{ "4h", 4 * 3600, IM_ARRAYSIZE(barLengths4h), 2, barLengths4h },
+	{ "1h", 1 * 3600, IM_ARRAYSIZE(barLengths1h), 2, barLengths1h },
+	{ "30m", 30 * 60, IM_ARRAYSIZE(barLengths30m), 1, barLengths30m },
+	{ "5m", 5 * 60, IM_ARRAYSIZE(barLengths5m), 1, barLengths5m },
+	{ "1m", 1 * 60, IM_ARRAYSIZE(barLengths1m), 0, barLengths1m },
+};
+
+
+WxControlBoard::WxControlBoard(const std::vector<std::string>& platforms) : _checkedButton(-1), _currentGraphLength(1), _barLengthIdx(-1)
 {
 	_window_flags |= ImGuiWindowFlags_NoTitleBar;
 	_window_flags |= ImGuiWindowFlags_NoMove;
@@ -25,6 +107,7 @@ WxControlBoard::WxControlBoard(const std::vector<std::string>& platforms) : _che
 WxControlBoard::~WxControlBoard()
 {
 }
+
 void WxControlBoard::update() {
 	FUNCTON_LOG();
 
@@ -102,29 +185,68 @@ void WxControlBoard::update() {
 		}
 	}
 	ImGui::Separator();
-	if (ImGui::CollapsingHeader("Graph mode", ImGuiTreeNodeFlags_DefaultOpen)) {
-		const char* graphLengths[] = {"7d", "1d", "12h", "4h", "1h", "30m", "5m", "1m" };
-		if (ImGui::BeginCombo("  ", graphLengths[_currentGraphLength]))
+	if (ImGui::CollapsingHeader("Graph Settings", ImGuiTreeNodeFlags_DefaultOpen)) {
 		{
-			int oldSelection = _currentGraphLength;
-			for (int n = 0; n < IM_ARRAYSIZE(graphLengths); n++)
+			ImGui::ScopedItemWidth filterWidthScope(70);
+			bool changed = false;
+			if (ImGui::BeginCombo("time", graphLengths[_currentGraphLength].name))
 			{
-				bool is_selected = _currentGraphLength == n;
-				if (ImGui::Selectable(graphLengths[n], is_selected))
-					_currentGraphLength = n;
-				if (is_selected)
-					ImGui::SetItemDefaultFocus();   // Set the initial focus when opening the combo (scrolling + for keyboard navigation support in the upcoming navigation branch)
+				int oldSelection = _currentGraphLength;
+				for (int n = 0; n < IM_ARRAYSIZE(graphLengths); n++)
+				{
+					bool is_selected = _currentGraphLength == n;
+					if (ImGui::Selectable(graphLengths[n].name, is_selected))
+						_currentGraphLength = n;
+					if (is_selected)
+						ImGui::SetItemDefaultFocus();   // Set the initial focus when opening the combo (scrolling + for keyboard navigation support in the upcoming navigation branch)
+				}
+				ImGui::EndCombo();
+
+				changed = oldSelection != _currentGraphLength;
 			}
-			ImGui::EndCombo();
-			if (oldSelection != _currentGraphLength && _graphLengthChangedHandler) {
+			auto& graphLengItem = graphLengths[_currentGraphLength];
+			if (_barLengthIdx < 0 || _barLengthIdx >= graphLengItem.barCount || changed) {
+				_barLengthIdx = graphLengItem.defaultSelection;
+			}
+
+			auto barLengths = graphLengItem.bars;
+
+			if (ImGui::BeginCombo("bar", barLengths[_barLengthIdx].name))
+			{
+				int oldSelection = _barLengthIdx;
+				for (int n = 0; n < graphLengItem.barCount; n++)
+				{
+					bool is_selected = _barLengthIdx == n;
+					if (ImGui::Selectable(barLengths[n].name, is_selected))
+						_barLengthIdx = n;
+					if (is_selected)
+						ImGui::SetItemDefaultFocus();   // Set the initial focus when opening the combo (scrolling + for keyboard navigation support in the upcoming navigation branch)
+				}
+				ImGui::EndCombo();
+				if (changed || oldSelection != _barLengthIdx) {
+					changed = true;
+				}
+			}
+			if (changed && _graphLengthChangedHandler) {
 				_graphLengthChangedHandler(this);
 			}
 		}
 	}
 	if (ImGui::CollapsingHeader("Symbol filter", ImGuiTreeNodeFlags_DefaultOpen)) {
-		if (ImGui::InputText("",
-			&_filterBuffer[0], sizeof(_filterBuffer),
-			ImGuiInputTextFlags_CharsNoBlank | ImGuiInputTextFlags_CharsUppercase)) {
+		{
+			ImGui::ScopedItemWidth filterWidthScope(70);
+
+			if (ImGui::InputText("",
+				&_filterBuffer[0], sizeof(_filterBuffer),
+				ImGuiInputTextFlags_CharsNoBlank | ImGuiInputTextFlags_CharsUppercase)) {
+				if (_filterChangedHandler) {
+					_filterChangedHandler(this);
+				}
+			}
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Clear")) {
+			_filterBuffer[0] = 0;
 			if (_filterChangedHandler) {
 				_filterChangedHandler(this);
 			}
@@ -195,42 +317,14 @@ bool WxControlBoard::isVolumeNotificationEnable() const {
 }
 
 unsigned int WxControlBoard::getCurrentGraphLengh() const {
-	static unsigned int graphLengths[] = {
-		7 * 24 * 3600,
-		1 * 24 * 3600,
-		12 * 3600,
-		4 * 3600,
-		1 * 3600,
-		30 * 60,
-		5 * 60,
-		60,
-	};
-
-	return graphLengths[_currentGraphLength];
+	return graphLengths[_currentGraphLength].timeLength;
 }
 
-int WxControlBoard::getCurrentBarCount() const {
-	//static unsigned int barCounts[] = {
-	//	672,
-	//	480,
-	//	240,
-	//	120,
-	//	60,
-	//	60,
-	//	30,
-	//	12,
-	//};
-	static unsigned int barCounts[] = {
-		672,
-		720,
-		360,
-		120,
-		30,
-		15,
-		30,
-		12,
-	};
-	return barCounts[_currentGraphLength];
+int WxControlBoard::getCurrentBarTime() const {
+	auto& graphLengItem = graphLengths[_currentGraphLength];
+	auto barLengths = graphLengItem.bars;
+
+	return barLengths[_barLengthIdx].timeLength;
 }
 
 const char* WxControlBoard::getFilterText() const {

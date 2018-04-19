@@ -1261,15 +1261,15 @@ void BasicApp::initChart() {
 }
 
 TIMESTAMP BasicApp::computeBarTimeLength() {
-	auto graphLength = _controlBoard->getCurrentGraphLengh();
-	int barCount = _controlBoard->getCurrentBarCount();
+	auto graphLength = _controlBoard->getCurrentGraphLengh() * 1000;
+	TIMESTAMP barTime = (TIMESTAMP)_controlBoard->getCurrentBarTime() * 1000;
 
-	graphLength *= 1000;
 	_pixelPerTime = _barChart->getGraphRegion().getWidth() * 1.0f / graphLength;
-	float barWith = (float)_barChart->getGraphRegion().getWidth() / barCount;
+	float barWith = _pixelPerTime * barTime;
+
 	_barChart->setBarWidth(barWith);
 
-	return (TIMESTAMP)(graphLength / barCount);
+	return barTime;
 }
 
 
