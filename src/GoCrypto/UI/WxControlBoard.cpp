@@ -1,4 +1,6 @@
 #include "WxControlBoard.h"
+#include "../common/Utility.h"
+#include <sstream>
 
 struct BarGUIItem {
 	char* name;
@@ -84,7 +86,7 @@ GraphLengthItem graphLengths[] = {
 };
 
 
-WxControlBoard::WxControlBoard(const std::vector<std::string>& platforms) : _checkedButton(-1), _currentGraphLength(1), _barLengthIdx(-1)
+WxControlBoard::WxControlBoard(const std::vector<std::string>& platforms) : _checkedButton(-1), _currentGraphLength(1), _barLengthIdx(-1), _pMarketData(nullptr)
 {
 	_window_flags |= ImGuiWindowFlags_NoTitleBar;
 	_window_flags |= ImGuiWindowFlags_NoMove;
@@ -114,6 +116,9 @@ void WxControlBoard::update() {
 	ImGui::SetNextWindowSize(_window_size, ImGuiCond_Always);
 	ImGui::SetNextWindowPos(_window_pos);
 
+	// current control align base on the control window at 130 width length
+	int widthAutoFilledLength = _window_size.x - 130;
+
 	if (!ImGui::Begin("Control board", nullptr, _window_flags))
 	{
 		// Early out if the window is collapsed, as an optimization.
@@ -137,23 +142,51 @@ void WxControlBoard::update() {
 		ImGui::Separator();
 	}
 
-	if (ImGui::Button("start", ImVec2(120, 35))) {
+	if (ImGui::Button("start", ImVec2(120 + widthAutoFilledLength, 35))) {
 		if (_startButtonClickHandler) {
 			_startButtonClickHandler(this);
 		}
 	}
 
-	if (ImGui::Button("stop", ImVec2(120, 35))) {
+	if (ImGui::Button("stop", ImVec2(120 + widthAutoFilledLength, 35))) {
 		if (_stopButtonClickHandler) {
 			_stopButtonClickHandler(this);
 		}
 	}
 
-	if (ImGui::Button("export", ImVec2(120, 35))) {
+	if (ImGui::Button("export", ImVec2(120 + widthAutoFilledLength, 35))) {
 		if (_exportButtonClickHandler) {
 			_exportButtonClickHandler(this);
 		}
 	}
+	ImGui::Separator();
+	if (ImGui::CollapsingHeader("Market data", ImGuiTreeNodeFlags_DefaultOpen)) {
+
+		const char* marketCapStr;
+		const char* lastUpdateStr;
+
+		std::string marketCap;
+		std::string lastUpdate;
+
+		if (_pMarketData == nullptr || _pMarketData->at == 0) {
+			marketCapStr = "N/A";
+			lastUpdateStr = "N/A";
+		}
+		else {
+			lastUpdate = Utility::time2strInSeconds(_pMarketData->at);
+			lastUpdateStr = lastUpdate.c_str();
+
+			std::stringstream ss;
+			ss.imbue(std::locale(""));
+			ss << ((__int64)_pMarketData->marketCapUSD) << " USD";
+			marketCap = ss.str();
+			marketCapStr = marketCap.c_str();
+		}
+
+		ImGui::Text("%s", marketCapStr);
+		ImGui::Text("%s", lastUpdateStr);
+	}
+
 	ImGui::Separator();
 	if (ImGui::CollapsingHeader("Notification", ImGuiTreeNodeFlags_DefaultOpen)) {
 		bool oldVal = _notifyPriceMovement;
@@ -187,7 +220,7 @@ void WxControlBoard::update() {
 	ImGui::Separator();
 	if (ImGui::CollapsingHeader("Graph Settings", ImGuiTreeNodeFlags_DefaultOpen)) {
 		{
-			ImGui::ScopedItemWidth filterWidthScope(70);
+			ImGui::ScopedItemWidth filterWidthScope(70 + widthAutoFilledLength);
 			bool changed = false;
 			if (ImGui::BeginCombo("time", graphLengths[_currentGraphLength].name))
 			{
@@ -234,7 +267,7 @@ void WxControlBoard::update() {
 	}
 	if (ImGui::CollapsingHeader("Symbol filter", ImGuiTreeNodeFlags_DefaultOpen)) {
 		{
-			ImGui::ScopedItemWidth filterWidthScope(70);
+			ImGui::ScopedItemWidth filterWidthScope(70 + widthAutoFilledLength);
 
 			if (ImGui::InputText("",
 				&_filterBuffer[0], sizeof(_filterBuffer),
@@ -329,4 +362,8 @@ int WxControlBoard::getCurrentBarTime() const {
 
 const char* WxControlBoard::getFilterText() const {
 	return &_filterBuffer[0];
+}
+
+void WxControlBoard::setMarketData(const MarketData* data) {
+	_pMarketData = data;
 }

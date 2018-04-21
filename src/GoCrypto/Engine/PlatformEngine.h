@@ -31,6 +31,8 @@ struct TickerUI {
 	char processLevel;
 };
 
+typedef std::function<void(MarketData*, int, bool)> MarketDataEventListener;
+
 #define TICKER_DURATION 60000
 
 class PlatformEngine
@@ -108,9 +110,19 @@ private:
 	bool _priceNotificationEnable = false;
 	bool _volumeNotificationEnable = false;
 	std::vector<TriggerVolumeBaseItem> _volumeBaseTriggers;
+	std::mutex _marketHistoriesMutex;
+	std::list<MarketData> _marketHistories;
+	std::future<void> _marketDataRequestLoop;
+	int _marketDataEventId;
+
+	int _autoId = 0;
+	Signal<bool> _stopLoopTask;
+	std::mutex _marketDataEventListenersMutex;
+	std::map<int, MarketDataEventListener> _marketDataEventListeners;
 private:
 	void pushMessageLoop();
 	void sheduleQueryHistory();
+	void updateMarketData();
 	void updateSymbolStatistics(CryptoBoardElmInfo* info, const std::list<TickerUI>&);
 	void analyzeTickerForNotification(NAPMarketEventHandler* handler, const std::list<TickerUI>&);
 	void onTrade(int i, NAPMarketEventHandler* sender, TradeItem* tradeItem, int, bool);
@@ -118,6 +130,8 @@ private:
 	bool measureVolumeInPeriod(TIMESTAMP duration, TIMESTAMP lastProcessingTime,
 		std::list<CandleItem>::const_iterator &it, const std::list<CandleItem>::const_iterator& end,
 		double& volume, double& priceHigh, double& priceLow);
+
+	void onMarketData(MarketData*, int, bool);
 public:
 	PlatformEngine(const char* configFile);
 	virtual ~PlatformEngine();
@@ -134,6 +148,8 @@ public:
 	void enableVolumeNotification(bool enable);
 	const std::string& getQuote(const std::string& symbol);
 	bool convertPrice(const std::string& symbol, const std::string& baseQuoteCurrency, const double& price, double& convertedPrice);
+	int addMarketDataEventListener(MarketDataEventListener&& eventListener);
+	void removeMarketDataEventListener(int id);
 };
 
 typedef std::shared_ptr<Notifier> TraderRef;

@@ -69,6 +69,7 @@ public:
 	void resetState(const T& resetSignalVale) {
 		std::lock_guard<std::mutex> lk(_messageQueueMutex);
 		_signal = resetSignalVale;
+		_signalReceived = false;
 	}
 
 	void sendSignal(const T& signal) {

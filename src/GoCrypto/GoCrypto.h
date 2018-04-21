@@ -25,6 +25,11 @@ struct CryptoBoardElmInfo {
 	PeriodInfo periods[1];
 };
 
+struct MarketData {
+	double marketCapUSD;
+	__int64 at;
+};
+
 template <class T>
 inline void destroy(std::vector<T*>& elms) {
 	for (auto it = elms.begin(); it != elms.end(); it++) {

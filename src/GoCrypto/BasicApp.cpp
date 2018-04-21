@@ -75,6 +75,9 @@ class BasicApp : public App {
 
 	thread _consoleThread;
 	bool _isConsoleThreadRunning = false;
+
+	int _marketDataEventId = -1;
+	MarketData _lastestMarketData;
 public:
 	BasicApp();
 	~BasicApp();
@@ -362,7 +365,7 @@ void BasicApp::setup()
 	_logAdapter = new LogAdapter(_applog.get());
 
 	topSpliter->setVertical(true);
-	topSpliter->setFixedPanelSize(130);
+	topSpliter->setFixedPanelSize(150);
 	topSpliter->setFixPanel(FixedPanel::Panel2);
 	topSpliter->setChild1(_cryptoBoard);
 	topSpliter->setChild2(_controlBoard);
@@ -731,6 +734,11 @@ void BasicApp::setup()
 
 	initializeConsole();
 	enalbeServerMode(false);
+
+	// initialze market data
+	_lastestMarketData.at = 0;
+	_lastestMarketData.marketCapUSD = 0;
+	_controlBoard->setMarketData(&_lastestMarketData);
 }
 
 void BasicApp::onSelectedSymbolChanged(Widget*) {
@@ -793,7 +801,6 @@ void BasicApp::startServices() {
 		return;
 	}
 
-
 	filesystem::path configPath = getExecutableAbsolutePath();
 	configPath = configPath.parent_path();
 	configPath /= "platforms";
@@ -827,6 +834,16 @@ void BasicApp::startServices() {
 		_controlBoard->setBaseCurrencies(_platformRunner->getCurrencies());
 	});
 
+	_marketDataEventId = _platformRunner->addMarketDataEventListener([this](MarketData* items, int n, bool snapShot) {
+		if (items == nullptr) return;
+		
+		if (snapShot || n != 1) {
+			return;
+		}
+
+		_lastestMarketData = *items;
+	});
+
 	pushLog((int)LogLevel::Info, "services have been started\n");
 }
 
@@ -838,6 +855,7 @@ void BasicApp::stopServices() {
 		return;
 	}
 	_lastSelectedHandler = nullptr;
+	_platformRunner->removeMarketDataEventListener(_marketDataEventId);
 
 	_platformRunner->stop();
 	_cryptoBoard->accessSharedData([this](Widget*) {

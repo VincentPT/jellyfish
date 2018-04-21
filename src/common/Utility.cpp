@@ -46,9 +46,20 @@ std::string Utility::time2shortStr(TIMESTAMP t) {
 	struct tm * timeinfo;
 	timeinfo = localtime(&tst);
 
-	// print format of time equivalent to Thu Aug 23 14:55:02
 	strftime(buffer, sizeof(buffer), "%T", timeinfo);
 	
+	return buffer;
+}
+
+std::string Utility::time2strInSeconds(TIMESTAMP t) {
+	char buffer[64];
+	time_t tst = (time_t)(t / 1000);
+
+	struct tm * timeinfo;
+	timeinfo = localtime(&tst);
+
+	// print format of time equivalent to Thu Aug 23 14:55:02
+	strftime(buffer, sizeof(buffer), "%b %d %T", timeinfo);
 	return buffer;
 }
 

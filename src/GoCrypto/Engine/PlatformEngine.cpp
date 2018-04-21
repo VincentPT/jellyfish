@@ -14,6 +14,7 @@ using namespace std;
 #include <cpprest/json.h>
 #include <algorithm>
 #include <string>
+#include <cpprest/http_client.h>
 
 #include "../common/Utility.h"
 
@@ -31,15 +32,20 @@ string formatPrice(double price) {
 	return buffer;
 }
 
-PlatformEngine::PlatformEngine(const char* configFile) : _runFlag(false), _hLib(nullptr) {
+PlatformEngine::PlatformEngine(const char* configFile) : _runFlag(false), _hLib(nullptr), _stopLoopTask(true) {
+	using namespace std::placeholders;
+
 	_platform = nullptr;
+
+	auto updateMarketdataHandler = std::bind(&PlatformEngine::onMarketData, this, _1, _2, _3);
+	_marketDataEventId = addMarketDataEventListener(updateMarketdataHandler);
 
 	filesystem::path p(configFile);
 	auto pathFile = p.filename();
 	auto& pathExt = pathFile.extension();
 	auto fileName = pathFile.u8string();
 	_platformName = fileName.substr(0, fileName.size() - pathExt.u8string().size());
-
+	
 	std::string moduleName;
 
 	auto parseTrigger = [](web::json::object& value) {
@@ -185,6 +191,8 @@ PlatformEngine::PlatformEngine(const char* configFile) : _runFlag(false), _hLib(
 }
 
 PlatformEngine::~PlatformEngine() {
+	removeMarketDataEventListener(_marketDataEventId);
+
 	if (_platform) {
 		_platform->disconnect();
 		delete _platform;
@@ -244,6 +252,110 @@ void PlatformEngine::pushMessageLoop() {
 			}
 		}
 	}
+}
+
+void PlatformEngine::updateMarketData() {
+	using namespace web::http;
+	/*
+	Request: https://api.coinmarketcap.com/v1/global/
+	Response:
+	{
+	"total_market_cap_usd": 378038428531.0,
+	"total_24h_volume_usd": 26418975872.0,
+	"bitcoin_percentage_of_market_cap": 39.39,
+	"active_currencies": 895,
+	"active_assets": 689,
+	"active_markets": 10641,
+	"last_updated": 1524322472
+	}
+	*/
+
+	TIMESTAMP t1, t2;
+	TIMESTAMP processTime;
+	unsigned int sleepTime;
+
+	// don't request market data too much time per one minute
+	TIMESTAMP interval = 10 * 1000;
+
+	client::http_client_config config;
+	// 5 seconds timeout
+	std::chrono::duration<long long, std::milli> timeout((long long)5000);
+	config.set_timeout(timeout);
+
+	http_request httpRequest(methods::GET);
+	auto& headers = httpRequest.headers();
+	headers[U("Connection")] = U("keep-alive");
+
+	utility::string_t url = U("https://api.coinmarketcap.com/v1/global/");
+	auto httClient = make_shared<client::http_client>(url, config);
+
+	bool temp, exceptionOccured;
+	MarketData marketData;
+	marketData.at = 0;
+
+	do
+	{
+		t1 = getCurrentTimeStamp();
+		exceptionOccured = false;
+		try {
+			pushLog((int)LogLevel::Verbose, "requesting market data...\n");
+			auto task = httClient->request(httpRequest).then([this, &marketData](http_response& response) {
+				if (response.status_code() == 200) {
+					auto js = response.extract_json().get();
+					if (js.is_object()) {
+						auto& obj = js.as_object();
+						auto it1 = obj.find(U("total_market_cap_usd"));
+						auto it2 = obj.find(U("last_updated"));
+
+						if (it1 != obj.end() && it2 != obj.end()) {
+							// last_updated is an unix time
+							TIMESTAMP lastUpdate = it2->second.as_number().to_int64() * 1000;
+							marketData.marketCapUSD = it1->second.as_double();
+							marketData.at = lastUpdate;
+
+							{
+								std::unique_lock<std::mutex> lk(_marketDataEventListenersMutex);
+								for (auto it = _marketDataEventListeners.begin(); it != _marketDataEventListeners.end(); it++) {
+									(it->second)(&marketData, 1, false);
+								}
+							}
+						}
+						else {
+							pushLog((int)LogLevel::Error, "unknow response format %s\n", CPPREST_FROM_STRING(js.as_string()).c_str());
+						}
+					}
+					else {
+						pushLog((int)LogLevel::Error, "unknow response format %s\n", CPPREST_FROM_STRING(js.as_string()).c_str());
+					}
+				}
+			});
+
+			task.wait();
+		}
+		catch (const std::exception&e) {
+			pushLog((int)LogLevel::Error, "request market data failed: %s\n", e.what());
+			exceptionOccured = true;
+		}
+		catch (...) {
+			pushLog((int)LogLevel::Error, "request market data failed: unknown error\n");
+			exceptionOccured = true;
+		}
+
+		if (exceptionOccured) {
+			// make the new client if an exception occured
+			httClient = make_shared<client::http_client>(url, config);
+		}
+
+		t2 = getCurrentTimeStamp();
+
+		processTime = t2 - t1;
+		if (processTime < interval) {
+			sleepTime = (unsigned int)(interval - processTime);
+		}
+		else {
+			sleepTime = 0;
+		}
+	} while (_stopLoopTask.waitSignal(temp, sleepTime) == false);
 }
 
 void PlatformEngine::sheduleQueryHistory() {
@@ -837,6 +949,7 @@ void PlatformEngine::run() {
 	LOG_SCOPE_ACCESS(_platform->getLogger(), __FUNCTION__);
 
 	_runFlag = true;
+	_stopLoopTask.resetState(false);
 
 	bool needGetAll = false;
 	for (auto it = _userRawListeners.begin(); it != _userRawListeners.end(); it++) {
@@ -938,6 +1051,7 @@ void PlatformEngine::run() {
 	//_broadCastIntervalTask = std::async(std::launch::async, [this]() {timeInterval(); });
 	_messageLoopTask = std::async(std::launch::async, [this]() {pushMessageLoop(); });
 	_sendTradeHistoryRequestLoop = std::async(std::launch::async, [this]() {sheduleQueryHistory(); });
+	_marketDataRequestLoop = std::async(std::launch::async, [this]() {updateMarketData(); });
 
 	// starting query time from server
 	_platform->startServerTimeQuery(5000);
@@ -962,6 +1076,7 @@ void PlatformEngine::stop() {
 
 	if (_runFlag == false) return;
 	_runFlag = false;
+	_stopLoopTask.sendSignal(true);
 
 	_platform->disconnect();
 
@@ -972,11 +1087,15 @@ void PlatformEngine::stop() {
 		_messageQueue.pushMessage({});
 		_messageLoopTask.wait();
 	}
+	if (_marketDataRequestLoop.valid()) {
+		_marketDataRequestLoop.wait();
+	}
 	pushLog((int)LogLevel::Debug, "stopped!\n");
 	pushLog((int)LogLevel::Debug, "stop querying trade history...\n");
 	if (_sendTradeHistoryRequestLoop.valid()) {
 		_sendTradeHistoryRequestLoop.wait();
 	}
+
 	pushLog((int)LogLevel::Debug, "stopped!\n");
 }
 
@@ -1175,4 +1294,38 @@ bool PlatformEngine::convertPrice(const std::string& symbol, const std::string& 
 	}
 
 	return true;
+}
+
+int PlatformEngine::addMarketDataEventListener(MarketDataEventListener&& eventListener) {
+	std::unique_lock<std::mutex> lk(_marketDataEventListenersMutex);
+
+	MarketDataEventListener emptyFunc;
+	auto emptyPair = std::make_pair(_autoId, emptyFunc);
+	auto it = _marketDataEventListeners.insert(emptyPair);
+	it.first->second = eventListener;
+
+	_autoId++;
+
+	return emptyPair.first;
+}
+
+void PlatformEngine::removeMarketDataEventListener(int id) {
+	std::unique_lock<std::mutex> lk(_marketDataEventListenersMutex);
+	_marketDataEventListeners.erase(id);
+}
+
+void PlatformEngine::onMarketData(MarketData* items, int n, bool snapShot) {
+	if (n == 0 || items == nullptr) return;
+	std::unique_lock<std::mutex> lk(_marketHistoriesMutex);
+	if (snapShot) {
+		pushLog((int)LogLevel::Info, "market data snapshot event has not been implemeted\n");
+	}
+	else if (n == 1) {
+		if (_marketHistories.size() == 0 || _marketHistories.back().at != items->at) {
+			_marketHistories.push_back(*items);
+		}
+	}
+	else {
+		pushLog((int)LogLevel::Info, "multiple market data update event has not been implemeted\n");
+	}
 }

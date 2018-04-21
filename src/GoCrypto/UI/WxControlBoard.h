@@ -28,6 +28,8 @@ class WxControlBoard :
 	std::vector<std::string> _currencies;
 	mutable std::mutex _mutex;
 	char _filterBuffer[16];
+
+	const MarketData* _pMarketData;
 public:
 	WxControlBoard(const std::vector<std::string>& platforms);
 	virtual ~WxControlBoard();
@@ -52,5 +54,6 @@ public:
 	unsigned int getCurrentGraphLengh() const;
 	int getCurrentBarTime() const;
 	const char* getFilterText() const;
+	void setMarketData(const MarketData* data);
 };
 
