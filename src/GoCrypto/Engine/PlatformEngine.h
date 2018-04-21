@@ -70,6 +70,13 @@ class PlatformEngine
 		TIMESTAMP duration;
 		EventHistoryType eventType;
 	};
+
+	struct TriggerVolumeBaseItem {
+		TIMESTAMP measureDuration;
+		float volumeChangedThreshold;
+		float priceChangedThreshold;
+		double miniumVolumeInBTC;
+	};
 	
 private:
 	bool _runFlag;
@@ -100,10 +107,7 @@ private:
 	SymbolStatisticUpdatedHandler _onSymbolStatisticUpdated;
 	bool _priceNotificationEnable = false;
 	bool _volumeNotificationEnable = false;
-	TIMESTAMP _measureDuration;
-	float _volumeChangedThreshold;
-	float _priceChangedThreshold = -1;
-	double _miniumVolumeInBTC;
+	std::vector<TriggerVolumeBaseItem> _volumeBaseTriggers;
 private:
 	void pushMessageLoop();
 	void sheduleQueryHistory();
@@ -111,6 +115,9 @@ private:
 	void analyzeTickerForNotification(NAPMarketEventHandler* handler, const std::list<TickerUI>&);
 	void onTrade(int i, NAPMarketEventHandler* sender, TradeItem* tradeItem, int, bool);
 	void onCandle(int i, NAPMarketEventHandler* sender, CandleItem* candleItems, int, bool);
+	bool measureVolumeInPeriod(TIMESTAMP duration, TIMESTAMP lastProcessingTime,
+		std::list<CandleItem>::const_iterator &it, const std::list<CandleItem>::const_iterator& end,
+		double& volume, double& priceHigh, double& priceLow);
 public:
 	PlatformEngine(const char* configFile);
 	virtual ~PlatformEngine();

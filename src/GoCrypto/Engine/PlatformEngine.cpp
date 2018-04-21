@@ -52,7 +52,6 @@ PlatformEngine::PlatformEngine(const char* configFile) : _runFlag(false), _hLib(
 
 	bool loadedTriggers = false;
 	try {
-
 		ifstream in;
 		in.open(configFile);
 		if (in.is_open()) {
@@ -69,13 +68,39 @@ PlatformEngine::PlatformEngine(const char* configFile) : _runFlag(false), _hLib(
 				return elm1.endTime < elm2.endTime;
 			});
 
-			auto& volumeTrigger = settings[U("volumeTrigger")].as_object();
-			_measureDuration = volumeTrigger[U("measureDuration")].as_integer() * 1000;
-			_volumeChangedThreshold = (float)volumeTrigger[U("volumeChangedThresholdInPercent")].as_double() / 100.0f;
-			if ( volumeTrigger.find(U("priceChangedThresholdInPercent")) != volumeTrigger.end()) {
-				_priceChangedThreshold = (float)volumeTrigger[U("priceChangedThresholdInPercent")].as_double() / 100.0f;
+			auto& volumeTriggers = settings[U("volumeTriggers")].as_array();
+			for (auto it = volumeTriggers.begin(); it != volumeTriggers.end(); it++) {
+				auto& volumeTrigger = it->as_object();
+				TriggerVolumeBaseItem volumeBaseTrigger;
+
+				volumeBaseTrigger.measureDuration = volumeTrigger[U("measureDuration")].as_integer() * 1000;
+				volumeBaseTrigger.volumeChangedThreshold = (float)volumeTrigger[U("volumeChangedThresholdInPercent")].as_double() / 100.0f;
+				volumeBaseTrigger.miniumVolumeInBTC = volumeTrigger[U("miniumVolumeInBTC")].as_double();
+				if (volumeTrigger.find(U("priceChangedThresholdInPercent")) != volumeTrigger.end()) {
+					volumeBaseTrigger.priceChangedThreshold = (float)volumeTrigger[U("priceChangedThresholdInPercent")].as_double() / 100.0f;
+				}
+				else {
+					volumeBaseTrigger.priceChangedThreshold = -1;
+				}
+
+				_volumeBaseTriggers.push_back(volumeBaseTrigger);
 			}
-			_miniumVolumeInBTC = volumeTrigger[U("miniumVolumeInBTC")].as_double();
+
+			// sort the trigger base on duration first then volume changed threshold
+			// this sorting need for further processing
+			std::sort(_volumeBaseTriggers.begin(), _volumeBaseTriggers.end(), [](TriggerVolumeBaseItem& item1, TriggerVolumeBaseItem& item2) {
+				if (item1.measureDuration == item2.measureDuration) {
+					if (item1.volumeChangedThreshold == item2.volumeChangedThreshold) {
+						if (item1.miniumVolumeInBTC == item2.volumeChangedThreshold) {
+							return item1.priceChangedThreshold > item2.priceChangedThreshold;
+						}
+						return item1.miniumVolumeInBTC > item2.volumeChangedThreshold;
+					}
+					return item1.volumeChangedThreshold > item2.volumeChangedThreshold;
+				}
+
+				return item1.measureDuration < item2.measureDuration;
+			});
 
 			loadedTriggers = true;
 
@@ -595,6 +620,31 @@ void PlatformEngine::onTrade(int i, NAPMarketEventHandler* sender, TradeItem* in
 	}
 }
 
+bool PlatformEngine::measureVolumeInPeriod(
+	TIMESTAMP duration, TIMESTAMP lastProcessingTime, 
+	std::list<CandleItem>::const_iterator&it, const std::list<CandleItem>::const_iterator& end,
+	double& volume, double& priceHigh, double& priceLow) {
+	auto timePoint = it->timestamp;
+	for (; it != end; it++) {
+		if (it->timestamp <= lastProcessingTime) {
+			return false;
+		}
+		if (timePoint - it->timestamp >= duration) {
+			break;
+		}
+		volume += it->volume;
+
+		if (priceLow > it->low) {
+			priceLow = it->low;
+		}
+		if (priceHigh < it->high) {
+			priceHigh = it->high;
+		}
+	}
+
+	return true;
+}
+
 void PlatformEngine::onCandle(int i, NAPMarketEventHandler* sender, CandleItem* candleItems, int count, bool snapshot) {
 	auto it = _sentCandleSnapshotRequest.insert(std::make_pair(sender->getPair(), 0));
 	if (it.second || (it.first->second < 7 && snapshot)) {
@@ -621,146 +671,161 @@ void PlatformEngine::onCandle(int i, NAPMarketEventHandler* sender, CandleItem* 
 	// process notification for volume
 	if (snapshot == false) {
 		auto& lastProcessingTime = _notifyProcessingVolumeMap[i];
-
 		auto& candleItems = sender->getCandleHistoriesNonSync();
 		auto it = candleItems.begin();
 		if (it == candleItems.end()) {
 			return;
 		}
-		auto lastestVolume = it->volume;
 		auto timePoint = it->timestamp;
+		auto priceNow = it->close;
+		auto itEnd = candleItems.begin();
+		double lastestVolume = 0, priceLow = FLT_MAX, priceHigh = FLT_MIN;
+		auto itStep1Previous = it;
+		TIMESTAMP step1PrevousDuration = 0;
 
-		auto priceLow = it->low;
-		auto priceHigh = it->high;
-
-		for (it++; it != candleItems.end(); it++) {
-			if (it->timestamp <= lastProcessingTime) {
-				return;
-			}
-			if (timePoint - it->timestamp >= _measureDuration) {
+		for (auto triggerIt = _volumeBaseTriggers.begin(); triggerIt != _volumeBaseTriggers.end(); triggerIt++) {
+			auto measureDuration = triggerIt->measureDuration;
+			/// part 1 - caculate volumes and prices in two lastest period base on current trigger duration
+			// caculate volume for first period at current duration
+			// for optimization, we only calculate the part that not count at previous of time
+			auto step1Duration = measureDuration - step1PrevousDuration;
+			
+			auto itTemp = itStep1Previous;
+			if (measureVolumeInPeriod(step1Duration, lastProcessingTime, itStep1Previous, itEnd, lastestVolume, priceLow, priceHigh) == false) {
 				break;
 			}
-			lastestVolume += it->volume;
-
-			if (priceLow > it->low) {
-				priceLow = it->low;
-			}
-			if (priceHigh < it->high) {
-				priceHigh = it->high;
-			}
-		}
-		if (it == candleItems.end()) {
-			return;
-		}
-		auto previousVolume = it->volume;
-		auto previousTimePoint = it->timestamp;
-		auto lastCheckTime = previousTimePoint;
-
-		auto previousLow = it->low;
-		auto previousHigh = it->high;
-
-		for (it++; it != candleItems.end(); it++) {
-			if (it->timestamp <= lastProcessingTime) {
-				return;
-			}
-			if (previousTimePoint - it->timestamp >= _measureDuration) {
+			// check if the iterator does not move or it reach the end
+			if (itStep1Previous == itEnd || itStep1Previous == itTemp) {
 				break;
 			}
-			previousVolume += it->volume;
-			lastCheckTime = it->timestamp;
+			it = itStep1Previous;
+			step1PrevousDuration = measureDuration;
 
-			if (previousLow > it->low) {
-				previousLow = it->low;
+			// caculate volume for second period at current duration
+			double previousVolume = 0, previousLow = FLT_MAX, previousHigh = FLT_MIN;
+			auto previousTimePoint = it->timestamp;
+			decltype(timePoint) lastCheckTime;
+			
+			itTemp = it;
+			if (measureVolumeInPeriod(measureDuration, lastProcessingTime, it, itEnd, previousVolume, previousLow, previousHigh) == false) {
+				break;
 			}
-			if (previousHigh < it->high) {
-				previousHigh = it->high;
+			// check if the iterator does not move
+			if (it == itTemp) {
+				break;
 			}
-		}
 
-		const char* action = nullptr;
-		float volumeChange, timeChange;
-		double smallerVolume, largerVolume;
-
-		if (lastestVolume > previousVolume) {
-			action = "jumped";
-			smallerVolume = previousVolume;
-			largerVolume = lastestVolume;
-		}
-		else {
-			smallerVolume = lastestVolume;
-			largerVolume = previousVolume;
-
-			volumeChange = previousVolume / smallerVolume;
-			// for drop action we must wait enough time to judge the movement
-			if (lastCheckTime - previousTimePoint >= _measureDuration * 90 / 1000) {
-				action = "dropped";
+			/// part 2 - judge the action, caculate volume changed, price changed
+			// get the last checked time
+			if (it == candleItems.end()) {
+				lastCheckTime = candleItems.back().timestamp;
 			}
-		}
-		if (smallerVolume <= 0) {
-			smallerVolume = 0.00001;
-		}
+			else {
+				// revert iterator to previous position to get previous timepoint
+				it--;
+				lastCheckTime = it->timestamp;
+				// make iterator at current position
+				it++;
+			}
 
-		decltype(priceLow) priceFrom, priceTo;
+			const char* action = nullptr;
+			float volumeChange, timeChange;
+			double smallerVolume, largerVolume;
 
-		if (std::abs(previousHigh - priceLow) > std::abs(priceHigh - previousLow)) {
-			priceFrom = previousHigh;
-			priceTo = priceLow;
-		}
-		else {
-			priceFrom = previousLow;
-			priceTo = priceHigh;
-		}
+			if (lastestVolume > previousVolume) {
+				action = "jumped";
+				smallerVolume = previousVolume;
+				largerVolume = lastestVolume;
+			}
+			else {
+				smallerVolume = lastestVolume;
+				largerVolume = previousVolume;
 
-		auto priceChanged = (priceTo - priceFrom) / priceFrom;
-		bool passedAllCondition = false;
-		
-		if (action) {
+				volumeChange = previousVolume / smallerVolume;
+				// for drop action we must wait enough time to judge the movement
+				if (lastCheckTime - previousTimePoint >= measureDuration * 90 / 1000) {
+					action = "dropped";
+				}
+			}
+			if (smallerVolume <= 0) {
+				smallerVolume = 0.00001;
+			}
+
+			decltype(priceNow) priceFrom, priceTo;
+
+			if (std::abs(previousHigh - priceNow) > std::abs(previousLow - priceNow)) {
+				priceFrom = previousHigh;
+				priceTo = priceNow;
+			}
+			else {
+				priceFrom = previousLow;
+				priceTo = priceNow;
+			}
+
+			auto priceChanged = (priceTo - priceFrom) / priceFrom;
 			volumeChange = largerVolume / smallerVolume;
+			bool passedAllCondition = false;
 
-			if (volumeChange >= _volumeChangedThreshold) {
+			/// part 3 - check if all trigger's conditions are matched
+			if (action) {
 				auto& originCrytoInfo = _symbolsStatistics[i];
 				auto& symbol = originCrytoInfo->symbol;
-				const std::string baseCurrency = "BTC";
-				double convertedPrice;
+				static const std::string baseCurrency = "BTC";
+				double convertedPrice = -1;
+				
+				// check all trigger that have same duration
+				for (auto jt = triggerIt; jt != _volumeBaseTriggers.end(); jt++) {
+					if (jt->measureDuration != triggerIt->measureDuration) {
+						break;
+					}
+					triggerIt = jt;
 
-				if (_priceChangedThreshold <= 0 || std::abs(priceChanged) >= _priceChangedThreshold) {
-					// convert price to BTC to check minium volume base on BTC on the period
-					if (convertPrice(symbol, baseCurrency, originCrytoInfo->price, convertedPrice)) {
-						// trading volume must larger than a specific amount of BTC to trigger notification
-						if (largerVolume * convertedPrice >= _miniumVolumeInBTC) {
-							passedAllCondition = true;
+					if (volumeChange >= jt->volumeChangedThreshold) {
+						if (jt->priceChangedThreshold <= 0 || std::abs(priceChanged) >= jt->priceChangedThreshold) {
+							// convert price to BTC to check minium volume base on BTC on the period
+							if (convertedPrice <= 0) {
+								convertPrice(symbol, baseCurrency, originCrytoInfo->price, convertedPrice);
+							}
+							if (convertedPrice > 0) {
+								// trading volume must larger than a specific amount of BTC to trigger notification
+								if (largerVolume * convertedPrice >= jt->miniumVolumeInBTC) {
+									passedAllCondition = true;
+									break;
+								}
+							}
 						}
 					}
 				}
 			}
-		}
 
-		if (passedAllCondition) {
-			char buffer[192];
-			auto volumeChangedPercent = volumeChange * 100;
-			timeChange = (float)((timePoint - lastCheckTime) / (1000.0f * 60.0f));
+			/// part 4 send notification
+			if (passedAllCondition) {
+				char buffer[192];
+				auto volumeChangedPercent = volumeChange * 100;
+				timeChange = (float)((timePoint - lastCheckTime) / (1000.0f * 60.0f));
 
-			char* priceAction = "jumped +";
-			if (priceChanged < 0) {
-				priceAction = "dropped ";
+				char* priceAction = "jumped +";
+				if (priceChanged < 0) {
+					priceAction = "dropped ";
+				}
+
+				sprintf_s(buffer, sizeof(buffer), "%s's volume %s %.2f%% in %.2f min from %f to %f, price %s%.2f%% from %s to %s at %s",
+					sender->getPair(), action, (float)volumeChangedPercent, timeChange, (float)previousVolume, (float)lastestVolume,
+					priceAction, (float)(priceChanged * 100),
+					formatPrice(priceFrom).c_str(),
+					formatPrice(priceTo).c_str(), Utility::time2shortStr(timePoint).c_str()
+				);
+
+				InternalNotificationData notification;
+				notification.notificationType = NotificationType::Volume;
+				notification.trigerTime = timePoint;
+				notification.message.title = _platformName;
+				notification.message.message = buffer;
+				notification.pair = sender->getPair();
+				_messageQueue.pushMessage(notification);
+
+				lastProcessingTime = timePoint;
 			}
-
-			sprintf_s(buffer, sizeof(buffer), "%s's volume %s %.2f%% in %.2f min from %f to %f, price %s%.2f%% from %s to %s at %s",
-				sender->getPair(), action, (float)volumeChangedPercent, timeChange, (float)previousVolume, (float)lastestVolume,
-				priceAction, (float)(priceChanged * 100),  
-				formatPrice(priceFrom).c_str(),
-				formatPrice(priceTo).c_str(), Utility::time2shortStr(timePoint).c_str()
-			);
-
-			InternalNotificationData notification;
-			notification.notificationType = NotificationType::Volume;
-			notification.trigerTime = timePoint;
-			notification.message.title = _platformName;
-			notification.message.message = buffer;
-			notification.pair = sender->getPair();
-			_messageQueue.pushMessage(notification);
-
-			lastProcessingTime = timePoint;
 		}
 	}
 }

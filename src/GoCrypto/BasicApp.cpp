@@ -869,7 +869,7 @@ void BasicApp::applySelectedCurrency(const std::string& currency) {
 		_cryptoBoard->accessSharedData([this](Widget* sender) {
 			((WxCryptoBoardInfo*)sender)->resetCryptoAdapterToDefault();
 			auto& items = _platformRunner->getSymbolsStatistics();
-			((WxCryptoBoardInfo*)sender)->setItems(&items);
+			((WxCryptoBoardInfo*)sender)->getAdapter()->setItems(&items);
 		});
 	}
 	else {
