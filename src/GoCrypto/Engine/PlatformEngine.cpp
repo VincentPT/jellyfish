@@ -305,12 +305,14 @@ void PlatformEngine::updateMarketData() {
 					if (js.is_object()) {
 						auto& obj = js.as_object();
 						auto it1 = obj.find(U("total_market_cap_usd"));
-						auto it2 = obj.find(U("last_updated"));
+						auto it2 = obj.find(U("total_24h_volume_usd"));
+						auto it3 = obj.find(U("last_updated"));
 
-						if (it1 != obj.end() && it2 != obj.end()) {
+						if (it1 != obj.end() && it2 != obj.end() && it3 != obj.end()) {
 							// last_updated is an unix time
-							TIMESTAMP lastUpdate = it2->second.as_number().to_int64() * 1000;
-							marketData.marketCapUSD = it1->second.as_double();
+							TIMESTAMP lastUpdate = it3->second.as_number().to_int64() * 1000;
+							marketData.marketCapUSD = it1->second.as_number().to_int64();
+							marketData.volume24h = it3->second.as_number().to_int64();
 							marketData.at = lastUpdate;
 
 							{

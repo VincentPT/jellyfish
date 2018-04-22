@@ -161,30 +161,39 @@ void WxControlBoard::update() {
 	}
 	ImGui::Separator();
 	if (ImGui::CollapsingHeader("Market data", ImGuiTreeNodeFlags_DefaultOpen)) {
-
-		const char* marketCapStr;
-		const char* lastUpdateStr;
-
 		std::string marketCap;
+		std::string volume24h;
 		std::string lastUpdate;
 
 		if (_pMarketData == nullptr || _pMarketData->at == 0) {
-			marketCapStr = "N/A";
-			lastUpdateStr = "N/A";
+			marketCap = "N/A";
+			lastUpdate = "N/A";
+			volume24h = "N/A";
 		}
 		else {
 			lastUpdate = Utility::time2strInSeconds(_pMarketData->at);
-			lastUpdateStr = lastUpdate.c_str();
 
 			std::stringstream ss;
 			ss.imbue(std::locale(""));
-			ss << ((__int64)_pMarketData->marketCapUSD) << " USD";
+			ss << ((__int64)_pMarketData->marketCapUSD);
 			marketCap = ss.str();
-			marketCapStr = marketCap.c_str();
+
+			ss.str(std::string());
+			ss << ((__int64)_pMarketData->volume24h);
+			volume24h = ss.str();
 		}
 
-		ImGui::Text("%s", marketCapStr);
-		ImGui::Text("%s", lastUpdateStr);
+		ImGui::Text("%s", marketCap.c_str());
+		if (ImGui::IsItemHovered())
+			ImGui::SetTooltip("Market cap(USD)");
+
+		ImGui::Text("%s", volume24h.c_str());
+		if (ImGui::IsItemHovered())
+			ImGui::SetTooltip("24h volume(USD)");
+
+		ImGui::Text("%s", lastUpdate.c_str());
+		if (ImGui::IsItemHovered())
+			ImGui::SetTooltip("last update");
 	}
 
 	ImGui::Separator();

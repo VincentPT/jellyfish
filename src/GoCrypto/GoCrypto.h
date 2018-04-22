@@ -26,7 +26,8 @@ struct CryptoBoardElmInfo {
 };
 
 struct MarketData {
-	double marketCapUSD;
+	__int64 marketCapUSD;
+	__int64 volume24h;
 	__int64 at;
 };
 
