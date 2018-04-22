@@ -45,6 +45,12 @@ SET (UI_SRC
     UI/WxPointBaseGraph.cpp
     UI/Panel.h
     UI/Panel.cpp
+    UI/WxVolumeTriggers.h
+    UI/WxVolumeTriggers.cpp
+    UI/WxPriceTriggers.h
+    UI/WxPriceTriggers.cpp
+    UI/ImPopup.h
+    UI/ImPopup.cpp
 )
 
 SET (MAIN_SOURCES

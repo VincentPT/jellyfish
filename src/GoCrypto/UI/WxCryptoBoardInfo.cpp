@@ -127,14 +127,6 @@ void CryptoBoardInfoDefaultAdapter::updateData() {}
 
 ////////////////////////////////////////////////////////////////////////
 
-inline RowBuffer* createRowBuffer(int nCell) {
-	auto res = (RowBuffer*)malloc(sizeof(RowBuffer) - sizeof(RowBuffer::rowData) + nCell * sizeof(RowBuffer::rowData[0]));
-	res->nCell = nCell;
-	res->cached = false;
-	return res;
-}
-
-
 bool WxCryptoBoardInfo::checkValidSymbol(int i) {
 	return _cryptoBoardInfoAdapter->checkValidSymbol(i);
 }

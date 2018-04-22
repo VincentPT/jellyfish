@@ -49,10 +49,10 @@ PlatformEngine::PlatformEngine(const char* configFile) : _runFlag(false), _hLib(
 	std::string moduleName;
 
 	auto parseTrigger = [](web::json::object& value) {
-		TriggerTimeBase trigger;
-		trigger.startTime = value[U("startTime")].as_integer() * 1000;
-		trigger.endTime = value[U("endTime")].as_integer() * 1000;
-		trigger.priceChangePerMin = value[U("changedPerMin")].as_double()/100;
+		TriggerPriceBase trigger;
+		trigger.startTime = value[U("startTime")].as_integer();
+		trigger.endTime = value[U("endTime")].as_integer();
+		trigger.priceChangePerMin = (float)value[U("changedPerMin")].as_double();
 		return trigger;
 	};
 
@@ -69,21 +69,18 @@ PlatformEngine::PlatformEngine(const char* configFile) : _runFlag(false), _hLib(
 			for (auto it = triggers.begin(); it != triggers.end(); it++) {
 				_triggers.push_back( parseTrigger(it->as_object()));
 			}
-
-			sort(_triggers.begin(), _triggers.end(), [](TriggerTimeBase& elm1, TriggerTimeBase& elm2) {
-				return elm1.endTime < elm2.endTime;
-			});
+			sortPriceTriggers();
 
 			auto& volumeTriggers = settings[U("volumeTriggers")].as_array();
 			for (auto it = volumeTriggers.begin(); it != volumeTriggers.end(); it++) {
 				auto& volumeTrigger = it->as_object();
 				TriggerVolumeBaseItem volumeBaseTrigger;
 
-				volumeBaseTrigger.measureDuration = volumeTrigger[U("measureDuration")].as_integer() * 1000;
-				volumeBaseTrigger.volumeChangedThreshold = (float)volumeTrigger[U("volumeChangedThresholdInPercent")].as_double() / 100.0f;
-				volumeBaseTrigger.miniumVolumeInBTC = volumeTrigger[U("miniumVolumeInBTC")].as_double();
+				volumeBaseTrigger.measureDuration = volumeTrigger[U("measureDuration")].as_integer();
+				volumeBaseTrigger.volumeChangedThreshold = (float)volumeTrigger[U("volumeChangedThresholdInPercent")].as_double();
+				volumeBaseTrigger.miniumVolumeInBTC = (float)volumeTrigger[U("miniumVolumeInBTC")].as_double();
 				if (volumeTrigger.find(U("priceChangedThresholdInPercent")) != volumeTrigger.end()) {
-					volumeBaseTrigger.priceChangedThreshold = (float)volumeTrigger[U("priceChangedThresholdInPercent")].as_double() / 100.0f;
+					volumeBaseTrigger.priceChangedThreshold = (float)volumeTrigger[U("priceChangedThresholdInPercent")].as_double();
 				}
 				else {
 					volumeBaseTrigger.priceChangedThreshold = -1;
@@ -91,22 +88,7 @@ PlatformEngine::PlatformEngine(const char* configFile) : _runFlag(false), _hLib(
 
 				_volumeBaseTriggers.push_back(volumeBaseTrigger);
 			}
-
-			// sort the trigger base on duration first then volume changed threshold
-			// this sorting need for further processing
-			std::sort(_volumeBaseTriggers.begin(), _volumeBaseTriggers.end(), [](TriggerVolumeBaseItem& item1, TriggerVolumeBaseItem& item2) {
-				if (item1.measureDuration == item2.measureDuration) {
-					if (item1.volumeChangedThreshold == item2.volumeChangedThreshold) {
-						if (item1.miniumVolumeInBTC == item2.volumeChangedThreshold) {
-							return item1.priceChangedThreshold > item2.priceChangedThreshold;
-						}
-						return item1.miniumVolumeInBTC > item2.volumeChangedThreshold;
-					}
-					return item1.volumeChangedThreshold > item2.volumeChangedThreshold;
-				}
-
-				return item1.measureDuration < item2.measureDuration;
-			});
+			sortVolumeTriggers();
 
 			loadedTriggers = true;
 
@@ -203,6 +185,30 @@ PlatformEngine::~PlatformEngine() {
 	}
 
 	destroy(_symbolsStatistics);
+}
+
+void PlatformEngine::sortPriceTriggers() {
+	sort(_triggers.begin(), _triggers.end(), [](TriggerPriceBase& elm1, TriggerPriceBase& elm2) {
+		return elm1.endTime < elm2.endTime;
+	});
+}
+
+void PlatformEngine::sortVolumeTriggers() {
+	// sort the trigger base on duration first then volume changed threshold
+	// this sorting need for further processing
+	std::sort(_volumeBaseTriggers.begin(), _volumeBaseTriggers.end(), [](TriggerVolumeBaseItem& item1, TriggerVolumeBaseItem& item2) {
+		if (item1.measureDuration == item2.measureDuration) {
+			if (item1.volumeChangedThreshold == item2.volumeChangedThreshold) {
+				if (item1.miniumVolumeInBTC == item2.volumeChangedThreshold) {
+					return item1.priceChangedThreshold > item2.priceChangedThreshold;
+				}
+				return item1.miniumVolumeInBTC > item2.volumeChangedThreshold;
+			}
+			return item1.volumeChangedThreshold > item2.volumeChangedThreshold;
+		}
+
+		return item1.measureDuration < item2.measureDuration;
+	});
 }
 
 void PlatformEngine::pushMessageLoop() {
@@ -792,20 +798,21 @@ void PlatformEngine::onCandle(int i, NAPMarketEventHandler* sender, CandleItem* 
 		}
 		auto timePoint = it->timestamp;
 		auto priceNow = it->close;
-		auto itEnd = candleItems.begin();
-		double lastestVolume = 0, priceLow = FLT_MAX, priceHigh = FLT_MIN;
+		auto itEnd = candleItems.end();
+		double lastestVolume = 0, previousLow = FLT_MAX, previousHigh = FLT_MIN;
 		auto itStep1Previous = it;
 		TIMESTAMP step1PrevousDuration = 0;
 
+		std::unique_lock<std::mutex> lk(_volumeTrigersMutex);
 		for (auto triggerIt = _volumeBaseTriggers.begin(); triggerIt != _volumeBaseTriggers.end(); triggerIt++) {
-			auto measureDuration = triggerIt->measureDuration;
+			auto measureDuration = ((TIMESTAMP)(triggerIt->measureDuration)) * 1000;
 			/// part 1 - caculate volumes and prices in two lastest period base on current trigger duration
 			// caculate volume for first period at current duration
 			// for optimization, we only calculate the part that not count at previous of time
 			auto step1Duration = measureDuration - step1PrevousDuration;
 			
 			auto itTemp = itStep1Previous;
-			if (measureVolumeInPeriod(step1Duration, lastProcessingTime, itStep1Previous, itEnd, lastestVolume, priceLow, priceHigh) == false) {
+			if (measureVolumeInPeriod(step1Duration, lastProcessingTime, itStep1Previous, itEnd, lastestVolume, previousHigh, previousLow) == false) {
 				break;
 			}
 			// check if the iterator does not move or it reach the end
@@ -816,12 +823,14 @@ void PlatformEngine::onCandle(int i, NAPMarketEventHandler* sender, CandleItem* 
 			step1PrevousDuration = measureDuration;
 
 			// caculate volume for second period at current duration
-			double previousVolume = 0, previousLow = FLT_MAX, previousHigh = FLT_MIN;
+			double previousVolume = 0;
+			previousLow = FLT_MAX;
+			previousHigh = FLT_MIN;
 			auto previousTimePoint = it->timestamp;
 			decltype(timePoint) lastCheckTime;
 			
 			itTemp = it;
-			if (measureVolumeInPeriod(measureDuration, lastProcessingTime, it, itEnd, previousVolume, previousLow, previousHigh) == false) {
+			if (measureVolumeInPeriod(measureDuration, lastProcessingTime, it, itEnd, previousVolume, previousHigh, previousLow) == false) {
 				break;
 			}
 			// check if the iterator does not move
@@ -854,10 +863,8 @@ void PlatformEngine::onCandle(int i, NAPMarketEventHandler* sender, CandleItem* 
 			else {
 				smallerVolume = lastestVolume;
 				largerVolume = previousVolume;
-
-				volumeChange = previousVolume / smallerVolume;
 				// for drop action we must wait enough time to judge the movement
-				if (lastCheckTime - previousTimePoint >= measureDuration * 90 / 1000) {
+				if (lastCheckTime - previousTimePoint >= measureDuration * 90 / 100) {
 					action = "dropped";
 				}
 			}
@@ -876,8 +883,8 @@ void PlatformEngine::onCandle(int i, NAPMarketEventHandler* sender, CandleItem* 
 				priceTo = priceNow;
 			}
 
-			auto priceChanged = (priceTo - priceFrom) / priceFrom;
-			volumeChange = largerVolume / smallerVolume;
+			auto priceChanged = (priceTo - priceFrom) / priceFrom * 100;
+			volumeChange = (largerVolume - smallerVolume) / smallerVolume * 100;
 			bool passedAllCondition = false;
 
 			/// part 3 - check if all trigger's conditions are matched
@@ -915,7 +922,6 @@ void PlatformEngine::onCandle(int i, NAPMarketEventHandler* sender, CandleItem* 
 			/// part 4 send notification
 			if (passedAllCondition) {
 				char buffer[192];
-				auto volumeChangedPercent = volumeChange * 100;
 				timeChange = (float)((timePoint - lastCheckTime) / (1000.0f * 60.0f));
 
 				char* priceAction = "jumped +";
@@ -924,8 +930,8 @@ void PlatformEngine::onCandle(int i, NAPMarketEventHandler* sender, CandleItem* 
 				}
 
 				sprintf_s(buffer, sizeof(buffer), "%s's volume %s %.2f%% in %.2f min from %f to %f, price %s%.2f%% from %s to %s at %s",
-					sender->getPair(), action, (float)volumeChangedPercent, timeChange, (float)previousVolume, (float)lastestVolume,
-					priceAction, (float)(priceChanged * 100),
+					sender->getPair(), action, (float)volumeChange, timeChange, (float)previousVolume, (float)lastestVolume,
+					priceAction, priceChanged,
 					formatPrice(priceFrom).c_str(),
 					formatPrice(priceTo).c_str(), Utility::time2shortStr(timePoint).c_str()
 				);
@@ -1144,6 +1150,7 @@ void PlatformEngine::analyzeTickerForNotification(NAPMarketEventHandler* handler
 	auto iter = it;
 	char buffer[256];
 
+	std::unique_lock<std::mutex> lk(_priceTrigersMutex);
 	for (char level = 0; level < (char)_triggers.size(); level++) {
 		auto& trigger = _triggers[level];
 		bestPricePoint = nullptr;
@@ -1156,7 +1163,7 @@ void PlatformEngine::analyzeTickerForNotification(NAPMarketEventHandler* handler
 			}
 
 			duration = lastPrice.at - ticker.low.at;
-			if (trigger.startTime <= duration && duration < trigger.endTime) {
+			if (trigger.startTime * 1000 <= duration && duration < trigger.endTime * 1000) {
 				if (updateBestPricePoint(bestPricePoint, lastPrice, &(ticker.low))) {
 					theTicker = &ticker;
 					iter = jt;
@@ -1164,7 +1171,7 @@ void PlatformEngine::analyzeTickerForNotification(NAPMarketEventHandler* handler
 			}
 
 			duration = lastPrice.at - ticker.high.at;
-			if (trigger.startTime <= duration && duration < trigger.endTime) {
+			if (trigger.startTime * 1000 <= duration && duration < trigger.endTime * 1000) {
 				if (updateBestPricePoint(bestPricePoint, lastPrice, &(ticker.high))) {
 					theTicker = &ticker;
 					iter = jt;
@@ -1201,7 +1208,7 @@ void PlatformEngine::analyzeTickerForNotification(NAPMarketEventHandler* handler
 			if (!detectedAnotherBestPrice) {
 				priceChanged /= bestPricePoint->price;
 				auto priceChangePerMin = priceChanged * 60 * 1000 / duration;
-				if (abs(priceChangePerMin) >= trigger.priceChangePerMin) {
+				if (abs(priceChangePerMin) >= trigger.priceChangePerMin/100) {
 					((TickerUI*)theTicker)->processLevel = level;
 					formatPriceChanged(buffer, sizeof(buffer), handler->getPair(), lastPrice, *bestPricePoint);
 
@@ -1330,4 +1337,24 @@ void PlatformEngine::onMarketData(MarketData* items, int n, bool snapShot) {
 	else {
 		pushLog((int)LogLevel::Info, "multiple market data update event has not been implemeted\n");
 	}
+}
+
+void PlatformEngine::setPriceTriggers(const std::vector<TriggerPriceBase>& triggers) {
+	std::unique_lock<std::mutex> lk(_priceTrigersMutex);
+	_triggers = triggers;
+	sortPriceTriggers();
+}
+
+const std::vector<TriggerPriceBase>& PlatformEngine::getPriceTriggers() const {
+	return _triggers;
+}
+
+void PlatformEngine::setVolumeTriggers(const std::vector<TriggerVolumeBaseItem>& triggers) {
+	std::unique_lock<std::mutex> lk(_volumeTrigersMutex);
+	_volumeBaseTriggers = triggers;
+	sortVolumeTriggers();
+}
+
+const std::vector<TriggerVolumeBaseItem>& PlatformEngine::getVolumeTriggers() const {
+	return _volumeBaseTriggers;
 }

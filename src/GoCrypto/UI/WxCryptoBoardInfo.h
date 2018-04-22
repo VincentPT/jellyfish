@@ -5,13 +5,6 @@
 #include <mutex>
 #include <string>
 
-struct ColumnHeader
-{
-	std::string label;
-	float size;
-	int additionalIdx;
-}; 
-
 typedef std::function<void(Widget* sender)> ItemSelecionChangedHandler;
 typedef std::function<int(int i1, int i2)> CompareFunction;
 typedef std::function<bool(int i)> CheckDataValidFunction;
@@ -142,16 +135,6 @@ inline int compareVol(const double& vol1, const double& vol2) {
 
 	return -1;
 }
-
-struct CellBuffer {
-	char data[32];
-};
-
-struct RowBuffer {
-	int nCell;
-	bool cached;
-	CellBuffer rowData[1];
-};
 
 class WxCryptoBoardInfo :
 	public ImWidget

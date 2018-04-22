@@ -159,6 +159,19 @@ void WxControlBoard::update() {
 			_exportButtonClickHandler(this);
 		}
 	}
+
+	if (ImGui::Button("price triggers", ImVec2(120 + widthAutoFilledLength, 35))) {
+		if (_priceTriggerClickHandler) {
+			_priceTriggerClickHandler(this);
+		}
+	}
+
+	if (ImGui::Button("volume triggers", ImVec2(120 + widthAutoFilledLength, 35))) {
+		if (_volumeTriggerClickHandler) {
+			_volumeTriggerClickHandler(this);
+		}
+	}
+
 	ImGui::Separator();
 	if (ImGui::CollapsingHeader("Market data", ImGuiTreeNodeFlags_DefaultOpen)) {
 		std::string marketCap;
@@ -308,6 +321,14 @@ void WxControlBoard::setOnStopButtonClickHandler(ButtonClickEventHandler&& handl
 
 void WxControlBoard::setOnExportButtonClickHandler(ButtonClickEventHandler&& handler) {
 	_exportButtonClickHandler = handler;
+}
+
+void WxControlBoard::setOnPriceTriggersButtonClickHandler(ButtonClickEventHandler&& handler) {
+	_priceTriggerClickHandler = handler;
+}
+
+void WxControlBoard::setOnVolumeTriggersButtonClickHandler(ButtonClickEventHandler&& handler) {
+	_volumeTriggerClickHandler = handler;
 }
 
 void WxControlBoard::setOnSelectedCurrencyChangedHandler(ButtonClickEventHandler&& handler) {

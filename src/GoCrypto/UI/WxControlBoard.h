@@ -17,6 +17,8 @@ class WxControlBoard :
 	ButtonClickEventHandler _priceNotificationChangedHandler;
 	ButtonClickEventHandler _volumeNotificationChangedHandler;
 	ButtonClickEventHandler _graphLengthChangedHandler;
+	ButtonClickEventHandler _volumeTriggerClickHandler;
+	ButtonClickEventHandler _priceTriggerClickHandler;
 	FilterActiveChanged _filterChangedHandler;
 	int _checkedButton;
 	int _currentPlatform;
@@ -39,6 +41,8 @@ public:
 	void setOnStartButtonClickHandler(ButtonClickEventHandler&& handler);
 	void setOnStopButtonClickHandler(ButtonClickEventHandler&& handler);
 	void setOnExportButtonClickHandler(ButtonClickEventHandler&& handler);
+	void setOnPriceTriggersButtonClickHandler(ButtonClickEventHandler&& handler);
+	void setOnVolumeTriggersButtonClickHandler(ButtonClickEventHandler&& handler);
 	void setOnSelectedCurrencyChangedHandler(ButtonClickEventHandler&& handler);
 	void setOnPriceNotificationChangedHandler(ButtonClickEventHandler&& handler);
 	void setOnVolumeNotificationChangedHandler(ButtonClickEventHandler&& handler);

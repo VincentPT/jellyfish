@@ -24,6 +24,8 @@ using namespace std;
 #include "UI/WxBarCharLive.h"
 #include "UI/WxControlBoard.h"
 #include "UI/Panel.h"
+#include "UI/WxPriceTriggers.h"
+#include "UI/WxVolumeTriggers.h"
 
 #include "Engine/PlatformEngine.h"
 #include "LogAdapter.h"
@@ -53,6 +55,9 @@ class BasicApp : public App {
 	shared_ptr<WxBarCharLive> _barChart;
 	shared_ptr<WxCryptoBoardInfo> _cryptoBoard;
 	shared_ptr<WxControlBoard> _controlBoard;
+	WxPriceTriggers _priceTriggersEditor;
+	WxVolumeTriggers _volumeTriggersEditor;
+
 	SyncMessageQueue<Task> _tasks;
 	CiWndCandle* _ciWndCandle = nullptr;
 	
@@ -648,6 +653,27 @@ void BasicApp::setup()
 		initChart();
 	});
 
+	_controlBoard->setOnPriceTriggersButtonClickHandler([this](Widget*) {
+		if (_platformRunner) {
+			_priceTriggersEditor.setTriggers(_platformRunner->getPriceTriggers());
+		}
+		else {
+			_priceTriggersEditor.clearTriggers();
+		}
+		_priceTriggersEditor.showWindow(true);
+	});
+
+
+	_controlBoard->setOnVolumeTriggersButtonClickHandler([this](Widget*) {
+		if (_platformRunner) {
+			_volumeTriggersEditor.setTriggers(_platformRunner->getVolumeTriggers());
+		}
+		else {
+			_volumeTriggersEditor.clearTriggers();
+		}
+		_volumeTriggersEditor.showWindow(true);
+	});
+
 	static std::string searchPattern;
 	static auto filter = [this](const char* text) -> bool {
 		//try {
@@ -739,6 +765,28 @@ void BasicApp::setup()
 	_lastestMarketData.at = 0;
 	_lastestMarketData.marketCapUSD = 0;
 	_controlBoard->setMarketData(&_lastestMarketData);
+
+	_priceTriggersEditor.setSize(500, 300);
+	_priceTriggersEditor.setOnApplyButtonClickHandler([this](Widget*) {
+		auto& triggers = _priceTriggersEditor.getTriggers();
+		if (_platformRunner) {
+			_platformRunner->setPriceTriggers(triggers);
+		}
+		else {
+			pushLog((int)LogLevel::Error, "Services have not run yet, use config file or start the services then update the triggers\n");
+		}
+	});
+
+	_volumeTriggersEditor.setSize(600, 400);
+	_volumeTriggersEditor.setOnApplyButtonClickHandler([this](Widget*) {
+		auto& triggers = _volumeTriggersEditor.getTriggers();
+		if (_platformRunner) {
+			_platformRunner->setVolumeTriggers(triggers);
+		}
+		else {
+			pushLog((int)LogLevel::Error, "Services have not run yet, use config file or start the services then update the triggers\n");
+		}
+	});
 }
 
 void BasicApp::onSelectedSymbolChanged(Widget*) {
@@ -1349,6 +1397,9 @@ void BasicApp::update()
 	if (_ciWndCandle) {
 		_ciWndCandle->update();
 	}
+	_priceTriggersEditor.update();
+	_volumeTriggersEditor.update();
+
 	if (_liveMode) {
 		TIMESTAMP liveTime = getLiveTime();
 		{

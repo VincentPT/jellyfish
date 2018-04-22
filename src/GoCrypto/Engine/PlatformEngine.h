@@ -37,12 +37,6 @@ typedef std::function<void(MarketData*, int, bool)> MarketDataEventListener;
 
 class PlatformEngine
 {
-	struct TriggerTimeBase {
-		TIMESTAMP startTime; // start time
-		TIMESTAMP endTime; // start time
-		double priceChangePerMin; // price change per one minute
-	};
-
 	struct UserListenerInfoRaw {
 		UserListenerInfo* userInfo;
 		std::list<std::string> pairs;
@@ -72,13 +66,6 @@ class PlatformEngine
 		TIMESTAMP duration;
 		EventHistoryType eventType;
 	};
-
-	struct TriggerVolumeBaseItem {
-		TIMESTAMP measureDuration;
-		float volumeChangedThreshold;
-		float priceChangedThreshold;
-		double miniumVolumeInBTC;
-	};
 	
 private:
 	bool _runFlag;
@@ -87,7 +74,8 @@ private:
 	std::future<void> _broadCastIntervalTask;
 	std::future<void> _messageLoopTask;
 	AccessEventDataFunc _tickerAnalyzer;
-	std::vector<TriggerTimeBase> _triggers;
+	std::mutex _priceTrigersMutex;
+	std::vector<TriggerPriceBase> _triggers;
 	SyncMessageQueue<InternalNotificationData> _messageQueue;
 	SyncMessageQueue<RequestEventHistoryMessage> _symbolQueue;
 	std::string _platformName;
@@ -109,6 +97,7 @@ private:
 	SymbolStatisticUpdatedHandler _onSymbolStatisticUpdated;
 	bool _priceNotificationEnable = false;
 	bool _volumeNotificationEnable = false;
+	std::mutex _volumeTrigersMutex;
 	std::vector<TriggerVolumeBaseItem> _volumeBaseTriggers;
 	std::mutex _marketHistoriesMutex;
 	std::list<MarketData> _marketHistories;
@@ -132,6 +121,8 @@ private:
 		double& volume, double& priceHigh, double& priceLow);
 
 	void onMarketData(MarketData*, int, bool);
+	void sortPriceTriggers();
+	void sortVolumeTriggers();
 public:
 	PlatformEngine(const char* configFile);
 	virtual ~PlatformEngine();
@@ -150,6 +141,12 @@ public:
 	bool convertPrice(const std::string& symbol, const std::string& baseQuoteCurrency, const double& price, double& convertedPrice);
 	int addMarketDataEventListener(MarketDataEventListener&& eventListener);
 	void removeMarketDataEventListener(int id);
+
+	void setPriceTriggers(const std::vector<TriggerPriceBase>& triggers);
+	const std::vector<TriggerPriceBase>& getPriceTriggers() const;
+
+	void setVolumeTriggers(const std::vector<TriggerVolumeBaseItem>& triggers);
+	const std::vector<TriggerVolumeBaseItem>& getVolumeTriggers() const;
 };
 
 typedef std::shared_ptr<Notifier> TraderRef;

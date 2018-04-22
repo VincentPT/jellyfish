@@ -1,6 +1,7 @@
 #pragma once
 #include <vector>
 #include <string>
+#include "TradingBase.h"
 
 struct Period
 {
@@ -28,7 +29,37 @@ struct CryptoBoardElmInfo {
 struct MarketData {
 	__int64 marketCapUSD;
 	__int64 volume24h;
-	__int64 at;
+	TIMESTAMP at;
+};
+
+struct ColumnHeader
+{
+	std::string label;
+	float size;
+	int additionalIdx;
+};
+
+struct TriggerVolumeBaseItem {
+	int measureDuration;
+	float volumeChangedThreshold;
+	float priceChangedThreshold;
+	float miniumVolumeInBTC;
+};
+
+struct TriggerPriceBase {
+	int startTime; // start time
+	int endTime; // start time
+	float priceChangePerMin; // price change per one minute
+};
+
+struct CellBuffer {
+	char data[32];
+};
+
+struct RowBuffer {
+	int nCell;
+	bool cached;
+	CellBuffer rowData[1];
 };
 
 template <class T>
@@ -54,6 +85,14 @@ inline CryptoBoardElmInfo* createCrytpElm(int nPeriod) {
 
 	return res;
 }
+
+inline RowBuffer* createRowBuffer(int nCell) {
+	auto res = (RowBuffer*)malloc(sizeof(RowBuffer) - sizeof(RowBuffer::rowData) + nCell * sizeof(RowBuffer::rowData[0]));
+	res->nCell = nCell;
+	res->cached = false;
+	return res;
+}
+
 
 void pushLog(int logLevel, const char* fmt, ...);
 
