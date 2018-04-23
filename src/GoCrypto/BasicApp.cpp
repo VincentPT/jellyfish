@@ -766,7 +766,7 @@ void BasicApp::setup()
 	_lastestMarketData.marketCapUSD = 0;
 	_controlBoard->setMarketData(&_lastestMarketData);
 
-	_priceTriggersEditor.setSize(500, 300);
+	_priceTriggersEditor.setSize(500, 350);
 	_priceTriggersEditor.setOnApplyButtonClickHandler([this](Widget*) {
 		auto& triggers = _priceTriggersEditor.getTriggers();
 		if (_platformRunner) {
@@ -777,7 +777,7 @@ void BasicApp::setup()
 		}
 	});
 
-	_volumeTriggersEditor.setSize(600, 400);
+	_volumeTriggersEditor.setSize(600, 370);
 	_volumeTriggersEditor.setOnApplyButtonClickHandler([this](Widget*) {
 		auto& triggers = _volumeTriggersEditor.getTriggers();
 		if (_platformRunner) {

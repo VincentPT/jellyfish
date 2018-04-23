@@ -12,6 +12,7 @@ WxVolumeTriggers::WxVolumeTriggers() : ImPopup("Volume triggers editor") {
 	// there is a bug if scrollbar is enable
 	// Luckily,for this window, we don't need scrollbars.
 	_window_flags |= ImGuiWindowFlags_NoScrollbar;
+	_window_flags |= ImGuiWindowFlags_NoResize;
 	_cellBuffer = createRowBuffer((int)_columns.size());
 }
 

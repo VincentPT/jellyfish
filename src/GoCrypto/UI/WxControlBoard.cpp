@@ -27,6 +27,8 @@ BarGUIItem barLengths1d[] = {
 	{ "4h", 4 * 3600 },
 	{ "1h", 1 * 3600 },
 	{ "30m", 30 * 60 },
+	{ "15m", 15 * 60 },
+	{ "10m", 10 * 60 },
 	{ "5m", 5 * 60 },
 	{ "2m", 2 * 60 },
 };
@@ -34,6 +36,8 @@ BarGUIItem barLengths1d[] = {
 BarGUIItem barLengths12h[] = {
 	{ "1h", 1 * 3600 },
 	{ "30m", 30 * 60 },
+	{ "15m", 15 * 60 },
+	{ "10m", 10 * 60 },
 	{ "5m", 5 * 60 },
 	{ "2m", 2 * 60 },
 	{ "1m", 1 * 60 },
@@ -41,6 +45,8 @@ BarGUIItem barLengths12h[] = {
 
 BarGUIItem barLengths4h[] = {
 	{ "30m", 30 * 60 },
+	{ "15m", 15 * 60 },
+	{ "10m", 10 * 60 },
 	{ "5m", 5 * 60 },
 	{ "2m", 2 * 60 },
 	{ "1m", 1 * 60 },
@@ -48,6 +54,7 @@ BarGUIItem barLengths4h[] = {
 };
 
 BarGUIItem barLengths1h[] = {
+	{ "10m", 10 * 60 },
 	{ "5m", 5 * 60 },
 	{ "2m", 2 * 60 },
 	{ "1m", 1 * 60 },
@@ -78,7 +85,7 @@ GraphLengthItem graphLengths[] = {
 	{ "7d", 7 * 24 * 3600, IM_ARRAYSIZE(barLengths7d), 4, barLengths7d },
 	{ "1d", 1 * 24 * 3600, IM_ARRAYSIZE(barLengths1d), 4, barLengths1d },
 	{ "12h", 12 * 3600, IM_ARRAYSIZE(barLengths12h), 3, barLengths12h },
-	{ "4h", 4 * 3600, IM_ARRAYSIZE(barLengths4h), 2, barLengths4h },
+	{ "4h", 4 * 3600, IM_ARRAYSIZE(barLengths4h), 3, barLengths4h },
 	{ "1h", 1 * 3600, IM_ARRAYSIZE(barLengths1h), 2, barLengths1h },
 	{ "30m", 30 * 60, IM_ARRAYSIZE(barLengths30m), 1, barLengths30m },
 	{ "5m", 5 * 60, IM_ARRAYSIZE(barLengths5m), 1, barLengths5m },
