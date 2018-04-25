@@ -43,6 +43,15 @@ extern std::string formatPrice(double price);
 
 const char* enableGUIComand = "show gui";
 
+const char* startStopButtonTexts[] = {"Start", "Starting...", "Stop", "Stopping..."};
+enum StartState : int {
+	NOT_STARTED = 0,
+	STARTING,
+	STARTED,
+	STOPING,
+};
+
+
 class BasicApp : public App {
 
 	typedef std::function<void()> Task;
@@ -83,6 +92,7 @@ class BasicApp : public App {
 
 	int _marketDataEventId = -1;
 	MarketData _lastestMarketData;
+	int _startStopButtonState = 0;
 public:
 	BasicApp();
 	~BasicApp();
@@ -124,6 +134,7 @@ public:
 	void enalbeServerMode(bool serverMode);
 	void initializeConsole();
 	void uninitializeConsole();
+	void setSSButtonState(int state);
 };
 
 void pushLog(int logLevel, const char* fmt, ...) {
@@ -580,13 +591,30 @@ void BasicApp::setup()
 		}
 	});
 
-	_controlBoard->setOnStartButtonClickHandler([this](Widget*) {
-		Task task = std::bind(&BasicApp::startServices, this);
-		_tasks.pushMessage(task);
+	_controlBoard->setOnStartStopButtonClickHandler([this](Widget*) {
+		if (StartState::NOT_STARTED == _startStopButtonState) {
+			setSSButtonState(StartState::STARTING);
+			Task task = std::bind(&BasicApp::startServices, this);
+			_tasks.pushMessage(task);
+		}
+		else if (StartState::STOPING == _startStopButtonState) {
+			pushLog((int)LogLevel::Error, "services are stoping, please wait\n");
+		}
+		else {
+			setSSButtonState(StartState::STOPING);
+			Task task = std::bind(&BasicApp::stopServices, this);
+			_tasks.pushMessage(task);
+		}
+		
 	});
-	_controlBoard->setOnStopButtonClickHandler([this](Widget*) {
-		Task task = std::bind(&BasicApp::stopServices, this);
-		_tasks.pushMessage(task);
+	_controlBoard->setOnForceLoadClickHandler([this](Widget*) {
+		if (_platformRunner == nullptr) return;
+		const char* symbol = _cryptoBoard->getSelectedSymbol();
+		if (symbol == nullptr) {
+			pushLog((int)LogLevel::Error, "You must select a symbol for this operation\n");
+			return;
+		}
+		_platformRunner->setSymbolRequestHitoriesHighPriority(symbol);
 	});
 
 	_controlBoard->setOnExportButtonClickHandler([this](Widget*) {
@@ -765,6 +793,7 @@ void BasicApp::setup()
 	_lastestMarketData.at = 0;
 	_lastestMarketData.marketCapUSD = 0;
 	_controlBoard->setMarketData(&_lastestMarketData);
+	setSSButtonState(StartState::NOT_STARTED);
 
 	_priceTriggersEditor.setSize(500, 350);
 	_priceTriggersEditor.setOnApplyButtonClickHandler([this](Widget*) {
@@ -838,6 +867,11 @@ void BasicApp::createCandleWindow() {
 void BasicApp::startServices() {
 	LOG_SCOPE_ACCESS(_logAdapter, __FUNCTION__);
 	pushLog((int)LogLevel::Info, "starting services...\n");
+
+	std::unique_ptr<void, std::function<void(void*)>> scopedFinishState((void*)1, [this](void*) {
+		setSSButtonState(StartState::STARTED);
+	});
+
 	if (_platformRunner) {
 		pushLog((int)LogLevel::Error, "services have been already started\n");
 		return;
@@ -898,6 +932,9 @@ void BasicApp::startServices() {
 void BasicApp::stopServices() {
 	LOG_SCOPE_ACCESS(_logAdapter, __FUNCTION__);
 	pushLog((int)LogLevel::Info, "stopping services...\n");
+	std::unique_ptr<void, std::function<void(void*)>> scopedFinishState((void*)1, [this](void*) {
+		setSSButtonState(StartState::NOT_STARTED);
+	});
 	if (!_platformRunner) {
 		pushLog((int)LogLevel::Error, "services are not running\n");
 		return;
@@ -1388,6 +1425,11 @@ TIMESTAMP BasicApp::getLiveTime() {
 	return liveTime;
 }
 
+void BasicApp::setSSButtonState(int state) {
+	_startStopButtonState = state;
+	_controlBoard->setStarStopButtonText(startStopButtonTexts[state]);
+}
+
 void BasicApp::update()
 {
 	FUNCTON_LOG();
@@ -1427,6 +1469,43 @@ void BasicApp::draw()
 	//}
 	//else {
 		gl::clear(ColorA::black());
+
+		if (_topCotrol == _panel.get()) {
+			std::string marketCap("market cap:  ");
+			std::string volume24h("24h volume:  ");
+			std::string lastUpdate("last update: ");
+
+			if (_lastestMarketData.at == 0) {
+				marketCap += "N/A";
+				lastUpdate += "N/A";
+				volume24h += "N/A";
+			}
+			else {
+				lastUpdate += Utility::time2strInSeconds(_lastestMarketData.at);
+
+				std::stringstream ss;
+				ss.imbue(std::locale(""));
+				ss << ((__int64)_lastestMarketData.marketCapUSD);
+				marketCap += ss.str();
+
+				ss.str(std::string());
+				ss << ((__int64)_lastestMarketData.volume24h);
+				volume24h += ss.str();
+			}
+
+			ColorA8u color(0, 255, 0);
+			constexpr float fontSize = 18;
+			ci::Font font("Arial", fontSize);
+			gl::color(color);
+
+			float xBegin = _graph->getGraphRegion().x2 - 200;
+			float yBegin = _graph->getY() + _graph->getGraphRegion().y1;
+
+			gl::drawString(marketCap, glm::vec2(xBegin, yBegin), color, font);
+			gl::drawString(volume24h, glm::vec2(xBegin, yBegin + fontSize), color, font);
+			gl::drawString(lastUpdate, glm::vec2(xBegin, yBegin + 2 * fontSize), color, font);
+		}
+
 		_topCotrol->draw();
 
 		if (_barChart) {

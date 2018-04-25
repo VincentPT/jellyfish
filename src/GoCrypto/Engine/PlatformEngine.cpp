@@ -533,7 +533,6 @@ void PlatformEngine::updateSymbolStatistics(CryptoBoardElmInfo* info, const std:
 
 void PlatformEngine::onTrade(int i, NAPMarketEventHandler* sender, TradeItem* incommingTrades, int count, bool snapshot) {
 	auto& trades = sender->getTradeHistoriesNonSync();
-
 	if (incommingTrades == nullptr || count == 0) return;
 
 	auto& tickers = _symbolsTickers[i];
@@ -707,27 +706,48 @@ void PlatformEngine::onTrade(int i, NAPMarketEventHandler* sender, TradeItem* in
 	CryptoBoardElmInfo* info = _symbolsStatistics[i];
 	info->price = trades.front().price;
 	info->volume = fabs(trades.front().amount);
-	// only request snapshot for trade when first trade history return
-	// to ensure the trade historys in local is fully and continous
-	if (_sentTradeSnapshotRequest.find(sender->getPair()) == _sentTradeSnapshotRequest.end()) {
-		TIMESTAMP tEnd = 0;
-		TIMESTAMP duration = 0;
 
-		for (auto it = _periods.begin(); it != _periods.end(); it++) {
-			duration += it->durationInSecs * 1000;
-		}
-		if (trades.size()) {
-			tEnd = trades.back().timestamp;
-			duration -= trades.front().timestamp - tEnd;
-		}
-		RequestEventHistoryMessage message;
-		message.pair = sender->getPair();
-		message.duration = duration;
-		message.endTime = tEnd;
-		message.eventType = EventHistoryType::TradeHistory;
+	{
+		std::unique_lock<std::mutex> lk(_symboRequestslMutex);
+		// it should only request snapshot for trade when first trade history return
+		// to ensure the trade historys in local is fully and continous
+		// try to insert a request and mark this request is executed on trade event
+		auto it = _sentTradeSnapshotRequest.insert(std::make_pair(sender->getPair(), 0));
+		if (it.second) {
+			TIMESTAMP tEnd = 0;
+			TIMESTAMP duration = 0;
 
-		_sentTradeSnapshotRequest[sender->getPair()] = true;
-		_symbolQueue.pushMessage(message);
+			for (auto it = _periods.begin(); it != _periods.end(); it++) {
+				duration += it->durationInSecs * 1000;
+			}
+			if (trades.size()) {
+				tEnd = trades.back().timestamp;
+				duration -= trades.front().timestamp - tEnd;
+			}
+			RequestEventHistoryMessage message;
+			message.pair = sender->getPair();
+			message.duration = duration;
+			message.endTime = tEnd;
+			message.eventType = EventHistoryType::TradeHistory;
+
+			_symbolQueue.pushMessage(message);
+		}
+		else if (it.first->second != 0) {
+			auto requestedHistoryEndAt = it.first->second;
+			if (requestedHistoryEndAt < pTradeItemStart->timestamp) {
+				// request trade histories to fill gaps between manual trade request and last trade event
+				RequestEventHistoryMessage message;
+				message.pair = sender->getPair();
+				message.endTime = pTradeItemStart->timestamp;
+				message.duration = message.endTime - requestedHistoryEndAt;
+				message.eventType = EventHistoryType::TradeHistory;
+
+				_symbolQueue.pushMessage(message);
+				pushLog((int)LogLevel::Info, "send request trade history to fill gap for %s\n", sender->getPair());
+			}
+			// mark this request is executed on trade event
+			it.first->second = 0;
+		}
 	}
 	
 	//analyze tickers for notification
@@ -766,25 +786,49 @@ bool PlatformEngine::measureVolumeInPeriod(
 }
 
 void PlatformEngine::onCandle(int i, NAPMarketEventHandler* sender, CandleItem* candleItems, int count, bool snapshot) {
-	auto it = _sentCandleSnapshotRequest.insert(std::make_pair(sender->getPair(), 0));
-	if (it.second || (it.first->second < 7 && snapshot)) {
-		auto& candleItems = sender->getCandleHistoriesNonSync();
-		if (candleItems.size()) {
-			//TIMESTAMP tEnd = candleItems.back().timestamp - 1;
-			//TIMESTAMP duration = 24 * 3600 * 1000 - (candleItems.front().timestamp - tEnd);
+	{
+		std::unique_lock<std::mutex> lk(_symboRequestslMutex);
+		// try to insert a request and mark this request is executed on trade event
+		auto rit = _sentCandleSnapshotRequest.insert(std::make_pair(sender->getPair(), 0));
+		if (rit.second) {
+			auto& candleItems = sender->getCandleHistoriesNonSync();
+			if (candleItems.size()) {
+				//TIMESTAMP tEnd = candleItems.back().timestamp - 1;
+				//TIMESTAMP duration = 24 * 3600 * 1000 - (candleItems.front().timestamp - tEnd);
 
-			TIMESTAMP tEnd = candleItems.back().timestamp - 1;
-			TIMESTAMP duration = 24 * 3600 * 1000;
+				TIMESTAMP tEnd = candleItems.back().timestamp - 1;
+				TIMESTAMP duration = 7 * 24 * 3600 * 1000;
 
-			RequestEventHistoryMessage message;
-			message.pair = sender->getPair();
-			message.duration = duration;
-			message.endTime = tEnd;
-			message.eventType = EventHistoryType::CandleHistory;
+				RequestEventHistoryMessage message;
+				message.pair = sender->getPair();
+				message.duration = duration;
+				message.endTime = tEnd;
+				message.eventType = EventHistoryType::CandleHistory;
 
-			_symbolQueue.pushMessage(message);
+				_symbolQueue.pushMessage(message);
+			}
+		}
+		else if (rit.first->second != 0) {
+			auto& candleItems = sender->getCandleHistoriesNonSync();
+			if (candleItems.size() == 0) {
+				return;
+			}
+			auto& lastItem = candleItems.back();
 
-			it.first->second++;
+			auto requestedHistoryEndAt = rit.first->second;
+			if (requestedHistoryEndAt < lastItem.timestamp) {
+				// request trade histories to fill gaps between manual trade request and last trade event
+				RequestEventHistoryMessage message;
+				message.pair = sender->getPair();
+				message.endTime = lastItem.timestamp;
+				message.duration = message.endTime - requestedHistoryEndAt;
+				message.eventType = EventHistoryType::CandleHistory;
+
+				_symbolQueue.pushMessage(message);
+				pushLog((int)LogLevel::Info, "send request trade history to fill gap for %s\n", sender->getPair());
+			}
+			// mark this request is executed on trade event
+			rit.first->second = 0;
 		}
 	}
 
@@ -947,6 +991,73 @@ void PlatformEngine::onCandle(int i, NAPMarketEventHandler* sender, CandleItem* 
 				lastProcessingTime = timePoint;
 			}
 		}
+	}
+}
+
+void PlatformEngine::setSymbolRequestHitoriesHighPriority(const std::string& symbol) {
+	std::unique_lock<std::mutex> lk(_symboRequestslMutex);
+
+	auto currentTimeStamp = getCurrentTimeStamp();
+
+	// try to insert a request and mark this request is executed on candle event
+	auto rit = _sentCandleSnapshotRequest.insert(std::make_pair(symbol, currentTimeStamp));
+
+	int sentCount = 0;
+
+	// check if candle histories request was not sent
+	if (rit.second) {
+		TIMESTAMP tEnd = currentTimeStamp;
+		TIMESTAMP duration = 7 * 24 * 3600 * 1000;
+
+		RequestEventHistoryMessage message;
+		message.pair = symbol;
+		message.duration = duration;
+		message.endTime = tEnd;
+		message.eventType = EventHistoryType::CandleHistory;
+
+		_symbolQueue.pushMessageFront(message);
+		pushLog((int)LogLevel::Info, "candle request was pushed at the highest priority\n");
+		sentCount++;
+	}
+	auto cit = _sentTradeSnapshotRequest.insert(std::make_pair(symbol, currentTimeStamp));
+	// check if trade histories request was not sent
+	if (cit.second) {
+		TIMESTAMP duration = 0;
+		for (auto it = _periods.begin(); it != _periods.end(); it++) {
+			duration += it->durationInSecs * 1000;
+		}
+
+		RequestEventHistoryMessage message;
+		message.pair = symbol;
+		message.duration = duration;
+		message.endTime = currentTimeStamp;
+		message.eventType = EventHistoryType::TradeHistory;
+
+		_symbolQueue.pushMessage(message);
+
+		pushLog((int)LogLevel::Info, "trade request was pushed at the highest priority\n");
+		sentCount++;
+	}
+	if (sentCount == 2) return;
+
+	std::list<RequestEventHistoryMessage> requestMessages;
+	// remove all candle request message for this symbol
+	_symbolQueue.removeMessage([&requestMessages, &symbol](RequestEventHistoryMessage& requestMessage) {
+		if (requestMessage.pair == symbol) {
+			requestMessages.push_back(requestMessage);
+			return true;
+		}
+		return false;
+	});
+
+	if (requestMessages.size()) {
+		for (auto it = requestMessages.rbegin(); it != requestMessages.rend(); it++) {
+			_symbolQueue.pushMessageFront(*it);
+		}
+		pushLog((int)LogLevel::Info,  "request for %s was re-arranged at the highest priority\n", symbol.c_str());
+	}
+	else {
+		pushLog((int)LogLevel::Error, "request for %s is executing or was executed completed\n", symbol.c_str());
 	}
 }
 

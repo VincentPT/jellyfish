@@ -92,6 +92,7 @@ GraphLengthItem graphLengths[] = {
 	{ "1m", 1 * 60, IM_ARRAYSIZE(barLengths1m), 0, barLengths1m },
 };
 
+#define START_STOP_BUTTON_ID "StartStop"
 
 WxControlBoard::WxControlBoard(const std::vector<std::string>& platforms) : _checkedButton(-1), _currentGraphLength(1), _barLengthIdx(-1), _pMarketData(nullptr)
 {
@@ -110,6 +111,8 @@ WxControlBoard::WxControlBoard(const std::vector<std::string>& platforms) : _che
 	}
 
 	_filterBuffer[0] = 0;
+
+	setStarStopButtonText("");
 }
 
 
@@ -148,16 +151,18 @@ void WxControlBoard::update() {
 		}
 		ImGui::Separator();
 	}
-
-	if (ImGui::Button("start", ImVec2(120 + widthAutoFilledLength, 35))) {
+	_starStopButtonStrMutex.lock();
+	auto tempButtonStr = _starStopButtonStr;
+	_starStopButtonStrMutex.unlock();
+	if (ImGui::Button(tempButtonStr.c_str(), ImVec2(120 + widthAutoFilledLength, 35))) {
 		if (_startButtonClickHandler) {
 			_startButtonClickHandler(this);
 		}
 	}
 
-	if (ImGui::Button("stop", ImVec2(120 + widthAutoFilledLength, 35))) {
-		if (_stopButtonClickHandler) {
-			_stopButtonClickHandler(this);
+	if (ImGui::Button("Load symbol", ImVec2(120 + widthAutoFilledLength, 35))) {
+		if (_forceLoadButtonClickHandler) {
+			_forceLoadButtonClickHandler(this);
 		}
 	}
 
@@ -318,12 +323,12 @@ void WxControlBoard::update() {
 	ImGui::End();
 }
 
-void WxControlBoard::setOnStartButtonClickHandler(ButtonClickEventHandler&& handler) {
+void WxControlBoard::setOnStartStopButtonClickHandler(ButtonClickEventHandler&& handler) {
 	_startButtonClickHandler = handler;
 }
 
-void WxControlBoard::setOnStopButtonClickHandler(ButtonClickEventHandler&& handler) {
-	_stopButtonClickHandler = handler;
+void WxControlBoard::setOnForceLoadClickHandler(ButtonClickEventHandler&& handler) {
+	_forceLoadButtonClickHandler = handler;
 }
 
 void WxControlBoard::setOnExportButtonClickHandler(ButtonClickEventHandler&& handler) {
@@ -403,4 +408,10 @@ const char* WxControlBoard::getFilterText() const {
 
 void WxControlBoard::setMarketData(const MarketData* data) {
 	_pMarketData = data;
+}
+
+void WxControlBoard::setStarStopButtonText(const char* buttonText) {
+	std::unique_lock<std::mutex> lk(_starStopButtonStrMutex);
+	_starStopButtonStr = buttonText;
+	_starStopButtonStr.append("##" START_STOP_BUTTON_ID);
 }

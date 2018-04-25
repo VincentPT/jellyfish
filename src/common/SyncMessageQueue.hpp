@@ -18,6 +18,12 @@ public:
 		_hasMessageCV.notify_one();
 	}
 
+	void pushMessageFront(const T& message) {
+		std::lock_guard<std::mutex> lk(_messageQueueMutex);
+		_messageQueue.push_front(message);
+		_hasMessageCV.notify_one();
+	}
+
 	void popMessage(T& message) {
 		std::unique_lock<std::mutex> lk(_messageQueueMutex);
 		_hasMessageCV.wait(lk, [this, &message] {
@@ -46,6 +52,12 @@ public:
 		});
 
 		return res;
+	}
+
+	template <class Fx>
+	void removeMessage(Fx fx) {
+		std::unique_lock<std::mutex> lk(_messageQueueMutex);
+		_messageQueue.remove_if(fx);
 	}
 
 	void clear() {

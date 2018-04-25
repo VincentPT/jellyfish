@@ -11,7 +11,7 @@ class WxControlBoard :
 	public ImWidget
 {
 	ButtonClickEventHandler _startButtonClickHandler;
-	ButtonClickEventHandler _stopButtonClickHandler;
+	ButtonClickEventHandler _forceLoadButtonClickHandler;
 	ButtonClickEventHandler _exportButtonClickHandler;
 	ButtonClickEventHandler _selectedCurrencyChangedHandler;
 	ButtonClickEventHandler _priceNotificationChangedHandler;
@@ -31,6 +31,9 @@ class WxControlBoard :
 	mutable std::mutex _mutex;
 	char _filterBuffer[16];
 
+	mutable std::mutex _starStopButtonStrMutex;
+	std::string _starStopButtonStr;
+
 	const MarketData* _pMarketData;
 public:
 	WxControlBoard(const std::vector<std::string>& platforms);
@@ -38,8 +41,8 @@ public:
 
 	virtual void update();
 
-	void setOnStartButtonClickHandler(ButtonClickEventHandler&& handler);
-	void setOnStopButtonClickHandler(ButtonClickEventHandler&& handler);
+	void setOnStartStopButtonClickHandler(ButtonClickEventHandler&& handler);
+	void setOnForceLoadClickHandler(ButtonClickEventHandler&& handler);
 	void setOnExportButtonClickHandler(ButtonClickEventHandler&& handler);
 	void setOnPriceTriggersButtonClickHandler(ButtonClickEventHandler&& handler);
 	void setOnVolumeTriggersButtonClickHandler(ButtonClickEventHandler&& handler);
@@ -59,5 +62,6 @@ public:
 	int getCurrentBarTime() const;
 	const char* getFilterText() const;
 	void setMarketData(const MarketData* data);
+	void setStarStopButtonText(const char* buttonText);
 };
 

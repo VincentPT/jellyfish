@@ -91,8 +91,9 @@ private:
 
 	typedef std::map<TRADE_ID, char> TradeLevelMap;
 	std::map<std::string, std::shared_ptr<TradeLevelMap>> _processLevelMap;
-	std::map<std::string, bool> _sentTradeSnapshotRequest;
-	std::map<std::string, int> _sentCandleSnapshotRequest;
+	std::mutex _symboRequestslMutex;
+	std::map<std::string, TIMESTAMP> _sentTradeSnapshotRequest;
+	std::map<std::string, TIMESTAMP> _sentCandleSnapshotRequest;
 	std::future<void> _sendTradeHistoryRequestLoop;
 	SymbolStatisticUpdatedHandler _onSymbolStatisticUpdated;
 	bool _priceNotificationEnable = false;
@@ -147,6 +148,7 @@ public:
 
 	void setVolumeTriggers(const std::vector<TriggerVolumeBaseItem>& triggers);
 	const std::vector<TriggerVolumeBaseItem>& getVolumeTriggers() const;
+	void setSymbolRequestHitoriesHighPriority(const std::string& symbol);
 };
 
 typedef std::shared_ptr<Notifier> TraderRef;

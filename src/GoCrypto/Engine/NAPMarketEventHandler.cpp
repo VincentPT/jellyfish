@@ -135,7 +135,6 @@ void NAPMarketEventHandler::onCandlesUpdate(CandleItem* candles, int count, bool
 }
 
 void NAPMarketEventHandler::onTradesUpdate(TradeItem* trades, int count, bool snapShot) {
-
 	std::unique_lock<std::mutex> lk(_m);
 	if (trades == nullptr) return;
 	if (_tradeHistory.size() == 0) {
