@@ -16,8 +16,8 @@ Chart only mode(double click on chart's area).
 Server mode(double click on application log's area).  
 ![Servermode](/docs/GoCrypto-server-mode.jpg)
 
-Volume movment triggered
-![chartView](/docs/volume_movement_triggered_sample.JPG)
+Volume movement trigger  
+An notification was pushed at 11:51:00 04/26/2018 when volume movement of symbol KNCBTC was triggered.  
 ![notificationview](/docs/notification_sample.JPG)
 
 1. platform name(platform's config file name without extension)  
