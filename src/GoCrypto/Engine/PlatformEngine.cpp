@@ -20,6 +20,10 @@ using namespace std;
 
 #define TICKER_INTERVAL_DEFAULT 5000
 
+#ifdef min
+#undef min
+#endif
+
 using namespace std::chrono;
 using namespace std;
 typedef  TradingPlatform* (*CreatePlatformInstanceF)();
@@ -84,6 +88,17 @@ PlatformEngine::PlatformEngine(const char* configFile) : _runFlag(false), _hLib(
 				}
 				else {
 					volumeBaseTrigger.priceChangedThreshold = -1;
+				}
+				if (volumeTrigger.find(U("symbolFilter")) != volumeTrigger.end()) {
+					auto symbolFilter = CPPREST_FROM_STRING(volumeTrigger[U("symbolFilter")].as_string());
+					std::transform(symbolFilter.begin(), symbolFilter.begin(), symbolFilter.begin(), ::toupper);
+
+					memcpy(volumeBaseTrigger.symbolFilter, symbolFilter.c_str(),
+						std::min(symbolFilter.size() + 1, sizeof(volumeBaseTrigger.symbolFilter))
+					);
+				}
+				else {
+					volumeBaseTrigger.symbolFilter[0] = 0;
 				}
 
 				_volumeBaseTriggers.push_back(volumeBaseTrigger);
@@ -281,7 +296,7 @@ void PlatformEngine::updateMarketData() {
 	unsigned int sleepTime;
 
 	// don't request market data too much time per one minute
-	TIMESTAMP interval = 10 * 1000;
+	TIMESTAMP interval = 30 * 1000;
 
 	client::http_client_config config;
 	// 5 seconds timeout
@@ -945,17 +960,19 @@ void PlatformEngine::onCandle(int i, NAPMarketEventHandler* sender, CandleItem* 
 					}
 					triggerIt = jt;
 
-					if (volumeChange >= jt->volumeChangedThreshold) {
-						if (jt->priceChangedThreshold <= 0 || std::abs(priceChanged) >= jt->priceChangedThreshold) {
-							// convert price to BTC to check minium volume base on BTC on the period
-							if (convertedPrice <= 0) {
-								convertPrice(symbol, baseCurrency, originCrytoInfo->price, convertedPrice);
-							}
-							if (convertedPrice > 0) {
-								// trading volume must larger than a specific amount of BTC to trigger notification
-								if (largerVolume * convertedPrice >= jt->miniumVolumeInBTC) {
-									passedAllCondition = true;
-									break;
+					if (jt->symbolFilter[0] == 0 || strcmp(jt->symbolFilter, symbol) == 0) {
+						if (volumeChange >= jt->volumeChangedThreshold) {
+							if (jt->priceChangedThreshold <= 0 || std::abs(priceChanged) >= jt->priceChangedThreshold) {
+								// convert price to BTC to check minium volume base on BTC on the period
+								if (convertedPrice <= 0) {
+									convertPrice(symbol, baseCurrency, originCrytoInfo->price, convertedPrice);
+								}
+								if (convertedPrice > 0) {
+									// trading volume must larger than a specific amount of BTC to trigger notification
+									if (largerVolume * convertedPrice >= jt->miniumVolumeInBTC) {
+										passedAllCondition = true;
+										break;
+									}
 								}
 							}
 						}

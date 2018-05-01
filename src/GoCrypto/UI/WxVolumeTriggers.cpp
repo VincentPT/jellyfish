@@ -3,10 +3,11 @@
 
 WxVolumeTriggers::WxVolumeTriggers() : ImPopup("Volume triggers editor") {
 	_columns = {
-		{ "duration", 80, 0 },
-		{ "volume changed threhold", 180, 1 },
+		{ "duration(*)", 80, 0 },
+		{ "volume changed threhold(*)", 190, 1 },
 		{ "price changed threshold", 180, 2 },
-		{ "minium volume(BTC)", 180, 3 },
+		{ "minium volume(BTC)(*)", 155, 3 },
+		{ "apply to", 90, 4 },
 	};
 
 	// there is a bug if scrollbar is enable
@@ -60,7 +61,7 @@ void WxVolumeTriggers::updateContent()
 	}
 
 	int ITEMS_COUNT = (int)_triggers.size();
-	auto dataGridHeight = std::min(itemHeight*ITEMS_COUNT + 20, 200.0f);
+	auto dataGridHeight = 190.0f;
 
 	if (ImGui::BeginChild("##ScrollingRegion", ImVec2(0, (int)dataGridHeight), false, ImGuiWindowFlags_HorizontalScrollbar)) {
 		ImGui::Columns((int)_columns.size());
@@ -80,6 +81,12 @@ void WxVolumeTriggers::updateContent()
 				sprintf(rowBuffer->rowData[1].data, "%.0f", trigger.volumeChangedThreshold);
 				sprintf(rowBuffer->rowData[2].data, "%.1f", trigger.priceChangedThreshold);
 				sprintf(rowBuffer->rowData[3].data, "%.2f", trigger.miniumVolumeInBTC);
+				if (trigger.symbolFilter[0] == 0) {
+					sprintf(rowBuffer->rowData[4].data, "any");
+				}
+				else {
+					sprintf(rowBuffer->rowData[4].data, "%s", &trigger.symbolFilter[0]);
+				}
 
 				offset = 0.0f;
 				std::string selectableLabel = rowBuffer->rowData[j].data;
@@ -114,15 +121,27 @@ void WxVolumeTriggers::updateContent()
 
 	if (pItem) {
 		ImGui::InputInt(_columns[0].label.c_str(), &pItem->measureDuration, 0, 0, flags);
+		ImGui::Separator();
 		ImGui::InputFloat(_columns[1].label.c_str(), &pItem->volumeChangedThreshold, 0, 0, 0, flags);
+		ImGui::Separator();
 		ImGui::InputFloat(_columns[2].label.c_str(), &pItem->priceChangedThreshold, 0, 0, 1, flags);
+		ImGui::Separator();
 		ImGui::InputFloat(_columns[3].label.c_str(), &pItem->miniumVolumeInBTC, 0, 0, 2, flags);
+		ImGui::Separator();
+		ImGui::InputText(_columns[4].label.c_str(), pItem->symbolFilter, sizeof(TriggerVolumeBaseItem::symbolFilter), ImGuiInputTextFlags_CharsUppercase);
+		ImGui::Separator();
 	}
 	else {
 		ImGui::LabelText(_columns[0].label.c_str(), "");
+		ImGui::Separator();
 		ImGui::LabelText(_columns[1].label.c_str(), "");
+		ImGui::Separator();
 		ImGui::LabelText(_columns[2].label.c_str(), "");
+		ImGui::Separator();
 		ImGui::LabelText(_columns[3].label.c_str(), "");
+		ImGui::Separator();
+		ImGui::LabelText(_columns[4].label.c_str(), "");
+		ImGui::Separator();
 	}
 
 	if (ImGui::Button("add", ImVec2(100, 20))) {
@@ -131,6 +150,7 @@ void WxVolumeTriggers::updateContent()
 		editingItem.miniumVolumeInBTC = 2;
 		editingItem.priceChangedThreshold = -1;
 		editingItem.volumeChangedThreshold = 600;
+		editingItem.symbolFilter[0] = 0;
 
 		_triggers.push_back(editingItem);
 		_selectedItemIdx = (int)_triggers.size() - 1;
@@ -143,6 +163,11 @@ void WxVolumeTriggers::updateContent()
 			}
 			_triggers.erase(_triggers.begin() + selectedItem);
 		}
+	}
+	ImGui::SameLine();
+	if (ImGui::Button("clear", ImVec2(100, 20))) {
+		_triggers.clear();
+		_selectedItemIdx = -1;
 	}
 	ImGui::SameLine();
 	if (ImGui::Button("apply&close", ImVec2(100, 20))) {

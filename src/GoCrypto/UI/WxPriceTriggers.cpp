@@ -3,9 +3,9 @@
 
 WxPriceTriggers::WxPriceTriggers() : ImPopup("Volume triggers editor") {
 	_columns = {
-		{ "start time", 120, 0 },
-		{ "end time", 120, 1 },
-		{ "price changed/min", 180, 2 },
+		{ "start time(*)", 120, 0 },
+		{ "end time(*)", 120, 1 },
+		{ "price changed/min(*)", 180, 2 },
 	};
 
 	// there is a bug if scrollbar is enable
@@ -58,7 +58,7 @@ void WxPriceTriggers::updateContent()
 	}
 
 	int ITEMS_COUNT = (int)_triggers.size();
-	auto dataGridHeight = std::min(itemHeight*ITEMS_COUNT + 20, 200.0f);
+	auto dataGridHeight = 190.0f;
 
 	if (ImGui::BeginChild("##ScrollingRegion", ImVec2(0, (int)dataGridHeight), false, ImGuiWindowFlags_HorizontalScrollbar)) {
 		ImGui::Columns((int)_columns.size());
@@ -112,13 +112,19 @@ void WxPriceTriggers::updateContent()
 
 	if (pItem) {
 		ImGui::InputInt(_columns[0].label.c_str(), &pItem->startTime, 0, 0, flags);
+		ImGui::Separator();
 		ImGui::InputInt(_columns[1].label.c_str(), &pItem->endTime, 0, 0, flags);
+		ImGui::Separator();
 		ImGui::InputFloat(_columns[2].label.c_str(), &pItem->priceChangePerMin, 0, 0, 4, flags);
+		ImGui::Separator();
 	}
 	else {
 		ImGui::LabelText(_columns[0].label.c_str(), "");
+		ImGui::Separator();
 		ImGui::LabelText(_columns[1].label.c_str(), "");
+		ImGui::Separator();
 		ImGui::LabelText(_columns[2].label.c_str(), "");
+		ImGui::Separator();
 	}
 
 	if (ImGui::Button("add", ImVec2(100, 20))) {
@@ -138,6 +144,11 @@ void WxPriceTriggers::updateContent()
 			}
 			_triggers.erase(_triggers.begin() + selectedItem);
 		}
+	}
+	ImGui::SameLine();
+	if (ImGui::Button("clear", ImVec2(100, 20))) {
+		_triggers.clear() ;
+		_selectedItemIdx = -1;
 	}
 	ImGui::SameLine();
 	if (ImGui::Button("apply&close", ImVec2(100, 20))) {

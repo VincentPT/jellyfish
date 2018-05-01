@@ -40,6 +40,7 @@ struct ColumnHeader
 };
 
 struct TriggerVolumeBaseItem {
+	char symbolFilter[32];
 	int measureDuration;
 	float volumeChangedThreshold;
 	float priceChangedThreshold;
