@@ -1,5 +1,6 @@
 # jellyfish
-A crypto application to help people in trading by showing and analyzing crypto's information.
+A crypto application to help people in trading crypto currencies.
+The application can monitors cryto information and push notifications of price movement to help people catch the wave before it go to top.
 
 ## Getting Started
 [Application binaries - v1.0.1.zip](/binaries/v1.0.1.zip)
@@ -43,7 +44,7 @@ Average prices for specific periods.
 Total volume of base symbol exchanged for specific periods.  
 
 13. Buy Per Shell.  
-Ratio in percent of bought volume per sold volume.
+Ratio in percent of taker's volume per maker's volume.
 
 15. Notification.  
 Notification through PushOver platform.
