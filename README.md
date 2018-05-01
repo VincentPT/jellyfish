@@ -48,7 +48,7 @@ Ratio in percent of bought volume per sold volume.
 15. Notification.  
 Notification through PushOver platform.
 
-
+#### Other screens
 Chart only mode(double click on chart's area).  
 ![Charts](/docs/GoCrypto-graph-only.jpg)
 
