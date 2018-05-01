@@ -627,7 +627,7 @@ void BasicApp::setup()
 
 			ofstream fs;
 			string fileName(symbol);
-			fileName.append(".csv");
+			fileName.append("_tickerUIs.csv");
 			fs.open(fileName, std::ios::out);
 			if (fs.is_open()) {
 
@@ -641,22 +641,40 @@ void BasicApp::setup()
 					fs << ticker.averagePrice << std::endl;
 				}
 			}
-
-			// export candles
+			
 			auto handler  = (NAPMarketEventHandler*) _platformRunner->getPlatform()->getHandler(symbol);
 			if (handler) {
+				// export trades
+				handler->accessSharedData([](NAPMarketEventHandler* sender) {
+					auto& trades = sender->getTradeHistoriesNonSync();
+
+					ofstream fs;
+					string fileName(sender->getPair());
+					fileName.append("_trades.csv");
+					fs.open(fileName, std::ios::out);
+					if (fs.is_open()) {
+						fs << "time,price,amount,id" << std::endl;
+						for (auto it = trades.begin(); it != trades.end(); it++) {
+							auto& item = *it;
+
+							fs << Utility::time2str(item.timestamp) << ", " << item.price << ", " << item.amount << ", " << item.oderId << endl;
+						}
+					}
+				});
+				// export candles
 				handler->accessSharedData([](NAPMarketEventHandler* sender) {
 					auto& candles = sender->getCandleHistoriesNonSync();
 
 					ofstream fs;
 					string fileName(sender->getPair());
-					fileName.append("_candles.txt");
+					fileName.append("_candles.csv");
 					fs.open(fileName, std::ios::out);
 					if (fs.is_open()) {
+						fs << "time,open,close,high,low,volume" << std::endl;
 						for (auto it = candles.begin(); it != candles.end(); it++) {
 							auto& item = *it;
 
-							fs << "{" << Utility::time2str(item.timestamp) << ", " << item.open << ", " << item.close << ", " << item.high << ", " << item.low << ", " << item.volume << "}" << endl;
+							fs << Utility::time2str(item.timestamp) << ", " << item.open << ", " << item.close << ", " << item.high << ", " << item.low << ", " << item.volume << endl;
 						}
 					}
 				});
@@ -795,7 +813,7 @@ void BasicApp::setup()
 	_controlBoard->setMarketData(&_lastestMarketData);
 	setSSButtonState(StartState::NOT_STARTED);
 
-	_priceTriggersEditor.setSize(500, 350);
+	_priceTriggersEditor.setSize(550, 360);
 	_priceTriggersEditor.setOnApplyButtonClickHandler([this](Widget*) {
 		auto& triggers = _priceTriggersEditor.getTriggers();
 		if (_platformRunner) {
@@ -806,7 +824,7 @@ void BasicApp::setup()
 		}
 	});
 
-	_volumeTriggersEditor.setSize(600, 370);
+	_volumeTriggersEditor.setSize(730, 380);
 	_volumeTriggersEditor.setOnApplyButtonClickHandler([this](Widget*) {
 		auto& triggers = _volumeTriggersEditor.getTriggers();
 		if (_platformRunner) {
