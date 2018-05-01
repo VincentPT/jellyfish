@@ -2,13 +2,23 @@
 A crypto application to help people in trading by showing and analyzing crypto's information.
 
 ## Getting Started
-[Application binaries - v1.0.0.zip](/binaries/v1.0.1.zip)
+[Application binaries - v1.0.1.zip](/binaries/v1.0.1.zip)
 
 Application screen.  
 ![Application screen](/docs/GoCrypto-with-marks.jpg)
 
 Mobile notification.  
 ![Notification](/docs/notifications.jpg)
+
+Chart only mode(double click on chart's area).  
+![Charts](/docs/GoCrypto-graph-only.jpg)
+
+Server mode(double click on application log's area).  
+![Servermode](/docs/GoCrypto-server-mode.jpg)
+
+Volume movement trigger  
+An notification was pushed at 11:51:00 04/26/2018 when volume movement of symbol KNCBTC was triggered.  
+![notificationview](/docs/notification_sample.JPG)
 
 1. platform name(platform's config file name without extension)  
 platform name list is loaded in forlder ./platforms in binaries folder.
