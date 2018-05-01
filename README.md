@@ -2,13 +2,23 @@
 A crypto application to help people in trading by showing and analyzing crypto's information.
 
 ## Getting Started
-[Application binaries - v1.0.0.zip](/binaries/v1.0.1.zip)
+[Application binaries - v1.0.1.zip](/binaries/v1.0.1.zip)
 
 Application screen.  
 ![Application screen](/docs/GoCrypto-with-marks.jpg)
 
 Mobile notification.  
 ![Notification](/docs/notifications.jpg)
+
+Chart only mode(double click on chart's area).  
+![Charts](/docs/GoCrypto-graph-only.jpg)
+
+Server mode(double click on application log's area).  
+![Servermode](/docs/GoCrypto-server-mode.jpg)
+
+Volume movment triggered
+![chartView](/docs/volume_movement_triggered_sample.JPG)
+![notificationview](/docs/notification_sample.JPG)
 
 1. platform name(platform's config file name without extension)  
 platform name list is loaded in forlder ./platforms in binaries folder.
