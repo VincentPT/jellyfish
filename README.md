@@ -59,14 +59,6 @@ Notification through PushOver platform.
  #### MacOS
 * Not supported yet
 
-## Build.
-### Windows.
-    
-### Linux.
-* Not supported yet
-### MacOS
-* Not supported yet
-
 ## Run.
 - The binaries package is already to run.  
   Howerver, notification feature is only available if the PushOver's keys is specifed in platform's configuration file.  
