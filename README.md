@@ -4,7 +4,7 @@ The application can monitors cryto information and push notifications of price m
 
 The application is free but I need a support from you to add more features and maintenance the app.
 You can send any amount of money via Paypal.
-<br>[![PayPal](https://www.paypalobjects.com/en_US/i/btn/btn_donate_LG.gif)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=TT29Z8YHUYQ78)
+<br>[![PayPal](https://www.paypalobjects.com/en_US/i/btn/btn_donate_LG.gif)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=RVQTSH368STYG)
 
 ## Getting Started
 
