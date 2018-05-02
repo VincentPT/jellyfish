@@ -2,7 +2,12 @@
 A crypto application to help people in trading crypto currencies.
 The application can monitors cryto information and push notifications of price movement to help people catch the wave before it go to top.
 
+The application is free but I need a support from you to add more features and maintenance the app.
+You can send any amount of money via Paypal.
+<br>[![PayPal](https://www.paypalobjects.com/en_US/i/btn/btn_donate_LG.gif)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=TT29Z8YHUYQ78)
+
 ## Getting Started
+
 [Application binaries - v1.0.1.zip](/binaries/v1.0.1.zip)
 
 Application screen.  
